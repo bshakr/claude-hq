@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
-  agentList, emptyAgents, onAgentResult, onHandback, onSpawn, onSubagentTool, onTurnComplete, prune, reconcile,
+  agentList, emptyAgents, onAgentResult, onHandback, onSpawn, onSubagentTool, onTaskNotification, onTurnComplete, prune, reconcile, settleQuiet,
 } from '../../hooks/data/agents'
 import { S, afterTool, agentsState, beforeTool, pendingClaims } from '../../hooks/data/observe'
 
@@ -159,4 +159,60 @@ test('agents: a directory a subagent cds into is attributed to that agent, the m
   afterTool({ tool: 'Bash', agentId: 'd1', tool_use_id: 'x1', command: `cd ${KOH} && git status` }, { result: { stdout: '' } })
   afterTool({ tool: 'Bash', tool_use_id: 'x2', command: `cd ${HOME}/code/other && ls` }, { result: { stdout: '' } })
   expect(S.dirs.slice(0, 2)).toEqual([{ dir: `${HOME}/code/other`, by: 'main' }, { dir: KOH, by: 'd1' }])
+})
+
+test('agents: a handed-back agent pruned after 30 min is not re-adopted as live from the engine list', () => {
+  const s = emptyAgents()
+  onSpawn(s, { toolUseId: 'tuP', description: 'Package for open source', background: true }, 'pk', 'opus', 1_000)
+  onTurnComplete(s, 'pk', 'answer', 'Packaged.', 2_000_000, 540_000)
+  const listed = (status: string) => [{ id: 'pk', description: 'Package for open source', type: 'general-purpose', status }]
+  reconcile(s, listed('idle'), 600_000)
+  prune(s, 540_000 + 30 * 60_000 + 1_000)
+  expect(s.byId.pk).toBe(undefined)
+  for (const status of ['idle', 'waiting', 'completed']) {
+    reconcile(s, listed(status), 540_000 + 30 * 60_000 + 3_000)
+    expect(agentList(s).filter(a => a.id === 'pk' && (a.status === 'running' || a.status === 'waiting'))).toEqual([])
+  }
+})
+
+test('agents: a live subagent the engine lists as idle has ended; a teammate waiting for a message has not', () => {
+  const s = emptyAgents()
+  onSpawn(s, { toolUseId: 'tu1', description: 'Handed back', background: true }, 'h', 'opus', 1)
+  onSpawn(s, { toolUseId: 'tu2', description: 'Teammate', background: true }, 't', 'opus', 1)
+  reconcile(s, [
+    { id: 'h', description: 'Handed back', type: 'general-purpose', status: 'idle' },
+    { id: 't', description: 'Teammate', type: 'teammate', status: 'idle' },
+  ], 50)
+  expect(s.byId.h).toMatchObject({ status: 'completed', endedAt: 50 })
+  expect(s.byId.t!.status).toBe('waiting')
+  reconcile(s, [{ id: 'new', description: 'Ended unseen', type: 'general-purpose', status: 'idle' }], 60)
+  expect(s.byId.new).toBe(undefined)
+})
+
+test('agents: a task notification with a final status ends the agent; a quiet notified agent ends after 10 min', () => {
+  const s = emptyAgents()
+  onSpawn(s, { toolUseId: 'tuA', description: 'A', background: true }, 'a', 'opus', 1)
+  onSpawn(s, { toolUseId: 'tuB', description: 'B', background: true }, 'b', 'opus', 1)
+  onSubagentTool(s, 'a', { tool: 'SubagentHandback', message: 'Done.' }, HOME, 100)
+  expect(onTaskNotification(s, [{ id: 'a', status: 'completed' }], 200)).toBe(true)
+  expect(s.byId.a).toMatchObject({ status: 'completed', endedAt: 200 })
+  expect(s.byId.a!.now).toBe(undefined)
+  onSubagentTool(s, 'b', { tool: 'Read', file_path: '/x/y.ts' }, HOME, 100)
+  onTaskNotification(s, [{ id: 'tuB' }], 200)
+  expect(settleQuiet(s, 100 + 9 * 60_000)).toBe(false)
+  expect(s.byId.b!.status).toBe('running')
+  expect(settleQuiet(s, 100 + 10 * 60_000)).toBe(true)
+  expect(s.byId.b).toMatchObject({ status: 'completed', endedAt: 100 + 10 * 60_000 })
+  expect('lastToolAt' in agentList(s)[0]!).toBe(false)
+})
+
+test('agents: internal tools never become doing text', () => {
+  const s = emptyAgents()
+  onSpawn(s, { toolUseId: 'tu1', description: 'X', background: true }, 'x', 'opus', 1)
+  for (const tool of ['SubagentHandback', 'TaskStop', 'SendMessage', 'ToolSearch', 'Monitor', 'SomeNewTool']) {
+    onSubagentTool(s, 'x', { tool }, HOME, 5)
+    expect(s.byId.x!.now).not.toContain(tool)
+  }
+  onTurnComplete(s, 'x', 'answer', 'ok', 2_411_391, 9)
+  expect(s.byId.x!.now).toBe(undefined)
 })

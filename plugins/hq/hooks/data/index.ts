@@ -2,9 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
 import type { AccountUsage, HqModel, OtherAgentVM, PublishedSession, TermEnv, WaitVM } from '../model/types'
-import { isLive, onSpawn, onTurnComplete, prune, reconcile } from './agents'
+import { isLive, onSpawn, onTaskNotification, onTurnComplete, prune, reconcile, settleQuiet } from './agents'
 import type { AgentsState, ListedAgent } from './agents'
-import { emptyActivity, onPrompt, onTurnEnd, todosOf, nowOf } from './activity'
+import { emptyActivity, notificationsOf, onPrompt, onTurnEnd, todosOf, nowOf } from './activity'
 import type { ActivityState } from './activity'
 import { repoOfRemote } from './claims'
 import {
@@ -134,6 +134,7 @@ export function installData(on: On, onChange: () => void): void {
       onPromptOrigin(e.origin?.kind)
       S.now = await $.clock.now()
       onPrompt(S.activity, e.text, e.origin?.kind, S.now)
+      if (e.origin?.kind === 'task-notification') onTaskNotification(S.agents, notificationsOf(e.text), S.now)
       if (S.activity.prompt !== undefined && e.origin?.kind !== 'task-notification') S.activity.idle = false
       S.dirty = true
       rebuild()
@@ -190,7 +191,11 @@ async function start($: EngineInterface): Promise<void> {
   if (act && Array.isArray(act.bg)) S.activity = { ...emptyActivity(), ...act }
   const storedAgents = (await $.store.get(storeKey('agents'))) as AgentsState | undefined
   if (storedAgents && typeof storedAgents === 'object' && storedAgents.byId) {
-    S.agents = { byId: { ...storedAgents.byId, ...S.agents.byId }, byToolUse: { ...storedAgents.byToolUse, ...S.agents.byToolUse } }
+    S.agents = {
+      byId: { ...storedAgents.byId, ...S.agents.byId },
+      byToolUse: { ...storedAgents.byToolUse, ...S.agents.byToolUse },
+      pruned: [...new Set([...(S.agents.pruned ?? []), ...(Array.isArray(storedAgents.pruned) ? storedAgents.pruned : [])])],
+    }
   }
 
   const repoCache = new Map<string, string | null>()
@@ -822,6 +827,7 @@ async function start($: EngineInterface): Promise<void> {
     } catch {
       // keep what the hooks recorded
     }
+    if (settleQuiet(S.agents, S.now)) S.dirty = true
     prune(S.agents, S.now)
     rebuild()
 

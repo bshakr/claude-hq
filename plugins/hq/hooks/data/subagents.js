@@ -57,7 +57,7 @@ export function parseTail(text, cut) {
             if (b?.type !== 'tool_use' || typeof b.name !== 'string')
                 continue;
             const input = b.input && typeof b.input === 'object' ? b.input : {};
-            doing = b.name === 'SubagentHandback' ? 'reporting back' : doingText({ ...input, tool: b.name });
+            doing = doingText({ ...input, tool: b.name });
             const at = v.timestamp ? Date.parse(v.timestamp) : NaN;
             if (typeof b.id === 'string')
                 open.set(b.id, { text: doing, ...(Number.isFinite(at) ? { since: at } : {}) });

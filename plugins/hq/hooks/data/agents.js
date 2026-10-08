@@ -4,8 +4,18 @@ import { doingText } from './doing';
 export const FINISHED_KEEP_MS = 30 * 60_000;
 const FINISHED_MAX = 8;
 const FILES_MAX = 5;
+/** A notified agent with no tool call for this long has ended, whatever the engine lists. */
+export const QUIET_END_MS = 10 * 60_000;
+const PRUNED_MAX = 50;
 export function emptyAgents() {
-    return { byId: {}, byToolUse: {} };
+    return { byId: {}, byToolUse: {}, pruned: [] };
+}
+function finish(a, status, now) {
+    a.status = status;
+    a.endedAt = a.endedAt ?? now;
+    if (status !== 'failed')
+        delete a.now;
+    delete a.callSince;
 }
 export function firstLine(text) {
     return summaryLine(text);
@@ -72,6 +82,8 @@ export function onSubagentTool(s, agentId, e, home, now) {
         a.callSince = now;
     else
         delete a.callSince;
+    if (now !== undefined)
+        a.lastToolAt = now;
     const file = str(e.file_path) ?? str(e.notebook_path);
     const cmdCwd = e.tool === 'Bash' ? cdOf(str(e.command) ?? '') : undefined;
     const wt = (file && worktreeOf(file)) || (cmdCwd && worktreeOf(cmdCwd)) || undefined;
@@ -125,13 +137,11 @@ export function onAgentResult(s, toolUseId, result, isError, errorText, now) {
     if (!a)
         return undefined;
     if (isError || !r) {
-        a.status = 'failed';
-        a.endedAt = now;
+        finish(a, 'failed', now);
         a.now = firstLine(errorText) ?? 'failed';
     }
     else if (r.status === 'completed') {
-        a.status = 'completed';
-        a.endedAt = now;
+        finish(a, 'completed', now);
         a.toolCount = Math.max(a.toolCount, r.totalToolUseCount);
         a.tokens = r.totalTokens;
         if (r.resolvedModel)
@@ -162,10 +172,10 @@ export function onTurnComplete(s, agentId, reason, answer, tokens, now) {
         return false;
     if (a.status === 'completed' || a.status === 'failed' || a.status === 'killed')
         return true;
-    a.status = reason === 'error' || reason === 'refusal' ? 'failed' : reason === 'aborted' ? 'killed' : 'completed';
-    a.endedAt = now;
+    const status = reason === 'error' || reason === 'refusal' ? 'failed' : reason === 'aborted' ? 'killed' : 'completed';
+    finish(a, status, now);
     const line = firstLine(answer);
-    if (a.status === 'failed')
+    if (status === 'failed')
         a.now = line ?? a.now;
     else if (!a.outcome)
         a.outcome = line;
@@ -180,9 +190,40 @@ export function onHandback(s, agentId, message) {
     if (a)
         a.outcome = firstLine(message) ?? a.outcome;
 }
-function mapStatus(status) {
+const FINAL = { completed: 'completed', failed: 'failed', killed: 'killed', stopped: 'killed' };
+/** `<task-notification>`s naming an agent (by id or its Agent call's id): a final status ends it, any marks it notified. */
+export function onTaskNotification(s, notes, now) {
+    let changed = false;
+    for (const n of notes) {
+        const a = s.byId[n.id] ?? s.byId[s.byToolUse[n.id] ?? ''];
+        if (!a || !isLive(a))
+            continue;
+        a.notifiedAt = now;
+        const final = n.status ? FINAL[n.status] : undefined;
+        if (final) {
+            finish(a, final, now);
+            wakeParent(s, a);
+        }
+        changed = true;
+    }
+    return changed;
+}
+/** Backstop for a lost end signal: notified, and no tool call for QUIET_END_MS. */
+export function settleQuiet(s, now) {
+    let changed = false;
+    for (const a of Object.values(s.byId)) {
+        if (!isLive(a) || a.notifiedAt === undefined || now - (a.lastToolAt ?? a.startedAt) < QUIET_END_MS)
+            continue;
+        finish(a, 'completed', now);
+        wakeParent(s, a);
+        changed = true;
+    }
+    return changed;
+}
+/** A subagent between turns has handed back; only a teammate idles waiting for a message. */
+function mapStatus(status, type) {
     if (status === 'idle')
-        return 'waiting';
+        return type === 'teammate' ? 'waiting' : 'completed';
     if (['pending', 'running', 'waiting', 'completed', 'failed', 'killed'].includes(status))
         return status;
     return 'running';
@@ -193,12 +234,13 @@ export function reconcile(s, listed, now) {
     for (const l of listed) {
         seen.add(l.id);
         const a = s.byId[l.id];
-        const status = mapStatus(l.status);
+        const status = mapStatus(l.status, l.type);
         if (!a) {
+            if (!isLive({ status }) || s.pruned?.includes(l.id))
+                continue;
             s.byId[l.id] = {
                 id: l.id, title: l.description, status, background: true, startedAt: now, toolCount: 0, files: [],
                 ...(l.parentId ? { parentId: l.parentId } : {}),
-                ...(isLive({ status }) ? {} : { endedAt: now }),
             };
             continue;
         }
@@ -206,8 +248,8 @@ export function reconcile(s, listed, now) {
         if (!isLive(a))
             continue;
         if (!isLive({ status })) {
-            a.status = status;
-            a.endedAt = a.endedAt ?? now;
+            finish(a, status, now);
+            wakeParent(s, a);
         }
         else if (status === 'waiting' || a.status !== 'waiting') {
             a.status = status;
@@ -218,10 +260,8 @@ export function reconcile(s, listed, now) {
         if (seen.has(a.id) || !isLive(a))
             continue;
         a.missing = (a.missing ?? 0) + 1;
-        if (a.missing >= 2) {
-            a.status = 'completed';
-            a.endedAt = now;
-        }
+        if (a.missing >= 2)
+            finish(a, 'completed', now);
     }
 }
 /** Drops finished agents past 30 min, keeping the newest few. */
@@ -234,6 +274,7 @@ export function prune(s, now) {
             delete s.byId[a.id];
             if (a.toolUseId)
                 delete s.byToolUse[a.toolUseId];
+            s.pruned = [a.id, ...(s.pruned ?? []).filter(id => id !== a.id)].slice(0, PRUNED_MAX);
         }
     });
 }
@@ -260,7 +301,7 @@ export function agentList(s, sessionRoot) {
             return (y.endedAt ?? 0) - (x.endedAt ?? 0) || x.id.localeCompare(y.id);
         return x.startedAt - y.startedAt || x.id.localeCompare(y.id);
     })
-        .map(({ root, toolUseId: _t, missing: _m, todos, ...vm }) => {
+        .map(({ root, toolUseId: _t, missing: _m, lastToolAt: _l, notifiedAt: _n, todos, ...vm }) => {
         const place = placeOf(root, sessionRoot);
         const current = todos?.find(t => t.status === 'in_progress');
         const todo = current && todos

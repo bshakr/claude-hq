@@ -117,9 +117,19 @@ export function shellText(command: string): string {
     .trim()
 }
 
+/** Each `<task-notification>`'s task and tool-use ids, with its `<status>` when it has one. */
+export function notificationsOf(text: string): { id: string; status?: string }[] {
+  const out: { id: string; status?: string }[] = []
+  for (const block of text.split('<task-notification>').slice(1)) {
+    const status = /<status>\s*([^<\s]+)\s*<\/status>/.exec(block)?.[1]
+    for (const m of block.matchAll(/<(task-id|tool-use-id)>\s*([^<\s]+)\s*<\/\1>/g)) out.push({ id: m[2]!, ...(status ? { status } : {}) })
+  }
+  return out
+}
+
 /** `<task-notification>` text: the shell it names is done. */
 export function onNotification(s: ActivityState, text: string): void {
-  const ids = [...text.matchAll(/<(task-id|tool-use-id)>\s*([^<\s]+)\s*<\/\1>/g)].map(m => m[2]!)
+  const ids = notificationsOf(text).map(n => n.id)
   if (ids.length === 0) return
   s.bg = s.bg.filter(b => !ids.includes(b.taskId) && !(b.toolUseId && ids.includes(b.toolUseId)))
 }

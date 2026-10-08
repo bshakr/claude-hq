@@ -6,6 +6,9 @@ import { doingText } from './doing'
 export const FINISHED_KEEP_MS = 30 * 60_000
 const FINISHED_MAX = 8
 const FILES_MAX = 5
+/** A notified agent with no tool call for this long has ended, whatever the engine lists. */
+export const QUIET_END_MS = 10 * 60_000
+const PRUNED_MAX = 50
 
 export interface AgentRecord extends AgentVM {
   /** The Agent tool call that started it; matches the tool result to the agent. */
@@ -16,16 +19,29 @@ export interface AgentRecord extends AgentVM {
   missing?: number
   /** Its own TodoWrite list, when it keeps one. */
   todos?: { text: string; status: string }[]
+  /** Its last tool call. */
+  lastToolAt?: number
+  /** A `<task-notification>` naming it arrived. */
+  notifiedAt?: number
 }
 
 export interface AgentsState {
   byId: Record<string, AgentRecord>
   /** tool_use_id → agentId */
   byToolUse: Record<string, string>
+  /** Ids pruned while the engine still lists them (ended agents stay resumable); never adopted again. */
+  pruned?: string[]
 }
 
 export function emptyAgents(): AgentsState {
-  return { byId: {}, byToolUse: {} }
+  return { byId: {}, byToolUse: {}, pruned: [] }
+}
+
+function finish(a: AgentRecord, status: AgentStatus, now: number): void {
+  a.status = status
+  a.endedAt = a.endedAt ?? now
+  if (status !== 'failed') delete a.now
+  delete a.callSince
 }
 
 export function firstLine(text: string | undefined): string | undefined {
@@ -106,6 +122,7 @@ export function onSubagentTool(s: AgentsState, agentId: string, e: ToolInput, ho
   // A foreground child parks it as `waiting` on that child instead.
   if (now !== undefined && e.tool !== 'Agent') a.callSince = now
   else delete a.callSince
+  if (now !== undefined) a.lastToolAt = now
   const file = str(e.file_path) ?? str(e.notebook_path)
   const cmdCwd = e.tool === 'Bash' ? cdOf(str(e.command) ?? '') : undefined
   const wt = (file && worktreeOf(file)) || (cmdCwd && worktreeOf(cmdCwd)) || undefined
@@ -176,12 +193,10 @@ export function onAgentResult(
   const a = id ? s.byId[id] : undefined
   if (!a) return undefined
   if (isError || !r) {
-    a.status = 'failed'
-    a.endedAt = now
+    finish(a, 'failed', now)
     a.now = firstLine(errorText) ?? 'failed'
   } else if (r.status === 'completed') {
-    a.status = 'completed'
-    a.endedAt = now
+    finish(a, 'completed', now)
     a.toolCount = Math.max(a.toolCount, r.totalToolUseCount)
     a.tokens = r.totalTokens
     if (r.resolvedModel) a.model = r.resolvedModel
@@ -217,10 +232,10 @@ export function onTurnComplete(
   const a = s.byId[agentId]
   if (!a) return false
   if (a.status === 'completed' || a.status === 'failed' || a.status === 'killed') return true
-  a.status = reason === 'error' || reason === 'refusal' ? 'failed' : reason === 'aborted' ? 'killed' : 'completed'
-  a.endedAt = now
+  const status: AgentStatus = reason === 'error' || reason === 'refusal' ? 'failed' : reason === 'aborted' ? 'killed' : 'completed'
+  finish(a, status, now)
   const line = firstLine(answer)
-  if (a.status === 'failed') a.now = line ?? a.now
+  if (status === 'failed') a.now = line ?? a.now
   else if (!a.outcome) a.outcome = line
   if (tokens !== undefined && a.tokens === undefined) a.tokens = tokens
   wakeParent(s, a)
@@ -233,6 +248,37 @@ export function onHandback(s: AgentsState, agentId: string, message: string): vo
   if (a) a.outcome = firstLine(message) ?? a.outcome
 }
 
+const FINAL: Record<string, AgentStatus> = { completed: 'completed', failed: 'failed', killed: 'killed', stopped: 'killed' }
+
+/** `<task-notification>`s naming an agent (by id or its Agent call's id): a final status ends it, any marks it notified. */
+export function onTaskNotification(s: AgentsState, notes: readonly { id: string; status?: string }[], now: number): boolean {
+  let changed = false
+  for (const n of notes) {
+    const a = s.byId[n.id] ?? s.byId[s.byToolUse[n.id] ?? '']
+    if (!a || !isLive(a)) continue
+    a.notifiedAt = now
+    const final = n.status ? FINAL[n.status] : undefined
+    if (final) {
+      finish(a, final, now)
+      wakeParent(s, a)
+    }
+    changed = true
+  }
+  return changed
+}
+
+/** Backstop for a lost end signal: notified, and no tool call for QUIET_END_MS. */
+export function settleQuiet(s: AgentsState, now: number): boolean {
+  let changed = false
+  for (const a of Object.values(s.byId)) {
+    if (!isLive(a) || a.notifiedAt === undefined || now - (a.lastToolAt ?? a.startedAt) < QUIET_END_MS) continue
+    finish(a, 'completed', now)
+    wakeParent(s, a)
+    changed = true
+  }
+  return changed
+}
+
 export interface ListedAgent {
   id: string
   description: string
@@ -241,8 +287,9 @@ export interface ListedAgent {
   parentId?: string
 }
 
-function mapStatus(status: string): AgentStatus {
-  if (status === 'idle') return 'waiting'
+/** A subagent between turns has handed back; only a teammate idles waiting for a message. */
+function mapStatus(status: string, type: string): AgentStatus {
+  if (status === 'idle') return type === 'teammate' ? 'waiting' : 'completed'
   if (['pending', 'running', 'waiting', 'completed', 'failed', 'killed'].includes(status)) return status as AgentStatus
   return 'running'
 }
@@ -253,20 +300,20 @@ export function reconcile(s: AgentsState, listed: readonly ListedAgent[], now: n
   for (const l of listed) {
     seen.add(l.id)
     const a = s.byId[l.id]
-    const status = mapStatus(l.status)
+    const status = mapStatus(l.status, l.type)
     if (!a) {
+      if (!isLive({ status }) || s.pruned?.includes(l.id)) continue
       s.byId[l.id] = {
         id: l.id, title: l.description, status, background: true, startedAt: now, toolCount: 0, files: [],
         ...(l.parentId ? { parentId: l.parentId } : {}),
-        ...(isLive({ status }) ? {} : { endedAt: now }),
       }
       continue
     }
     a.missing = 0
     if (!isLive(a)) continue
     if (!isLive({ status })) {
-      a.status = status
-      a.endedAt = a.endedAt ?? now
+      finish(a, status, now)
+      wakeParent(s, a)
     } else if (status === 'waiting' || a.status !== 'waiting') {
       a.status = status
     }
@@ -275,10 +322,7 @@ export function reconcile(s: AgentsState, listed: readonly ListedAgent[], now: n
   for (const a of Object.values(s.byId)) {
     if (seen.has(a.id) || !isLive(a)) continue
     a.missing = (a.missing ?? 0) + 1
-    if (a.missing >= 2) {
-      a.status = 'completed'
-      a.endedAt = now
-    }
+    if (a.missing >= 2) finish(a, 'completed', now)
   }
 }
 
@@ -291,6 +335,7 @@ export function prune(s: AgentsState, now: number): void {
     if (i >= FINISHED_MAX || now - (a.endedAt ?? now) > FINISHED_KEEP_MS) {
       delete s.byId[a.id]
       if (a.toolUseId) delete s.byToolUse[a.toolUseId]
+      s.pruned = [a.id, ...(s.pruned ?? []).filter(id => id !== a.id)].slice(0, PRUNED_MAX)
     }
   })
 }
@@ -315,7 +360,7 @@ export function agentList(s: AgentsState, sessionRoot?: string): AgentVM[] {
       if (RANK[x.status] === 2) return (y.endedAt ?? 0) - (x.endedAt ?? 0) || x.id.localeCompare(y.id)
       return x.startedAt - y.startedAt || x.id.localeCompare(y.id)
     })
-    .map(({ root, toolUseId: _t, missing: _m, todos, ...vm }) => {
+    .map(({ root, toolUseId: _t, missing: _m, lastToolAt: _l, notifiedAt: _n, todos, ...vm }) => {
       const place = placeOf(root, sessionRoot)
       const current = todos?.find(t => t.status === 'in_progress')
       const todo = current && todos
