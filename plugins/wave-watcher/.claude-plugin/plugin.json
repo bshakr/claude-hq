@@ -1,0 +1,9 @@
+{
+  "name": "wave-watcher",
+  "version": "0.1.0",
+  "description": "Live pane of your open GitHub PRs (CI, merge, rebase, gallery state), polled with gh every 60s without model turns; wakes the session on CI red, merges and rebases.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Bassem Shaker"
+  }
+}

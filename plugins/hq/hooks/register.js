@@ -1,0 +1,201 @@
+import { atom, read, update } from 'claude-code';
+import { currentModel, installData } from './data/index';
+import { runJump } from './ui/jump';
+import { layout, scrollFor } from './ui/layout';
+import { drawPane } from './ui/pane';
+export const PANE = 'hq';
+const COMMAND = 'hq';
+export const IDLE_REDRAW_MS = 30_000;
+const rev = atom({ plugin: 'hq', key: 'rev' }, 0);
+const cursor = atom({ plugin: 'hq', key: 'cursor' }, null);
+const expanded = atom({ plugin: 'hq', key: 'expanded' }, []);
+const scroll = atom({ plugin: 'hq', key: 'scroll' }, 0);
+const phase = atom({ plugin: 'hq', key: 'phase' }, 0);
+const HELP = [
+    '/hq          open the pane (⌃g moves the keys between it and the prompt)',
+    '/hq close    close the pane',
+    '/hq help     this list',
+    '',
+    'In the pane: j/k or Tab move, Enter or a click opens a PR or switches tmux,',
+    'Enter on an agent expands it. Esc returns the keys to the prompt.',
+].join('\n');
+/** Motion only while something visibly runs: the session's own turn, a running agent, checks in progress, a busy session. */
+export function hasMotion(m) {
+    return ((m.current.now !== undefined && !m.current.now.idle) ||
+        (m.current.waiting?.length ?? 0) > 0 ||
+        m.current.agents.some(a => a.status === 'running') ||
+        m.current.prs.some(p => p.ci.kind === 'running' && p.ci.done < p.ci.total) ||
+        m.others.some(g => g.sessions.some(s => s.status === 'busy')));
+}
+// Module state: a hot reload starts it afresh; session.start re-reads whether the pane is up.
+let refresh;
+let syncMotion;
+let last;
+let isPaneOpen = false;
+async function startPane($) {
+    let motion;
+    let slow;
+    syncMotion = async () => {
+        const m = currentModel();
+        const want = isPaneOpen && hasMotion(m);
+        if (want && motion === undefined)
+            motion = $.clock.every(2000, () => void update($, phase, n => n + 1));
+        else if (!want && motion !== undefined) {
+            motion.cancel();
+            motion = undefined;
+        }
+        // Idle, nothing animates; the "now" row's age still moves.
+        const wantSlow = isPaneOpen && !want && m.current.now?.idle === true;
+        if (wantSlow && slow === undefined)
+            slow = $.clock.every(IDLE_REDRAW_MS, () => void update($, rev, n => n + 1));
+        else if (!wantSlow && slow !== undefined) {
+            slow.cancel();
+            slow = undefined;
+        }
+    };
+    refresh = async () => {
+        const m = currentModel();
+        $.ui.status(m.statusText ? m.statusText : undefined);
+        await update($, rev, n => n + 1);
+        await syncMotion?.();
+    };
+    try {
+        isPaneOpen = (await $.ui.panes()).some(pane => pane.id === PANE);
+    }
+    catch {
+        isPaneOpen = false;
+    }
+    await refresh();
+    try {
+        await $.command.register({
+            name: COMMAND,
+            description: 'Pane of what needs you: agents, PRs and other sessions',
+            argumentHint: '[close | help]',
+            immediate: true,
+        });
+    }
+    catch (thrown) {
+        $.ui.log(`hq: /${COMMAND} was not registered (${thrown instanceof Error ? thrown.message : String(thrown)})`);
+    }
+}
+/** What a press does. Jumps run host commands; everything else only moves /hq's own view. */
+export async function act($, key, action, last) {
+    switch (action.kind) {
+        case 'jump': {
+            const failed = await runJump(action.jump, argv => $.process.run(argv, { timeoutMs: 5000 }));
+            if (failed !== undefined) {
+                $.ui.toast(`hq: ${failed}`);
+                return;
+            }
+            await update($, cursor, () => key);
+            return;
+        }
+        case 'toggle': {
+            await update($, expanded, list => (list.includes(action.id) ? list.filter(id => id !== action.id) : [...list, action.id]));
+            await update($, cursor, () => key);
+            return;
+        }
+        case 'move': {
+            if (!last || last.items.length === 0)
+                return;
+            let at = 0;
+            await update($, cursor, current => {
+                const i = current === null ? -1 : last.items.indexOf(current);
+                at = i < 0 ? (action.dir > 0 ? 0 : last.items.length - 1) : Math.min(last.items.length - 1, Math.max(0, i + action.dir));
+                return last.items[at] ?? null;
+            });
+            const target = last.items[at];
+            if (target === undefined)
+                return;
+            const s = scrollFor(last, target, last.scroll);
+            if (s !== last.scroll)
+                await update($, scroll, () => s);
+            // The target's Button may arrive with the next drawing; focus waits for it.
+            await $.ui.focus({ requestId: PANE, key: target });
+            return;
+        }
+        case 'scroll': {
+            if (!last)
+                return;
+            const max = Math.max(0, last.bodyLen - last.region);
+            const page = Math.max(1, last.region - 2);
+            await update($, scroll, () => Math.min(max, Math.max(0, last.scroll + action.dir * page)));
+            return;
+        }
+    }
+}
+function press($, key, action) {
+    void act($, key, action, last);
+}
+export const register = on => {
+    installData(on, () => void refresh?.());
+    // The data layer owns the unmatched session.start; the pane's start runs under a matcher per session kind.
+    on('session.start', { isInteractive: true }, async ($, e, next) => {
+        await startPane($);
+        return next(e);
+    });
+    on('session.start', { isInteractive: false }, async ($, e, next) => {
+        await startPane($);
+        return next(e);
+    });
+    on('command.run', { command: COMMAND }, async ($, e) => {
+        const args = e.args.trim();
+        if (args === '' || args === 'open') {
+            const opened = await $.ui.open({ id: PANE, title: 'hq' });
+            isPaneOpen = true;
+            await syncMotion?.();
+            return { text: opened.isPlaced ? 'hq pane opened. ⌃g moves the keys to it.' : 'hq pane is waiting for room to draw.' };
+        }
+        if (args === 'close') {
+            await $.ui.close({ id: PANE });
+            isPaneOpen = false;
+            await syncMotion?.();
+            return { text: 'hq pane closed.' };
+        }
+        if (args === 'help')
+            return { text: HELP };
+        return { text: `Unknown subcommand "${args}".\n${HELP}` };
+    });
+    on('ui.close', async ($, e, next) => {
+        const closed = await next(e);
+        if (e.id === PANE) {
+            isPaneOpen = false;
+            await syncMotion?.();
+        }
+        return closed;
+    }).catch(($, e, next) => next(e));
+    // Tab and clicks move the ring: the cursor row follows it.
+    on('ui.focus', async ($, e, next) => {
+        const moved = await next(e);
+        if (e.requestId === PANE && moved.deny === undefined && e.element !== undefined && last?.items.includes(e.element)) {
+            const key = e.element;
+            await update($, cursor, () => key);
+        }
+        return moved;
+    }).catch(($, e, next) => next(e));
+    on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+        if (!isPaneOpen) {
+            isPaneOpen = true;
+            void syncMotion?.();
+        }
+        await read($, rev);
+        const view = {
+            width: e.props.bodyColumns,
+            rows: e.props.scroll.bodyRows,
+            focused: e.props.isFocused,
+            cursor: await read($, cursor),
+            expanded: await read($, expanded),
+            scroll: await read($, scroll),
+            phase: await read($, phase),
+        };
+        const l = layout(currentModel(), view);
+        last = l;
+        const shown = (key) => l.rows.some(r => r.head && r.item === key);
+        const autoFocusKey = view.cursor !== null && shown(view.cursor) ? view.cursor : l.items.find(shown);
+        return drawPane(l.rows, {
+            el: $.ui.resolve(e),
+            autoFocusKey,
+            onAction: (key, action) => press($, key, action),
+        });
+    });
+};
