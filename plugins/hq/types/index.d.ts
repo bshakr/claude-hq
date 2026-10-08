@@ -84,6 +84,8 @@ declare module 'claude-code' {
       owned: OwnedState
       /** The main loop's last prompt, in-flight tool, todo list and background shells. */
       activity: ActivityState
+      /** HQ opened its pane by itself this session (userConfig `autoOpen`); never again after. */
+      autoOpened: boolean
     }
   }
 }

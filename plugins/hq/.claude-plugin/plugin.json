@@ -8,5 +8,67 @@
   },
   "repository": "https://github.com/bshakr/claude-hq",
   "homepage": "https://github.com/bshakr/claude-hq",
-  "license": "MIT"
+  "license": "MIT",
+  "userConfig": {
+    "colorBroken": {
+      "type": "string",
+      "title": "Colour: broken",
+      "description": "Failed checks, broken PRs, conflicts. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 1, the terminal's own palette slot.",
+      "default": "ansi256(1)"
+    },
+    "colorWaiting": {
+      "type": "string",
+      "title": "Colour: waiting",
+      "description": "A session or agent waiting on you, and the asks line. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 3, the terminal's own palette slot.",
+      "default": "ansi256(3)"
+    },
+    "colorWorking": {
+      "type": "string",
+      "title": "Colour: working",
+      "description": "Running dots (and their dim pulse), checks in progress, busy sessions. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 4, the terminal's own palette slot.",
+      "default": "ansi256(4)"
+    },
+    "colorDone": {
+      "type": "string",
+      "title": "Colour: done",
+      "description": "Passed checks, merged PRs, finished agents, plan usage bars. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 2, the terminal's own palette slot.",
+      "default": "ansi256(2)"
+    },
+    "colorAccent": {
+      "type": "string",
+      "title": "Colour: accent",
+      "description": "The focus bar and the cursor marker. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 6, the terminal's own palette slot.",
+      "default": "ansi256(6)"
+    },
+    "colorDim": {
+      "type": "string",
+      "title": "Colour: dim",
+      "description": "Card borders of quiet cards and rules. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 8, the terminal's own palette slot.",
+      "default": "ansi256(8)"
+    },
+    "summaries": {
+      "type": "boolean",
+      "title": "Summaries",
+      "description": "Ask Haiku for each card's goal line and for short glosses of ticket and ADR ids. Off: no model calls; cards show the AI title or first prompt, ids bare. /hq summaries on|off overrides this on one machine.",
+      "default": true
+    },
+    "wake": {
+      "type": "boolean",
+      "title": "Wake on owned PRs",
+      "description": "Start a turn when a PR this session owns goes red, merges, conflicts or falls behind. Off: toasts only. /hq wake on|off overrides this on one machine.",
+      "default": true
+    },
+    "notify": {
+      "type": "boolean",
+      "title": "Notify",
+      "description": "A desktop notification when another session starts waiting on you. /hq notify on|off overrides this on one machine.",
+      "default": true
+    },
+    "autoOpen": {
+      "type": "boolean",
+      "title": "Open the pane at start",
+      "description": "Open the HQ pane by itself once per session. An unasked pane is drawn from 144 terminal columns (110 once you have opened it with /hq) and waits below that.",
+      "default": true
+    }
+  }
 }

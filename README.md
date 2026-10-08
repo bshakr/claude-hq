@@ -52,7 +52,7 @@ At the prompt of a Claude Code session in a terminal:
 /plugin install hq --marketplace bshakr/claude-hq
 ```
 
-Answer `y` to add the marketplace, then pick a scope (user scope is first; press Enter). Type `/hq` to open the pane.
+Answer `y` to add the marketplace, then pick a scope (user scope is first; press Enter). The pane opens by itself at the start of each session on a wide terminal; type `/hq` to open it any time.
 
 **Focus key (recommended).** Plugins can't ship keybindings, so add one yourself to `~/.claude/keybindings.json`. It moves the keys between the prompt and the pane:
 
@@ -79,6 +79,8 @@ Answer `y` to add the marketplace, then pick a scope (user scope is first; press
 
 Developed on macOS. Linux works for reading and for tmux, but opening a PR uses `open`, which is macOS only.
 
+Running Claude Code inside tmux? Set CLAUDE_CODE_TMUX_TRUECOLOR=1 so hex colours aren't reduced to 256.
+
 ## What counts as yours
 
 A session owns only the PRs it created, pushed, or has checked out. A PR another session is driving shows on that session's card, not in your list, and only its owner gets woken when it changes. Other sessions are grouped by tmux session, the ones waiting on you first.
@@ -88,7 +90,52 @@ A session owns only the PRs it created, pushed, or has checked out. A PR another
 - HQ reads Claude Code's local files: the session registry, transcripts and subagent transcripts under `~/.claude/`. Each HQ writes a short summary of its own session to `~/.claude/hq/sessions/` for the others to read.
 - **Goal line:** up to 6,000 characters from a session's transcript (first prompt, titles, the latest compaction summary, task subjects, recent prompts) go to Haiku through your own Claude account. It refreshes only when the session moved: a compaction, 5 new prompts, or every 30 minutes while busy.
 - **Glosses:** ticket and ADR titles go to Haiku in batches of up to 12.
-- No telemetry. Nothing else leaves the machine, apart from the `gh` and `linear` calls you are already logged in for. There is no switch for the model calls yet; disabling the plugin stops them.
+- No telemetry. Nothing else leaves the machine, apart from the `gh` and `linear` calls you are already logged in for. Set `summaries` to `false` (or run `/hq summaries off`) to stop every model call; see [Configuration](#configuration).
+
+## Configuration
+
+HQ reads its defaults from the plugin's settings. Change them in `/config` (each field is a row there) or in `~/.claude/settings.json` under `pluginConfigs`, keyed by how the plugin was loaded:
+
+- installed with `/plugin install hq --marketplace bshakr/claude-hq`: `pluginConfigs["hq@claude-hq"].options`
+- run from a checkout with `claude --plugin-dir plugins/hq`: `pluginConfigs["hq@inline"].options` (a bare `"hq"` key is read too)
+
+A change reloads HQ with the new values.
+
+| Field | Default | Does |
+| --- | --- | --- |
+| `colorBroken` | `ansi256(1)` | failed checks, broken PRs, conflicts |
+| `colorWaiting` | `ansi256(3)` | a session or agent waiting on you, the asks line |
+| `colorWorking` | `ansi256(4)` | running dots and their dim pulse, checks in progress, busy sessions |
+| `colorDone` | `ansi256(2)` | passed checks, merged PRs, plan usage bars |
+| `colorAccent` | `ansi256(6)` | the focus bar and the cursor marker |
+| `colorDim` | `ansi256(8)` | borders of quiet cards and rules |
+| `summaries` | `true` | Haiku goal lines and id glosses; off makes no model calls, cards show the AI title or first prompt and ids show bare |
+| `wake` | `true` | default for `/hq wake` |
+| `notify` | `true` | default for `/hq notify` |
+| `autoOpen` | `true` | open the pane by itself once per session (unasked, it is drawn from 144 columns, or 110 once you have opened it with `/hq`) |
+
+Colours take `#rrggbb`, `ansi256(N)` or a bare palette number `N` (0-255). The defaults are your terminal's own palette slots, so HQ follows your terminal theme. An invalid colour keeps its default and the pane's footer shows one dim line naming it.
+
+`/hq wake`, `/hq notify` and `/hq summaries` on or off are kept per machine and win over these settings on that machine.
+
+Catppuccin Mocha:
+
+```json
+{
+  "pluginConfigs": {
+    "hq@claude-hq": {
+      "options": {
+        "colorBroken": "#f38ba8",
+        "colorWaiting": "#f9e2af",
+        "colorWorking": "#89b4fa",
+        "colorDone": "#a6e3a1",
+        "colorAccent": "#94e2d5",
+        "colorDim": "#6c7086"
+      }
+    }
+  }
+}
+```
 
 ## Works with
 
@@ -112,6 +159,7 @@ iTerm2 and Terminal.app ask for Automation permission the first time.
 | `/hq close` | close the pane |
 | `/hq wake on` / `off` | start a turn when an owned PR goes red, merges, conflicts or falls behind (on by default); off means toasts only |
 | `/hq notify on` / `off` | a desktop notification when another session starts waiting on you; `/hq notify` shows the setting |
+| `/hq summaries on` / `off` | Haiku goal lines and id glosses on cards; `/hq summaries` shows the setting |
 | `/hq help` | the list above |
 
 In the pane: `j`/`k` or Tab to move, Enter or click to open, Enter on an agent to expand it, Esc to go back to the prompt.

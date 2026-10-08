@@ -1,16 +1,10 @@
+import { DEFAULT_TOKENS } from '../config';
 /** ansi256 slots of the sheet's tokens (the validator refuses `ansi:<name>`). */
-export const TOKENS = {
-    fail: 'ansi256(1)',
-    wait: 'ansi256(3)',
-    run: 'ansi256(4)',
-    ok: 'ansi256(2)',
-    accent: 'ansi256(6)',
-    rule: 'ansi256(8)',
-};
-function textProps(s, hovered) {
+export const TOKENS = DEFAULT_TOKENS;
+function textProps(s, hovered, tokens) {
     const props = {};
     if (s.c !== undefined) {
-        props.color = TOKENS[s.c];
+        props.color = tokens[s.c];
         // A colour may be dimmed too: the running dot's motion phase.
         if (s.dim)
             props.dimColor = true;
@@ -31,7 +25,7 @@ function drawRow(row, o, hovered) {
     if (segs.length === 0)
         return <Text> </Text>;
     const styled = (s) => {
-        const props = textProps(s.s, hovered);
+        const props = textProps(s.s, hovered, o.tokens ?? TOKENS);
         const inner = Object.keys(props).length === 0 ? s.t : <Text {...props}>{s.t}</Text>;
         return s.s.href !== undefined ? <Link href={s.s.href}>{inner}</Link> : inner;
     };

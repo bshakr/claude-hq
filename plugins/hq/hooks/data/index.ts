@@ -31,6 +31,7 @@ import type { BranchClaim, OwnedState, PrFiles, StoredClaim } from './prs'
 import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting'
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify'
 import { WAKE_KEY, newsOf } from './wake'
+import { SUMMARIES_KEY, config, effective } from '../config'
 
 /** An owned PR with no live watcher is re-read from GitHub this often. */
 export const REFRESH_MS = 120_000
@@ -207,6 +208,8 @@ async function start($: EngineInterface): Promise<void> {
   const glossInflight = new Set<string>()
   const idWaitSince = new Map<string, number>()
   let briefInflight = false
+  // Re-read each tick: a /hq summaries toggle takes effect without a reload.
+  let summaries = config().summaries
   const budget = { ticket: 0, adr: 0 }
   const toplevels = new Map<string, string>()
   const prStates = new Map<string, { state: PrState; title?: string; at: number }>()
@@ -484,6 +487,7 @@ async function start($: EngineInterface): Promise<void> {
 
   // One model call at a time across sessions, never awaited by the tick.
   const maybeGoal = async (sid: string, d: Digest, busy: boolean, ids: IdState): Promise<GoalCache | undefined> => {
+    if (!summaries) return undefined
     if (!goals.has(sid)) goals.set(sid, (await $.store.get(goalKey(sid))) as GoalCache | undefined)
     const c = goals.get(sid)
     // A summary waits a little for the ids it names, so it can say what they are.
@@ -555,7 +559,7 @@ async function start($: EngineInterface): Promise<void> {
   const idsOf = async (cwd: string, texts: readonly string[], max: number): Promise<IdState> => {
     const refs = findIds(texts.filter(Boolean).join('\n')).slice(0, max)
     const out: IdState = { glosses: {}, titles: [], pending: false }
-    if (refs.length === 0) return out
+    if (refs.length === 0 || !summaries) return out
     const root = refs.some(r => r.kind === 'adr') ? await toplevelOf(cwd) : cwd
     for (const ref of refs) {
       const key = glossKey(ref, root)
@@ -578,7 +582,7 @@ async function start($: EngineInterface): Promise<void> {
 
   /** One batched model call for every title still without a brief. */
   const launchBriefs = () => {
-    if (briefInflight) return
+    if (briefInflight || !summaries) return
     const due = new Map([...glossCache].filter((kv): kv is [string, GlossEntry] => briefDue(kv[1], S.now)))
     if (due.size === 0) return
     briefInflight = true
@@ -609,7 +613,7 @@ async function start($: EngineInterface): Promise<void> {
     const context = preferred(fresh, d.usage, await settingModelFor(cwd))
     const prTitles = d.prs.flatMap(p => prStates.get(prStateKey(p.repo, p.number))?.title ?? [])
     const ids = await idsOf(cwd, [d.firstPrompt ?? '', ...d.titles, ...d.prompts.slice(-5).map(p => p.text), ...prTitles, ...d.branches], DIGEST_IDS_MAX)
-    const cache = fresh?.goal?.goal ? fresh.goal : await maybeGoal(sid, d, busy, ids)
+    const cache = summaries && fresh?.goal?.goal ? fresh.goal : await maybeGoal(sid, d, busy, ids)
     const day = dayOf(d.firstTs, S.now)
     const prs = prText(d.prs, statesOf(d))
     const todos = fresh?.todos ?? todoProgress(d.tasks)
@@ -690,6 +694,7 @@ async function start($: EngineInterface): Promise<void> {
     S.now = await $.clock.now()
     budget.ticket = 0
     budget.adr = 0
+    summaries = effective(await $.store.get(SUMMARIES_KEY), config().summaries)
     const sid = await $.session.id()
     if (sid && sid !== S.sessionId) {
       S.sessionId = sid
@@ -744,7 +749,7 @@ async function start($: EngineInterface): Promise<void> {
     )
     const news = newsOf(previousPrs, S.prs)
     for (const text of news.toasts) $.ui.toast(text, { timeoutMs: 8000 })
-    if (news.prompt !== null && (await $.store.get(WAKE_KEY)) !== false) $.prompt.submit({ text: news.prompt }).catch(() => undefined)
+    if (news.prompt !== null && effective(await $.store.get(WAKE_KEY), config().wake)) $.prompt.submit({ text: news.prompt }).catch(() => undefined)
 
     const branches = new Map<string, string | undefined>()
     const published = new Map<string, PublishedSession>()
@@ -904,7 +909,7 @@ async function start($: EngineInterface): Promise<void> {
       await run(['find', notifiedDir(), '-mindepth', '1', '-maxdepth', '1', '-mmin', '+1440', '-exec', 'rmdir', '{}', '+'])
     }
     await notifyWaits(due, notified, {
-      enabled: async () => (await $.store.get(NOTIFY_STORE_KEY)) !== false,
+      enabled: async () => effective(await $.store.get(NOTIFY_STORE_KEY), config().notify),
       claim: async key => (await run(['mkdir', `${notifiedDir()}/${claimName(key)}`]))?.exitCode === 0,
       send: async text => {
         await $.ui.notify(text, { title: NOTIFY_TITLE })

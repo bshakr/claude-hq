@@ -14,6 +14,7 @@ import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSour
 import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting';
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify';
 import { WAKE_KEY, newsOf } from './wake';
+import { SUMMARIES_KEY, config, effective } from '../config';
 /** An owned PR with no live watcher is re-read from GitHub this often. */
 export const REFRESH_MS = 120_000;
 /** An owned branch with no open PR yet is looked up after 2 min, then 10, then every 30; a push resets it. */
@@ -187,6 +188,8 @@ async function start($) {
     const glossInflight = new Set();
     const idWaitSince = new Map();
     let briefInflight = false;
+    // Re-read each tick: a /hq summaries toggle takes effect without a reload.
+    let summaries = config().summaries;
     const budget = { ticket: 0, adr: 0 };
     const toplevels = new Map();
     const prStates = new Map();
@@ -496,6 +499,8 @@ async function start($) {
     const goalKey = (sid) => `goal:${sid}`;
     // One model call at a time across sessions, never awaited by the tick.
     const maybeGoal = async (sid, d, busy, ids) => {
+        if (!summaries)
+            return undefined;
         if (!goals.has(sid))
             goals.set(sid, (await $.store.get(goalKey(sid))));
         const c = goals.get(sid);
@@ -568,7 +573,7 @@ async function start($) {
     const idsOf = async (cwd, texts, max) => {
         const refs = findIds(texts.filter(Boolean).join('\n')).slice(0, max);
         const out = { glosses: {}, titles: [], pending: false };
-        if (refs.length === 0)
+        if (refs.length === 0 || !summaries)
             return out;
         const root = refs.some(r => r.kind === 'adr') ? await toplevelOf(cwd) : cwd;
         for (const ref of refs) {
@@ -595,7 +600,7 @@ async function start($) {
     };
     /** One batched model call for every title still without a brief. */
     const launchBriefs = () => {
-        if (briefInflight)
+        if (briefInflight || !summaries)
             return;
         const due = new Map([...glossCache].filter((kv) => briefDue(kv[1], S.now)));
         if (due.size === 0)
@@ -627,7 +632,7 @@ async function start($) {
         const context = preferred(fresh, d.usage, await settingModelFor(cwd));
         const prTitles = d.prs.flatMap(p => prStates.get(prStateKey(p.repo, p.number))?.title ?? []);
         const ids = await idsOf(cwd, [d.firstPrompt ?? '', ...d.titles, ...d.prompts.slice(-5).map(p => p.text), ...prTitles, ...d.branches], DIGEST_IDS_MAX);
-        const cache = fresh?.goal?.goal ? fresh.goal : await maybeGoal(sid, d, busy, ids);
+        const cache = summaries && fresh?.goal?.goal ? fresh.goal : await maybeGoal(sid, d, busy, ids);
         const day = dayOf(d.firstTs, S.now);
         const prs = prText(d.prs, statesOf(d));
         const todos = fresh?.todos ?? todoProgress(d.tasks);
@@ -714,6 +719,7 @@ async function start($) {
         S.now = await $.clock.now();
         budget.ticket = 0;
         budget.adr = 0;
+        summaries = effective(await $.store.get(SUMMARIES_KEY), config().summaries);
         const sid = await $.session.id();
         if (sid && sid !== S.sessionId) {
             S.sessionId = sid;
@@ -774,7 +780,7 @@ async function start($) {
         const news = newsOf(previousPrs, S.prs);
         for (const text of news.toasts)
             $.ui.toast(text, { timeoutMs: 8000 });
-        if (news.prompt !== null && (await $.store.get(WAKE_KEY)) !== false)
+        if (news.prompt !== null && effective(await $.store.get(WAKE_KEY), config().wake))
             $.prompt.submit({ text: news.prompt }).catch(() => undefined);
         const branches = new Map();
         const published = new Map();
@@ -946,7 +952,7 @@ async function start($) {
             await run(['find', notifiedDir(), '-mindepth', '1', '-maxdepth', '1', '-mmin', '+1440', '-exec', 'rmdir', '{}', '+']);
         }
         await notifyWaits(due, notified, {
-            enabled: async () => (await $.store.get(NOTIFY_STORE_KEY)) !== false,
+            enabled: async () => effective(await $.store.get(NOTIFY_STORE_KEY), config().notify),
             claim: async (key) => (await run(['mkdir', `${notifiedDir()}/${claimName(key)}`]))?.exitCode === 0,
             send: async (text) => {
                 await $.ui.notify(text, { title: NOTIFY_TITLE });

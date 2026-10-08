@@ -514,3 +514,44 @@ test('integration: ids on a card are glossed from linear and the repo\'s ADRs; a
   expect((store.get('gloss:BLO-1936') as { brief: string }).brief).toBe('raw bank import')
   expect((store.get(`gloss:adr:${HOME}/code/x:0019`) as { title: string }).title).toBe('Raw bank data is append-only')
 })
+
+for (const how of ['config', 'store'] as const) {
+  test(`integration: summaries off by ${how} makes no model call and no id lookup; cards fall back to the AI title, ids bare`, { options: { summaries: how === 'store' } }, async ($, on) => {
+    const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
+    const store = new Map<string, unknown>()
+    if (how === 'store') store.set('summaries', false)
+    fakeStore(on, store)
+    const fx = newFake()
+    registry(fx)
+    fakeHost(on, fx)
+    fx.linear = { 'BLO-1936': 'Raw bank import: keep every statement line' }
+    fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-bank-data.md`] = '# Raw bank data is append-only\n'
+    let calls = 0
+    on('model.complete', () => {
+      calls++
+      return { value: { isAnswered: true, text: '{"goal":"should not show","step":"nor this"}', usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } } as never
+    })
+    const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
+    fx.files[path] = [
+      `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic BLO-1936 work' }, timestamp: '2026-10-08T09:00:00Z' })}\n`,
+      `${JSON.stringify({ type: 'ai-title', aiTitle: 'BLO-1936 bank import' })}\n`,
+    ].join('')
+    await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
+    await clock.settle()
+    for (let i = 0; i < 20; i++) await clock.advance(2_000)
+    await clock.advance(60 * 60_000)
+
+    const ui = await $.ui.mount({
+      plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq',
+      props: { title: 'hq', isFocused: false, bodyColumns: 120, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
+    })
+    const drawn = JSON.stringify(await ui.drawn())
+    await ui.unmount()
+    expect(calls).toBe(0)
+    expect(fx.ran.filter(a => a[0] === 'linear')).toEqual([])
+    expect(drawn.includes('BLO-1936 bank import')).toBe(true)
+    expect(drawn.includes('should not show')).toBe(false)
+    expect(drawn.includes('(raw bank import)')).toBe(false)
+    expect([...store.keys()].some(k => k.startsWith('goal:') || k.startsWith('gloss:'))).toBe(false)
+  })
+}

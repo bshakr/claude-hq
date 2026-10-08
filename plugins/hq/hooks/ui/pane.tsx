@@ -1,28 +1,24 @@
 import type { ElementTable, RenderElement, RenderNode } from 'claude-code'
 
+import { DEFAULT_TOKENS } from '../config'
 import type { Action, Row, Seg, Sty, Tok } from './row'
 
 /** ansi256 slots of the sheet's tokens (the validator refuses `ansi:<name>`). */
-export const TOKENS: Record<Tok, string> = {
-  fail: 'ansi256(1)',
-  wait: 'ansi256(3)',
-  run: 'ansi256(4)',
-  ok: 'ansi256(2)',
-  accent: 'ansi256(6)',
-  rule: 'ansi256(8)',
-}
+export const TOKENS = DEFAULT_TOKENS
 
 export type DrawOpts = {
   el: ElementTable
   onAction: (key: string, action: Action) => void
   /** The Button the focus ring starts on when the pane takes the keys. */
   autoFocusKey?: string
+  /** The resolved palette; the defaults when left out. */
+  tokens?: Readonly<Record<Tok, string>>
 }
 
-function textProps(s: Sty, hovered: boolean) {
+function textProps(s: Sty, hovered: boolean, tokens: Readonly<Record<Tok, string>>) {
   const props: { color?: string; dimColor?: boolean; bold?: boolean; hover?: { dimColor?: boolean } } = {}
   if (s.c !== undefined) {
-    props.color = TOKENS[s.c]
+    props.color = tokens[s.c]
     // A colour may be dimmed too: the running dot's motion phase.
     if (s.dim) props.dimColor = true
   } else if (s.dim) {
@@ -40,7 +36,7 @@ function drawRow(row: Row, o: DrawOpts, hovered: boolean): RenderElement {
   if (segs.length === 0) return <Text> </Text>
 
   const styled = (s: Seg): RenderNode => {
-    const props = textProps(s.s, hovered)
+    const props = textProps(s.s, hovered, o.tokens ?? TOKENS)
     const inner = Object.keys(props).length === 0 ? s.t : <Text {...props}>{s.t}</Text>
     return s.s.href !== undefined ? <Link href={s.s.href}>{inner}</Link> : inner
   }

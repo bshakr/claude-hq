@@ -796,8 +796,9 @@ export function layout(m, view) {
             itemLine[r.item] = i;
         }
     });
-    // Rows the frame keeps: the top rows, [body], below, hint.
-    const region = Math.max(0, R - top - 2);
+    // Rows the frame keeps: the top rows, [body], below, [warning], hint.
+    const foot = view.warning ? 1 : 0;
+    const region = Math.max(0, R - top - 2 - foot);
     const overflow = content.length > region;
     const scroll = overflow ? Math.min(Math.max(0, view.scroll), content.length - region) : 0;
     const vis = content.slice(scroll, scroll + region);
@@ -819,6 +820,11 @@ export function layout(m, view) {
     if (below > 0) {
         const r = new Row(W);
         indicator(r, 'down', below, litCount(content.slice(scroll + region)), actions);
+        place(R - 2 - foot, r);
+    }
+    if (view.warning) {
+        const r = new Row(W);
+        r.put(1, view.warning, DIM);
         place(R - 2, r);
     }
     const hr = new Row(W);

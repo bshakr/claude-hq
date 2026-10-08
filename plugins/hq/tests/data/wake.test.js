@@ -174,6 +174,17 @@ for (const wake of [undefined, false]) {
         expect(h.prompts).toHaveLength(wake === false ? 0 : 1);
     });
 }
+for (const [stored, wakes] of [[undefined, false], [true, true]]) {
+    test(`config wake off ${stored === undefined ? 'only toasts' : 'yields to a stored /hq wake on'}`, { options: { wake: false } }, async ($, on) => {
+        const h = host(on, [40], stored);
+        watchFile(h, 40, [ok('lint'), pending('rspec')]);
+        const clock = await begin($, on);
+        watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z');
+        await clock.advance(2_000);
+        expect(h.toasts).toEqual(['acme/app#40 CI went red: rspec']);
+        expect(h.prompts).toHaveLength(wakes ? 1 : 0);
+    });
+}
 test('a merge wakes with the other owned open PRs to rebase-check; alone it only toasts', async ($, on) => {
     const h = host(on, [40, 41]);
     watchFile(h, 40, [ok('lint')]);

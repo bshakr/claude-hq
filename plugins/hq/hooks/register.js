@@ -1,4 +1,5 @@
 import { atom, read, update } from 'claude-code';
+import { SUMMARIES_KEY, config, effective, resolveConfig, setConfig } from './config';
 import { currentModel, installData } from './data/index';
 import { NOTIFY_STORE_KEY, parseNotifyArg } from './data/notify';
 import { WAKE_KEY, parseWake } from './data/wake';
@@ -13,12 +14,15 @@ const cursor = atom({ plugin: 'hq', key: 'cursor' }, null);
 const expanded = atom({ plugin: 'hq', key: 'expanded' }, []);
 const scroll = atom({ plugin: 'hq', key: 'scroll' }, 0);
 const phase = atom({ plugin: 'hq', key: 'phase' }, 0);
+const autoOpened = atom({ plugin: 'hq', key: 'autoOpened' }, false);
 const HELP = [
     '/hq          open the pane (⌃g moves the keys between it and the prompt)',
     '/hq close    close the pane',
     '/hq wake on  wake this session on its own PRs going red, merging, conflicting or behind (default)',
     '/hq wake off toasts only, never start a turn',
     '/hq notify on|off   a notification when another session starts waiting on you',
+    '/hq summaries on|off  Haiku goal lines and id glosses on cards',
+    '  wake, notify and summaries default to the plugin config; a toggle here overrides it on this machine.',
     '/hq help     this list',
     '',
     'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
@@ -37,7 +41,7 @@ let refresh;
 let syncMotion;
 let last;
 let isPaneOpen = false;
-async function startPane($) {
+async function startPane($, isInteractive) {
     let motion;
     let slow;
     syncMotion = async () => {
@@ -71,11 +75,22 @@ async function startPane($) {
         isPaneOpen = false;
     }
     await refresh();
+    // Once per session: a reload or /clear must not reopen a pane the person closed.
+    if (isInteractive && config().autoOpen && !isPaneOpen && !(await read($, autoOpened))) {
+        await update($, autoOpened, () => true);
+        try {
+            isPaneOpen = (await $.ui.open({ id: PANE, title: 'hq' })).isPlaced;
+            await syncMotion?.();
+        }
+        catch {
+            // no pane on this surface; /hq still opens it
+        }
+    }
     try {
         await $.command.register({
             name: COMMAND,
             description: 'Pane of what needs you: agents, PRs and other sessions',
-            argumentHint: '[close | wake on|off | notify on|off | help]',
+            argumentHint: '[close | wake on|off | notify on|off | summaries on|off | help]',
             immediate: true,
         });
     }
@@ -134,15 +149,16 @@ export async function act($, key, action, last) {
 function press($, key, action) {
     void act($, key, action, last);
 }
-export const register = on => {
+export const register = (on, options) => {
+    setConfig(resolveConfig(options));
     installData(on, () => void refresh?.());
     // The data layer owns the unmatched session.start; the pane's start runs under a matcher per session kind.
     on('session.start', { isInteractive: true }, async ($, e, next) => {
-        await startPane($);
+        await startPane($, true);
         return next(e);
     });
     on('session.start', { isInteractive: false }, async ($, e, next) => {
-        await startPane($);
+        await startPane($, false);
         return next(e);
     });
     on('command.run', { command: COMMAND }, async ($, e) => {
@@ -161,13 +177,20 @@ export const register = on => {
         }
         const notify = parseNotifyArg(args);
         if (notify === 'show')
-            return { text: `hq notifications are ${(await $.store.get(NOTIFY_STORE_KEY)) === false ? 'off' : 'on'}.` };
+            return { text: `hq notifications are ${effective(await $.store.get(NOTIFY_STORE_KEY), config().notify) ? 'on' : 'off'}.` };
         if (notify !== undefined) {
             await $.store.set(NOTIFY_STORE_KEY, notify);
             return { text: `hq notifications ${notify ? 'on' : 'off'}.` };
         }
         if (args === 'help')
             return { text: HELP };
+        const summaries = /^summaries(?:\s+(on|off))?$/.exec(args);
+        if (summaries) {
+            if (summaries[1] === undefined)
+                return { text: `hq summaries are ${effective(await $.store.get(SUMMARIES_KEY), config().summaries) ? 'on' : 'off'}.` };
+            await $.store.set(SUMMARIES_KEY, summaries[1] === 'on');
+            return { text: `hq summaries ${summaries[1]}.` };
+        }
         const toggle = parseWake(args);
         if (toggle !== null) {
             await $.store.set(WAKE_KEY, toggle === 'on');
@@ -206,6 +229,7 @@ export const register = on => {
             expanded: await read($, expanded),
             scroll: await read($, scroll),
             phase: await read($, phase),
+            ...(config().warning ? { warning: config().warning } : {}),
         };
         const l = layout(currentModel(), view);
         last = l;
@@ -213,6 +237,7 @@ export const register = on => {
         const autoFocusKey = view.cursor !== null && shown(view.cursor) ? view.cursor : l.items.find(shown);
         return drawPane(l.rows, {
             el: $.ui.resolve(e),
+            tokens: config().tokens,
             autoFocusKey,
             onAction: (key, action) => press($, key, action),
         });
