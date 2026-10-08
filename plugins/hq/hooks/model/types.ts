@@ -187,7 +187,7 @@ export interface PublishedSession {
   doing?: string
   /** Its running subagents, newest first, at most a few. */
   agents?: OtherAgentVM[]
-  /** The PRs this session owns (ADR 0002); wave-watcher wakes only for these. */
+  /** The PRs this session owns (ADR 0002). */
   owned?: { repo: string; number: number }[]
   /** Its task list's progress, so others need not reconstruct it from the transcript. */
   todos?: TodoProgress

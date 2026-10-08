@@ -1,6 +1,7 @@
 import { isLive } from './agents';
 import { pickFlare } from './fleet';
 import { prTone } from './prs';
+import { withPrStatus } from './wake';
 /** "3/7 · Rewriting PR claim rules", or the last prompt while there is no list. */
 export function doingLine(activity) {
     const todos = activity?.todos ?? [];
@@ -97,7 +98,7 @@ export function buildModel(inputs) {
             ...(inputs.glosses && Object.keys(inputs.glosses).length ? { glosses: inputs.glosses } : {}),
         },
         others: inputs.others,
-        statusText: statusTextOf(counts, sessions.filter(s => s.status === 'waiting'), inputs.now),
+        statusText: withPrStatus(statusTextOf(counts, sessions.filter(s => s.status === 'waiting'), inputs.now), inputs.prs),
     };
 }
 /** Stable serialisation without `now`, so a clock tick alone is no change. */

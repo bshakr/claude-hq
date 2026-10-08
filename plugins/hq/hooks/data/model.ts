@@ -3,6 +3,7 @@ import { isLive } from './agents'
 import { pickFlare } from './fleet'
 import { prTone } from './prs'
 import type { PrTone } from './prs'
+import { withPrStatus } from './wake'
 
 export interface ModelInputs {
   now: number
@@ -116,7 +117,7 @@ export function buildModel(inputs: ModelInputs): HqModel {
       ...(inputs.glosses && Object.keys(inputs.glosses).length ? { glosses: inputs.glosses } : {}),
     },
     others: inputs.others,
-    statusText: statusTextOf(counts, sessions.filter(s => s.status === 'waiting'), inputs.now),
+    statusText: withPrStatus(statusTextOf(counts, sessions.filter(s => s.status === 'waiting'), inputs.now), inputs.prs),
   }
 }
 

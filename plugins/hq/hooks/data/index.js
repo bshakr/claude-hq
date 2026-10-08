@@ -9,6 +9,7 @@ import { doingLine, prSummary } from './model';
 import { OPEN_CALL_CAP_MS, OTHER_AGENTS_MAX, TAIL_BYTES, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from './subagents';
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe';
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs';
+import { WAKE_KEY, newsOf } from './wake';
 /** An owned PR with no live watcher is re-read from GitHub this often. */
 export const REFRESH_MS = 120_000;
 /** An owned branch with no open PR yet is looked up after 2 min, then 10, then every 30; a push resets it. */
@@ -712,7 +713,13 @@ async function start($) {
                 S.dirty = true;
             }
         }
+        const previousPrs = S.prs;
         S.prs = Object.entries(S.claims).map(([key, claim]) => prFromSources(claim, files.get(key) ?? {}, pid => alive.has(pid)));
+        const news = newsOf(previousPrs, S.prs);
+        for (const text of news.toasts)
+            $.ui.toast(text, { timeoutMs: 8000 });
+        if (news.prompt !== null && (await $.store.get(WAKE_KEY)) !== false)
+            $.prompt.submit({ text: news.prompt }).catch(() => undefined);
         const branches = new Map();
         const published = new Map();
         const topicMap = new Map();
