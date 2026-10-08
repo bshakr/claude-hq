@@ -4,7 +4,7 @@
 
 Run a few Claude Code sessions, each with its own subagents and pull requests, and it gets hard to tell which one is blocked on a permission prompt, which one's CI just went red, and which one is fine. HQ is a Claude Code mod that docks a pane beside your conversation and answers that at a glance.
 
-<!-- screenshot: docs/hq.png -->
+<p align="center"><img src="docs/hq.png" alt="The HQ pane: one card for this session, one per other session, with what each is doing and which one needs you" width="560"></p>
 
 ```
  ◆ 1 waiting on you · 2 working                  5h 12% · wk 31%
