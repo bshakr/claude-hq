@@ -4,6 +4,8 @@ import type { On } from 'claude-code'
 import * as SUB from './subagent-fixtures'
 
 const HOME = '/home/u'
+// Hours of mocked ticks take ~2 s here and several times that on a CI runner; the kit's default is 5 s.
+const SLOW = { timeoutMs: 30_000 }
 const SID = 'self-sid'
 
 interface Fake {
@@ -458,7 +460,7 @@ test('integration: a tick writes the store only when a value changed', async ($,
   expect(sets).toBe(after + 1)
 })
 
-test('integration: a branch with no PR is looked up after 2, 10, then 30 minutes; a push resets it', async ($, on) => {
+test('integration: a branch with no PR is looked up after 2, 10, then 30 minutes; a push resets it', SLOW, async ($, on) => {
   const clock = mock.clock(on, { now: 1_000_000 })
   mock.store(on)
   const fx = newFake()
@@ -491,93 +493,104 @@ test('integration: a branch with no PR is looked up after 2, 10, then 30 minutes
   expect(lists()).toBe(7)
 })
 
-test('integration: another session card carries its goal, day and PR counts; the model is asked once, again only after 5 new prompts', async ($, on) => {
-  const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
-  const store = new Map<string, unknown>()
-  fakeStore(on, store)
-  const fx = newFake()
-  registry(fx)
-  fakeHost(on, fx)
-  const asked: string[] = []
-  on('model.complete', ($, e) => {
-    asked.push(e.prompt)
-    return {
-      value: {
-        isAnswered: true,
-        text: '{"goal":"Pipeline v2 rearchitecture","step":"stage 4 of 7: kind stage"}',
-        usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-      },
-    } as never
-  })
-  const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
-  const line = (v: Record<string, unknown>) => `${JSON.stringify(v)}\n`
-  const prompt = (t: string, ts: string) => line({ type: 'user', message: { content: t }, timestamp: ts })
-  fx.files[path] = [
-    prompt('Rebuild the pipeline as v2', '2026-10-06T09:00:00Z'),
-    line({ type: 'ai-title', aiTitle: '269 merged whats next' }),
-    line({
-      type: 'pr-link',
-      prNumber: 270,
-      prUrl: 'https://github.com/acme/app/pull/270',
-      prRepository: 'acme/app',
-      timestamp: '2026-10-07T09:00:00Z',
-    }),
-    line({
-      type: 'pr-link',
-      prNumber: 271,
-      prUrl: 'https://github.com/acme/app/pull/271',
-      prRepository: 'acme/app',
-      timestamp: '2026-10-08T09:00:00Z',
-    }),
-    line({
-      type: 'pr-link',
-      prNumber: 271,
-      prUrl: 'https://github.com/acme/app/pull/271',
-      prRepository: 'acme/app',
-      timestamp: '2026-10-08T09:01:00Z',
-    }),
-  ].join('')
-  await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
-  await clock.settle()
-  await clock.advance(2_000)
-  await clock.advance(2_000)
-
-  const pane = async () => {
-    const ui = await $.ui.mount({
-      plugin: 'hq',
-      surface: 'terminal',
-      component: 'Pane',
-      requestId: 'hq',
-      props: { title: 'hq', isFocused: false, bodyColumns: 80, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
+test(
+  'integration: another session card carries its goal, day and PR counts; the model is asked once, again only after 5 new prompts',
+  SLOW,
+  async ($, on) => {
+    const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
+    const store = new Map<string, unknown>()
+    fakeStore(on, store)
+    const fx = newFake()
+    registry(fx)
+    fakeHost(on, fx)
+    const asked: string[] = []
+    on('model.complete', ($, e) => {
+      asked.push(e.prompt)
+      return {
+        value: {
+          isAnswered: true,
+          text: '{"goal":"Pipeline v2 rearchitecture","step":"stage 4 of 7: kind stage"}',
+          usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      } as never
     })
-    const text = JSON.stringify(await ui.drawn())
-    await ui.unmount()
-    return text
-  }
-  const drawn = await pane()
-  expect(asked.length).toBe(1)
-  expect(asked[0]!.includes('Rebuild the pipeline as v2')).toBe(true)
-  expect(drawn.includes('Pipeline v2 rearchitecture')).toBe(true)
-  expect(drawn.includes('day 3')).toBe(true)
-  expect(drawn.includes('stage 4 of 7: kind stage · 1 PR merged, 1 open')).toBe(true)
-  expect(fx.gh.filter(a => a[1] === 'api').length).toBe(1)
-  expect((store.get('goal:w1') as { goal: string }).goal).toBe('Pipeline v2 rearchitecture')
+    const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
+    const line = (v: Record<string, unknown>) => `${JSON.stringify(v)}\n`
+    const prompt = (t: string, ts: string) => line({ type: 'user', message: { content: t }, timestamp: ts })
+    fx.files[path] = [
+      prompt('Rebuild the pipeline as v2', '2026-10-06T09:00:00Z'),
+      line({ type: 'ai-title', aiTitle: '269 merged whats next' }),
+      line({
+        type: 'pr-link',
+        prNumber: 270,
+        prUrl: 'https://github.com/acme/app/pull/270',
+        prRepository: 'acme/app',
+        timestamp: '2026-10-07T09:00:00Z',
+      }),
+      line({
+        type: 'pr-link',
+        prNumber: 271,
+        prUrl: 'https://github.com/acme/app/pull/271',
+        prRepository: 'acme/app',
+        timestamp: '2026-10-08T09:00:00Z',
+      }),
+      line({
+        type: 'pr-link',
+        prNumber: 271,
+        prUrl: 'https://github.com/acme/app/pull/271',
+        prRepository: 'acme/app',
+        timestamp: '2026-10-08T09:01:00Z',
+      }),
+    ].join('')
+    await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
+    await clock.settle()
+    await clock.advance(2_000)
+    await clock.advance(2_000)
 
-  // Idle and unchanged for an hour: no call. Four new prompts: none. The fifth: one.
-  await clock.advance(60 * 60_000)
-  expect(asked.length).toBe(1)
-  for (let i = 1; i <= 4; i++) fx.files[path] += prompt(`next ${i}`, `2026-10-08T13:0${i}:00Z`)
-  await clock.advance(2_000)
-  expect(asked.length).toBe(1)
-  fx.files[path] += prompt('next 5', '2026-10-08T13:05:00Z')
-  await clock.advance(2_000)
-  await clock.advance(2_000)
-  expect(asked.length).toBe(2)
-  // Only the appended bytes were read after the first pass.
-  expect(fx.tails.filter(p => p === path).length).toBeGreaterThan(1)
-})
+    const pane = async () => {
+      const ui = await $.ui.mount({
+        plugin: 'hq',
+        surface: 'terminal',
+        component: 'Pane',
+        requestId: 'hq',
+        props: {
+          title: 'hq',
+          isFocused: false,
+          bodyColumns: 80,
+          placement: 'dock' as const,
+          scroll: { offset: 0, bodyRows: 60 },
+          view: {},
+        },
+      })
+      const text = JSON.stringify(await ui.drawn())
+      await ui.unmount()
+      return text
+    }
+    const drawn = await pane()
+    expect(asked.length).toBe(1)
+    expect(asked[0]!.includes('Rebuild the pipeline as v2')).toBe(true)
+    expect(drawn.includes('Pipeline v2 rearchitecture')).toBe(true)
+    expect(drawn.includes('day 3')).toBe(true)
+    expect(drawn.includes('stage 4 of 7: kind stage · 1 PR merged, 1 open')).toBe(true)
+    expect(fx.gh.filter(a => a[1] === 'api').length).toBe(1)
+    expect((store.get('goal:w1') as { goal: string }).goal).toBe('Pipeline v2 rearchitecture')
 
-test("integration: ids on a card are glossed from linear and the repo's ADRs; a hung lookup never stalls the tick", async ($, on) => {
+    // Idle and unchanged for an hour: no call. Four new prompts: none. The fifth: one.
+    await clock.advance(60 * 60_000)
+    expect(asked.length).toBe(1)
+    for (let i = 1; i <= 4; i++) fx.files[path] += prompt(`next ${i}`, `2026-10-08T13:0${i}:00Z`)
+    await clock.advance(2_000)
+    expect(asked.length).toBe(1)
+    fx.files[path] += prompt('next 5', '2026-10-08T13:05:00Z')
+    await clock.advance(2_000)
+    await clock.advance(2_000)
+    expect(asked.length).toBe(2)
+    // Only the appended bytes were read after the first pass.
+    expect(fx.tails.filter(p => p === path).length).toBeGreaterThan(1)
+  },
+)
+
+test("integration: ids on a card are glossed from linear and the repo's ADRs; a hung lookup never stalls the tick", SLOW, async ($, on) => {
   const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
   const store = new Map<string, unknown>()
   fakeStore(on, store)
@@ -644,7 +657,7 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
 for (const how of ['config', 'store'] as const) {
   test(
     `integration: summaries off by ${how} makes no model call and no id lookup; cards fall back to the AI title, ids bare`,
-    { options: { summaries: how === 'store' } },
+    { ...SLOW, options: { summaries: how === 'store' } },
     async ($, on) => {
       const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
       const store = new Map<string, unknown>()
