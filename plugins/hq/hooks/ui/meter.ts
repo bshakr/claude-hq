@@ -36,14 +36,29 @@ export function meterParts(ctx: ContextUsage | undefined): { full: Part[]; pct: 
   return { full, pct }
 }
 
-/** `5h 5% · wk 18%`, dim; a figure past WARN_AT or FAIL_AT takes that colour. */
-export function accountParts(a: AccountUsage | undefined): Part[] {
+export const USAGE_CELLS = 6
+
+/** Plan usage as the status line colours it: green, yellow from WARN_AT, red from FAIL_AT. */
+export function planTone(percent: number): Sty {
+  return { c: percent >= FAIL_AT ? 'fail' : percent >= WARN_AT ? 'wait' : 'ok' }
+}
+
+/** `5h ▰▱▱▱▱▱ 10% · wk ▰▰▱▱▱▱ 20%`; `bars: false` drops the cells. */
+export function accountParts(a: AccountUsage | undefined, bars = true): Part[] {
   if (!a) return []
   const out: Part[] = []
   for (const [label, v] of [['5h', a.fiveHour], ['wk', a.week]] as const) {
     if (v === undefined) continue
     if (out.length) out.push({ t: ' · ', s: DIM })
-    out.push({ t: `${label} `, s: DIM }, { t: `${v}%`, s: usageTone(v) })
+    const tone = planTone(v)
+    out.push({ t: `${label} `, s: DIM })
+    if (bars) {
+      const on = filledCells(v, USAGE_CELLS)
+      if (on) out.push({ t: '▰'.repeat(on), s: tone })
+      if (on < USAGE_CELLS) out.push({ t: '▱'.repeat(USAGE_CELLS - on), s: DIM })
+      out.push({ t: ' ', s: {} })
+    }
+    out.push({ t: `${v}%`, s: tone })
   }
   return out
 }

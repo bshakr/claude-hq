@@ -201,7 +201,9 @@ export interface HqModel {
   current: {
     label: string // e.g. "monolense:@1 · BLO-1940-promote"
     /** The session's goal summary and calendar day (ADR 0004). */
-    goal?: { text: string; day?: number }
+    goal?: { text: string; day?: number; step?: string }
+    /** Repo or folder name: the card's title once there is a goal. */
+    title?: string
     now?: NowVM
     todos?: TodoVM[]
     waiting?: WaitingVM[]

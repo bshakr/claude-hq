@@ -19,6 +19,7 @@ The first build (ADR 0001, "Name and shape") was a flat sheet: a three-counter h
 - The pane reads as grouped and quieter; colour now carries status without a legend.
 - Card glyphs are part of every row, so width maths and the layout sheets must account for two border cells and the inner padding.
 - A native border would need the row grid and its tests reworked first.
+- As built (2026-10-08): the header sentence is gone (plan usage bars only); "this session" is titled by its repo and opens on its goal like the other cards, its now line reads `◷ waiting on N agents` while agents run, and only the newest finished agent shows above a `+N finished` toggle.
 
 ## Alternatives considered
 

@@ -184,7 +184,18 @@ export function doingText(e) {
             const s = str(e.skill);
             return s ? `using skill ${s}` : 'using a skill';
         }
+        case 'SubagentHandback':
+            return 'reporting back';
+        case 'TaskStop':
+            return 'stopping a task';
+        case 'SendMessage':
+            return 'sending a message';
+        case 'Monitor':
+            return 'watching a process';
+        case 'ToolSearch':
+            return 'loading tools';
         default:
-            return file ? `${tool}: ${baseName(file)}` : tool;
+            // Never the tool's own name: internal and MCP names mean nothing on the doing line.
+            return file ? `working on ${baseName(file)}` : 'working';
     }
 }

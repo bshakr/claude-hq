@@ -1,6 +1,6 @@
 import { atom, read, update } from 'claude-code';
-import { isLive, onSpawn, onTurnComplete, prune, reconcile } from './agents';
-import { emptyActivity, onPrompt, onTurnEnd, todosOf, nowOf } from './activity';
+import { isLive, onSpawn, onTaskNotification, onTurnComplete, prune, reconcile, settleQuiet } from './agents';
+import { emptyActivity, notificationsOf, onPrompt, onTurnEnd, todosOf, nowOf } from './activity';
 import { repoOfRemote } from './claims';
 import { CHUNK_BYTES, GOAL_MODEL, HEAD_BYTES, PR_REFRESH_MS, TAIL_BYTES as DIGEST_TAIL_BYTES, dayOf, emptyDigest, goalDue, goalText, ingest, ingestLines, parsePrStates, prKey as prStateKey, prStateQuery, prText, prsToLook, refreshGoal, todoProgress, } from './context';
 import { PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, parsePsPids, parsePublished, parseRegistryRow, selfTmux, splitTmux, transcriptPath, } from './fleet';
@@ -105,6 +105,8 @@ export function installData(on, onChange) {
             onPromptOrigin(e.origin?.kind);
             S.now = await $.clock.now();
             onPrompt(S.activity, e.text, e.origin?.kind, S.now);
+            if (e.origin?.kind === 'task-notification')
+                onTaskNotification(S.agents, notificationsOf(e.text), S.now);
             if (S.activity.prompt !== undefined && e.origin?.kind !== 'task-notification')
                 S.activity.idle = false;
             S.dirty = true;
@@ -171,7 +173,11 @@ async function start($) {
         S.activity = { ...emptyActivity(), ...act };
     const storedAgents = (await $.store.get(storeKey('agents')));
     if (storedAgents && typeof storedAgents === 'object' && storedAgents.byId) {
-        S.agents = { byId: { ...storedAgents.byId, ...S.agents.byId }, byToolUse: { ...storedAgents.byToolUse, ...S.agents.byToolUse } };
+        S.agents = {
+            byId: { ...storedAgents.byId, ...S.agents.byId },
+            byToolUse: { ...storedAgents.byToolUse, ...S.agents.byToolUse },
+            pruned: [...new Set([...(S.agents.pruned ?? []), ...(Array.isArray(storedAgents.pruned) ? storedAgents.pruned : [])])],
+        };
     }
     const repoCache = new Map();
     const branchCache = new Map();
@@ -847,7 +853,9 @@ async function start($) {
             S.dirty = true;
         }
         launchBriefs();
-        const goal = ownGoal ? { text: ownGoal, ...(own.ctx.day ? { day: own.ctx.day } : {}) } : undefined;
+        const goal = ownGoal
+            ? { text: ownGoal, ...(own.ctx.day ? { day: own.ctx.day } : {}), ...(own.ctx.step ? { step: own.ctx.step } : {}) }
+            : undefined;
         if (JSON.stringify(goal) !== JSON.stringify(S.goal)) {
             S.goal = goal;
             S.dirty = true;
@@ -856,12 +864,15 @@ async function start($) {
         const target = session ? `${session}${window ? `:${window}` : ''}` : '';
         const branch = await branchOf(sessionCwd);
         S.label = [target, branch].filter(Boolean).join(' · ');
+        S.title = (await repoForDir(sessionCwd))?.split('/').pop() || sessionCwd.replace(/\/+$/, '').split('/').pop() || '';
         try {
             reconcile(S.agents, (await $.agent.list()), S.now);
         }
         catch {
             // keep what the hooks recorded
         }
+        if (settleQuiet(S.agents, S.now))
+            S.dirty = true;
         prune(S.agents, S.now);
         rebuild();
         if (S.now - publishedAt >= PUBLISH_MS || publishedId !== S.sessionId || publishedWaitRev !== W.rev) {

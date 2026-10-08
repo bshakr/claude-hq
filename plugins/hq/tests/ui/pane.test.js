@@ -3,6 +3,7 @@ import { runJump } from '../../hooks/ui/jump';
 import { layout } from '../../hooks/ui/layout';
 import { drawPane } from '../../hooks/ui/pane';
 import { BUSY, EMPTY, LONG, QUIET } from './fixtures';
+import { METERED } from './usage-fixtures';
 const PROBE = 'hq-probe';
 const props = (bodyColumns, bodyRows, isFocused = false) => ({
     title: 'hq', isFocused, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows }, view: {},
@@ -13,7 +14,7 @@ function probe(on, p) {
 function draw($, e, p) {
     const l = layout(p.model, {
         width: e.props.bodyColumns, rows: e.props.scroll.bodyRows, focused: e.props.isFocused,
-        cursor: p.cursor, expanded: p.expanded, scroll: 0, phase: 0,
+        cursor: p.cursor, expanded: p.expanded, scroll: 0, phase: p.phase ?? 0,
     });
     p.last = l;
     return drawPane(l.rows, { el: $.ui.resolve(e), autoFocusKey: l.items[0], onAction: () => undefined });
@@ -102,4 +103,32 @@ test('the plugin itself: /hq opens the pane, j and k are Buttons with hotkeys, p
         await ui.unmount();
     }
     expect(ran.slice(before).filter(a => a[0] === 'tmux' || a[0] === 'open')).toEqual([]);
+});
+test('a dimmed running dot and the green plan bars validate as colour plus dimColor, never a background', async ($, on) => {
+    const p = { model: { ...BUSY, account: METERED.account }, cursor: null, expanded: [], phase: 1 };
+    probe(on, p);
+    const ui = await $.ui.mount({ plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: PROBE, props: props(80, 40) });
+    const json = JSON.stringify(await ui.drawn());
+    expect(json.includes('backgroundColor')).toBe(false);
+    expect(/"color":"ansi256\(4\)","dimColor":true/.test(json)).toBe(true);
+    expect(json.includes('"color":"ansi256(2)"')).toBe(true);
+    await ui.unmount();
+});
+test('the +N finished toggle is a Button the engine accepts, open or closed', async ($, on) => {
+    const fin = (id, mins) => ({
+        id, title: `Finished ${id}`, status: 'completed', background: true, startedAt: BUSY.now - 20 * 60_000,
+        endedAt: BUSY.now - mins * 60_000, toolCount: 1, files: [],
+    });
+    const model = { ...BUSY, current: { ...BUSY.current, agents: [...BUSY.current.agents, fin('f1', 1), fin('f2', 2)] } };
+    const p = { model, cursor: null, expanded: [] };
+    probe(on, p);
+    for (const expanded of [[], ['+finished']]) {
+        p.expanded = expanded;
+        const ui = await $.ui.mount({ plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: PROBE, props: props(80, 58) });
+        const drawn = await ui.drawn();
+        expect(JSON.stringify(drawn).includes('backgroundColor')).toBe(false);
+        const buttons = await ui.findAll({ type: 'Button' });
+        expect(buttons.some(b => b.props.key === 'finished' || b.key === 'finished')).toBe(true);
+        await ui.unmount();
+    }
 });

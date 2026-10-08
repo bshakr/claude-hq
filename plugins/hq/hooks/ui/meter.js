@@ -30,8 +30,13 @@ export function meterParts(ctx) {
     full.push({ t: ` ${ctx.percent}%`, s: tone });
     return { full, pct };
 }
-/** `5h 5% · wk 18%`, dim; a figure past WARN_AT or FAIL_AT takes that colour. */
-export function accountParts(a) {
+export const USAGE_CELLS = 6;
+/** Plan usage as the status line colours it: green, yellow from WARN_AT, red from FAIL_AT. */
+export function planTone(percent) {
+    return { c: percent >= FAIL_AT ? 'fail' : percent >= WARN_AT ? 'wait' : 'ok' };
+}
+/** `5h ▰▱▱▱▱▱ 10% · wk ▰▰▱▱▱▱ 20%`; `bars: false` drops the cells. */
+export function accountParts(a, bars = true) {
     if (!a)
         return [];
     const out = [];
@@ -40,7 +45,17 @@ export function accountParts(a) {
             continue;
         if (out.length)
             out.push({ t: ' · ', s: DIM });
-        out.push({ t: `${label} `, s: DIM }, { t: `${v}%`, s: usageTone(v) });
+        const tone = planTone(v);
+        out.push({ t: `${label} `, s: DIM });
+        if (bars) {
+            const on = filledCells(v, USAGE_CELLS);
+            if (on)
+                out.push({ t: '▰'.repeat(on), s: tone });
+            if (on < USAGE_CELLS)
+                out.push({ t: '▱'.repeat(USAGE_CELLS - on), s: DIM });
+            out.push({ t: ' ', s: {} });
+        }
+        out.push({ t: `${v}%`, s: tone });
     }
     return out;
 }

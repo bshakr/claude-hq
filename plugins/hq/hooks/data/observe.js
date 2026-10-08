@@ -20,6 +20,7 @@ export const S = {
     now: 0,
     label: '',
     goal: undefined,
+    title: '',
     glosses: {},
     context: undefined,
     account: undefined,
@@ -50,7 +51,7 @@ export function activityState() {
 }
 export function rebuild() {
     const model = buildModel({
-        now: S.now, label: S.label, ...(S.goal ? { goal: S.goal } : {}), glosses: S.glosses,
+        now: S.now, label: S.label, ...(S.goal ? { goal: S.goal } : {}), ...(S.title ? { title: S.title } : {}), glosses: S.glosses,
         ...(S.context ? { context: S.context } : {}), ...(S.account ? { account: S.account } : {}), agents: agentList(S.agents, S.cwd || undefined), prs: S.prs, others: S.others,
         activity: { now: nowOf(S.activity), todos: todosOf(S.activity), waiting: waitingOf(S.activity) },
     });

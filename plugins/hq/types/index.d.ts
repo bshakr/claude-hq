@@ -1,4 +1,4 @@
-/** Key of a pane row: `flare`, `a:<agent id>`, `p:<repo>#<n>` or `s:<session id>`; null before any. */
+/** Key of a pane row: `flare`, `finished`, `a:<agent id>`, `p:<repo>#<n>` or `s:<session id>`; null before any. */
 export type HqCursor = string | null
 
 export type OwnReason = 'created' | 'pushed' | 'checkout'
@@ -74,7 +74,7 @@ declare module 'claude-code' {
       rev: number
       /** Key of the row the cursor is on (`flare`, `a:<id>`, `p:<repo>#<n>`, `s:<sessionId>`). */
       cursor: HqCursor
-      /** Agent ids shown expanded inline. */
+      /** Agent ids shown expanded inline; `+finished` when the older finished agents are shown. */
       expanded: string[]
       /** First body row shown in the pane's window. */
       scroll: number

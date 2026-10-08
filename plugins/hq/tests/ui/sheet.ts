@@ -1,12 +1,14 @@
 // The pane cell for cell, regenerated from layout() after checking each dump by eye.
 
 export const a80 = [
-  " ◆ 3 waiting on you · 2 broken · 3 working",
+  "",
   "",
   " ◆ rp-api is waiting for your input 2m                           ritualpass:@3 ⏎",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────╮",
   " │                                                                            │",
+  " │  ◷ waiting on 1 agent                                             14m 20s  │",
+  " │                                                                            │",
   " │  ✗ Capture screenshot pairs                               sonnet · 6m 30s  │",
   " │    port 3000 already in use · failed 1m ago                                │",
   " │  ◷ Implement ledger refund reconcile                       opus · 14m 20s  │",
@@ -61,19 +63,19 @@ export const a80 = [
   " │        ci passed · ↑ behind main · gallery linked · merge-wait             │",
   " │  #433  Stat cards: one-decimal trend deltas                ▰▰▰▰▰▰▰▰▰▰ 7/7  │",
   " │        ci passed · gallery linked · merge-wait                             │",
-  " │  #429  Sidebar: collapse state persists                     merged 4m ago  │",
-  " │                                                                            │",
-  " ↓ 4 rows below   ◆ 1 waiting on you",
-  " ⌃g focus · click a PR to open it, a session to switch to it"
+  " ↓ 6 rows below   ◆ 1 waiting on you",
+  " ⌃g focus · click a PR to open it, a session to switch to it",
 ]
 
 export const aFocusFlare = [
-  "▌◆ 3 waiting on you · 2 broken · 3 working",
+  "▌",
   "",
   "▶◆ rp-api is waiting for your input 2m                           ritualpass:@3 ⏎",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────╮",
   " │                                                                            │",
+  " │  ◷ waiting on 1 agent                                             14m 20s  │",
+  " │                                                                            │",
   " │  ✗ Capture screenshot pairs                               sonnet · 6m 30s  │",
   " │    port 3000 already in use · failed 1m ago                                │",
   " │  ◷ Implement ledger refund reconcile                       opus · 14m 20s  │",
@@ -128,14 +130,12 @@ export const aFocusFlare = [
   " │        ci passed · ↑ behind main · gallery linked · merge-wait             │",
   " │  #433  Stat cards: one-decimal trend deltas                ▰▰▰▰▰▰▰▰▰▰ 7/7  │",
   " │        ci passed · gallery linked · merge-wait                             │",
-  " │  #429  Sidebar: collapse state persists                     merged 4m ago  │",
-  " │                                                                            │",
-  " ↓ 4 rows below   ◆ 1 waiting on you",
-  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt"
+  " ↓ 6 rows below   ◆ 1 waiting on you",
+  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt",
 ]
 
 export const b80 = [
-  " ○ nothing needs you",
+  "",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────╮",
   " │                                                                            │",
@@ -198,11 +198,11 @@ export const b80 = [
   "",
   "",
   "",
-  " ⌃g focus · click a PR to open it, a session to switch to it"
+  " ⌃g focus · click a PR to open it, a session to switch to it",
 ]
 
 export const bFocus433 = [
-  "▌○ nothing needs you",
+  "▌",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────╮",
   " │                                                                            │",
@@ -265,15 +265,17 @@ export const bFocus433 = [
   "",
   "",
   "",
-  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt"
+  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt",
 ]
 
 export const c80 = [
-  "▌◆ 3 waiting on you · 2 broken · 3 working",
+  "▌",
   "",
   " ◆ rp-api is waiting for your input 2m                           ritualpass:@3 ⏎",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────╮",
+  " │                                                                            │",
+  " │  ◷ waiting on 1 agent                                             14m 20s  │",
   " │                                                                            │",
   " │  ✗ Capture screenshot pairs                               sonnet · 6m 30s  │",
   " │    port 3000 already in use · failed 1m ago                                │",
@@ -329,18 +331,18 @@ export const c80 = [
   " │        ci passed · ↑ behind main · gallery linked · merge-wait             │",
   " │  #433  Stat cards: one-decimal trend deltas                ▰▰▰▰▰▰▰▰▰▰ 7/7  │",
   " │        ci passed · gallery linked · merge-wait                             │",
-  " │  #429  Sidebar: collapse state persists                     merged 4m ago  │",
-  " │                                                                            │",
-  " ↓ 4 rows below   ◆ 1 waiting on you",
-  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt"
+  " ↓ 6 rows below   ◆ 1 waiting on you",
+  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt",
 ]
 
 export const e40 = [
-  " ◆ 3 waiting on you · 2 broken · 3 work…",
+  "",
   "",
   " ◆ rp-api is waitin… 2m  ritualpass:@3 ⏎",
   "",
   " ╭─ this session ─────────────────────╮",
+  " │                                    │",
+  " │  ◷ waiting on 1 agent     14m 20s  │",
   " │                                    │",
   " │  ✗ Capture scre…  sonnet · 6m 30s  │",
   " │    port 3000 alr… · failed 1m ago  │",
@@ -396,18 +398,18 @@ export const e40 = [
   " │        ci passed · ↑ behind main   │",
   " │  #433  Stat cards: o…  ▰▰▰▰▰▰ 7/7  │",
   " │        ci passed · gallery linked  │",
-  " │  #429  Sidebar: c…  merged 4m ago  │",
-  " │                                    │",
-  " ↓ 4 rows below   ◆ 1 waiting on you",
-  " ⌃g focus · click a PR to open it, a se…"
+  " ↓ 6 rows below   ◆ 1 waiting on you",
+  " ⌃g focus · click a PR to open it, a se…",
 ]
 
 export const e88 = [
-  " ◆ 3 waiting on you · 2 broken · 3 working",
+  "",
   "",
   " ◆ rp-api is waiting for your input 2m                                   ritualpass:@3 ⏎",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────────────╮",
+  " │                                                                                    │",
+  " │  ◷ waiting on 1 agent                                                     14m 20s  │",
   " │                                                                                    │",
   " │  ✗ Capture screenshot pairs                                       sonnet · 6m 30s  │",
   " │    port 3000 already in use · failed 1m ago                                        │",
@@ -463,18 +465,18 @@ export const e88 = [
   " │        ci passed · ↑ behind main · gallery linked · merge-wait                     │",
   " │  #433  Stat cards: one-decimal trend deltas                        ▰▰▰▰▰▰▰▰▰▰ 7/7  │",
   " │        ci passed · gallery linked · merge-wait                                     │",
-  " │  #429  Sidebar: collapse state persists                             merged 4m ago  │",
-  " │                                                                                    │",
-  " ↓ 4 rows below   ◆ 1 waiting on you",
-  " ⌃g focus · click a PR to open it, a session to switch to it"
+  " ↓ 6 rows below   ◆ 1 waiting on you",
+  " ⌃g focus · click a PR to open it, a session to switch to it",
 ]
 
 export const f80 = [
-  " ◆ 4 waiting on you · 3 broken · 4 working",
+  "",
   "",
   " ◆ rp-api is waiting for your input 2m · +1 more                 ritualpass:@3 ⏎",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────╮",
+  " │                                                                            │",
+  " │  ◷ waiting on 1 agent                                             14m 20s  │",
   " │                                                                            │",
   " │  ✗ Capture screenshot pairs                               sonnet · 6m 30s  │",
   " │    port 3000 already in use · failed 1m ago                                │",
@@ -530,17 +532,15 @@ export const f80 = [
   " │  bshakr/monolense                                                          │",
   " │  #212  Ledger: reconcile partial refunds                   ▰▰▰▰▰▰▰▰▰▰ 9/9  │",
   " │        ✗ rspec failed · no gallery · ci-wait                               │",
-  " │  #214  Pipeline: retry classification on timeout           ▰▰▰▰▰▰▱▱▱▱ 5/9  │",
-  " │        ci running · no gallery · ci-wait                                   │",
-  " ↓ 12 rows below   ◆ 2 waiting on you",
-  " ⌃g focus · click a PR to open it, a session to switch to it"
+  " ↓ 14 rows below   ◆ 2 waiting on you",
+  " ⌃g focus · click a PR to open it, a session to switch to it",
 ]
 
 export const f2 = [
-  "▌◆ 4 waiting on you · 3 broken · 4 working",
+  "▌",
   "",
   " ◆ rp-api is waiting for your input 2m · +1 more                 ritualpass:@3 ⏎",
-  " ↑ 12 rows above   ✗ 1 broken",
+  " ↑ 14 rows above   ✗ 1 broken",
   " ╰────────────────────────────────────────────────────────────────────────────╯",
   "",
   " ╭─ ritualpass ───────────────────────────────────────────────────────────────╮",
@@ -600,15 +600,17 @@ export const f2 = [
   " │        ci passed · no visual change · no watcher                           │",
   " ╰────────────────────────────────────────────────────────────────────────────╯",
   "",
-  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt"
+  " j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt",
 ]
 
 export const f3 = [
-  " ◆ 4 waiting on you · 3 broken · 4 working",
+  "",
   "",
   " ◆ rp-api is waiting for your input 2m · +1 more                 ritualpass:@3 ⏎",
   "",
   " ╭─ this session ─────────────────────────────────────────────────────────────╮",
+  " │                                                                            │",
+  " │  ◷ waiting on 1 agent                                             14m 20s  │",
   " │                                                                            │",
   " │  ✗ Capture screenshot pairs                               sonnet · 6m 30s  │",
   " │    port 3000 already in use · failed 1m ago                                │",
@@ -634,8 +636,6 @@ export const f3 = [
   "",
   " ╭─ finance ──────────────────────────────────────────────────────────────────╮",
   " │  finance-tax                                         ✗ 1 PR red · idle 1d  │",
-  " │                                                                            │",
-  " │  finance                                                          idle 2d  │",
-  " ↓ 42 rows below   ✗ 1 broken   ◆ 2 waiting on you",
-  " ⌃g focus · click a PR to open it, a session to switch to it"
+  " ↓ 44 rows below   ✗ 1 broken   ◆ 2 waiting on you",
+  " ⌃g focus · click a PR to open it, a session to switch to it",
 ]

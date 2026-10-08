@@ -19,7 +19,8 @@ export const METERED: HqModel = {
   counts: { waiting: 0, broken: 0, inProgress: 1, sessions: 4 },
   current: {
     label: 'work:@1 · main',
-    goal: { text: 'Session usage meters', day: 2 },
+    title: 'claude-hq',
+    goal: { text: 'Session usage meters', day: 2, step: 'Wiring the header bars' },
     context: { percent: 28, window: 1_000_000, tokens: 280_000, source: 'live' },
     agents: [],
     prs: [],
