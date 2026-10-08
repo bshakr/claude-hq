@@ -107,6 +107,24 @@ export interface OtherSessionVM {
   todos?: TodoProgress
   /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("BLO-1947", "ADR 0019"). */
   glosses?: Record<string, string>
+  /** Its context window's fill (ADR 0007). */
+  context?: ContextUsage
+}
+
+/** A session's context fill: live from its own HQ, else estimated from its transcript (ADR 0007). */
+export interface ContextUsage {
+  /** Whole percent of `window`, 0 to 100. */
+  percent: number
+  window: number
+  tokens?: number
+  model?: string
+  source: 'live' | 'transcript'
+}
+
+/** The account's rate-limit windows, percent used as the engine reports it. */
+export interface AccountUsage {
+  fiveHour?: number
+  week?: number
 }
 
 /** A task list's progress and its in-progress item. */
@@ -170,8 +188,11 @@ export interface HqModel {
     prs: PrVM[]
     /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("BLO-1947", "ADR 0019"). */
     glosses?: Record<string, string>
+    context?: ContextUsage
   }
   others: TmuxGroupVM[]
+  /** Plan usage, account-wide, shown once in the header. */
+  account?: AccountUsage
   /** plain text for $.ui.status */
   statusText: string
 }
@@ -193,6 +214,10 @@ export interface PublishedSession {
   todos?: TodoProgress
   /** Its own goal summary, so other sessions reuse it instead of asking the model again. */
   goal?: { goal?: string; step?: string; at: number }
+  /** Its live context fill, as the engine reports it. */
+  context?: ContextUsage
+  /** The account's rate limits as this session last saw them. */
+  account?: AccountUsage
 }
 
 /** Written by pr-ci-wait / pr-merge-wait to ~/.cache/pr-watch/<owner>__<repo>__<n>.<watcher>.json (owner/repo lowercased) each poll. */

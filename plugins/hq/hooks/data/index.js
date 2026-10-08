@@ -7,6 +7,7 @@ import { PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, parsePsPids, parseP
 import { ADR_LOOKUPS_PER_TICK, GLOSS_MODEL, TICKET_LOOKUPS_PER_TICK, briefBatch, briefDue, findIds, glossOf, lookUpAdr, lookUpTicket, lookupDue as idLookupDue, } from './ids';
 import { doingLine, prSummary } from './model';
 import { OPEN_CALL_CAP_MS, OTHER_AGENTS_MAX, TAIL_BYTES, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from './subagents';
+import { accountOf, live, preferred, settingsModel } from './usage';
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe';
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs';
 /** An owned PR with no live watcher is re-read from GitHub this often. */
@@ -178,6 +179,8 @@ async function start($) {
     let publishedId = '';
     let isTicking = false;
     let selfPid;
+    const settingsCache = new Map();
+    let ownAccount;
     const run = async (argv, cwd) => {
         try {
             return await $.process.run(argv, { timeoutMs: 15_000, ...(cwd ? { cwd } : {}) });
@@ -360,6 +363,19 @@ async function start($) {
                 // keep what it had
             }
         }
+    };
+    // User, project, then local settings: the last that names a model wins.
+    const settingModelFor = async (cwd) => {
+        let model;
+        for (const path of [`${S.home}/.claude/settings.json`, `${cwd}/.claude/settings.json`, `${cwd}/.claude/settings.local.json`]) {
+            let hit = settingsCache.get(path);
+            if (!hit || S.now - hit.at >= BRANCH_TTL_MS) {
+                hit = { at: S.now, model: settingsModel(await readText(path)) };
+                settingsCache.set(path, hit);
+            }
+            model = hit.model ?? model;
+        }
+        return model;
     };
     // A transcript is read once in full (sparsely when large), then only the bytes appended since.
     const digestOf = async (sessionId, cwd) => {
@@ -576,10 +592,11 @@ async function start($) {
     /** The summary lines of one session's card. */
     const contextOf = async (sid, cwd, busy, pub) => {
         const d = await digestOf(sid, cwd);
-        if (!d)
-            return { ctx: {}, topic: {} };
-        await lookUpPrStates(d);
         const fresh = pub && S.now - pub.updatedAt < PUBLISH_FRESH_MS ? pub : undefined;
+        if (!d)
+            return { ctx: fresh?.context ? { context: fresh.context } : {}, topic: {} };
+        await lookUpPrStates(d);
+        const context = preferred(fresh, d.usage, await settingModelFor(cwd));
         const prTitles = d.prs.flatMap(p => prStates.get(prStateKey(p.repo, p.number))?.title ?? []);
         const ids = await idsOf(cwd, [d.firstPrompt ?? '', ...d.titles, ...d.prompts.slice(-5).map(p => p.text), ...prTitles, ...d.branches], DIGEST_IDS_MAX);
         const cache = fresh?.goal?.goal ? fresh.goal : await maybeGoal(sid, d, busy, ids);
@@ -596,6 +613,7 @@ async function start($) {
                 ...(cache?.step ? { step: cache.step } : {}),
                 ...(prs ? { prText: prs } : {}),
                 ...(todos && todos.total > 0 ? { todos } : {}),
+                ...(context ? { context } : {}),
             },
         };
     };
@@ -753,6 +771,25 @@ async function start($) {
         const self = fleet.self;
         S.others = fleet.others;
         const own = await contextOf(S.sessionId, sessionCwd, !S.activity.idle, undefined);
+        // The engine's own figures, else the transcript estimate; plan usage from any fresh publish until this session has a reading.
+        let liveContext = own.ctx.context;
+        let account = [...published.values()]
+            .filter(p => p.account && S.now - p.updatedAt < PUBLISH_FRESH_MS)
+            .sort((a, b) => b.updatedAt - a.updatedAt)[0]?.account;
+        try {
+            const u = await $.session.usage();
+            liveContext = live(u.context, await $.session.model()) ?? liveContext;
+            ownAccount = accountOf(u.rateLimits);
+            account = ownAccount ?? account;
+        }
+        catch {
+            // an engine without the op: the estimate stands
+        }
+        if (JSON.stringify([liveContext, account]) !== JSON.stringify([S.context, S.account])) {
+            S.context = liveContext;
+            S.account = account;
+            S.dirty = true;
+        }
         const ownGoal = own.ctx.goal ?? own.topic.title ?? own.topic.firstPrompt;
         const ownIds = await idsOf(sessionCwd, [ownGoal ?? '', ...S.model.current.agents.flatMap(a => [a.title, a.todo?.text ?? a.now ?? ''])], VISIBLE_IDS_MAX);
         if (JSON.stringify(ownIds.glosses) !== JSON.stringify(S.glosses)) {
@@ -805,6 +842,9 @@ async function start($) {
                 ...(doing ? { doing } : {}),
                 ...((t => (t ? { todos: t } : {}))(todoProgress(todosOf(S.activity).map((x, i) => ({ id: String(i), ...x }))))),
                 ...((g => (g?.goal ? { goal: { goal: g.goal, ...(g.step ? { step: g.step } : {}), at: g.at } } : {}))(goals.get(S.sessionId))),
+                ...(S.context?.source === 'live' ? { context: S.context } : {}),
+                // Only its own reading, so a relayed figure never outlives its source.
+                ...(ownAccount ? { account: ownAccount } : {}),
             };
             try {
                 await $.fs.write(`${S.home}/.claude/hq/sessions/${S.sessionId}.json`, JSON.stringify(mine));
