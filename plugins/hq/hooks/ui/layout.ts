@@ -1,6 +1,7 @@
 import { summaryLine } from '../model/plain'
 import { LONG_CALL_MS } from '../model/types'
 import type { AgentVM, CiState, HqModel, NowVM, OtherAgentVM, OtherSessionVM, PrVM, TmuxGroupVM, TodoVM, WaitingVM } from '../model/types'
+import { resumeOnly } from './focus'
 import { Row } from './row'
 import type { Action, Sty, Tok } from './row'
 import { expandIds } from '../data/ids'
@@ -419,6 +420,9 @@ function otherAgentRows(s: OtherSessionVM, under: () => Row, x: Ctx): Row[] {
   return out
 }
 
+/** On a card whose Enter can only copy the resume command (ADR 0008). */
+export const RESUME_HINT = '↵ copies resume'
+
 function sessionTone(s: OtherSessionVM): Tok {
   return (s.prSummary?.broken ?? 0) > 0 ? 'fail' : s.status === 'waiting' ? 'wait' : 'rule'
 }
@@ -474,9 +478,11 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
   } else r.put(0, clip(name, room), sty)
   const out = [r]
   const second = expandIds([s.step, s.prText].filter(Boolean).join(' · ') || s.detail || '', s.glosses)
-  if (second) {
+  const hint = s.jump && resumeOnly(s.jump) && IW >= 32 ? RESUME_HINT : ''
+  if (second || hint) {
     const d = under()
-    d.put(0, clip(second, IW), DIM)
+    d.put(0, clip(second, hint ? IW - cellLen(hint) - 2 : IW), DIM)
+    if (hint) d.right(hint, DIM)
     out.push(d)
   }
   if (s.todos && s.todos.total > 0) {

@@ -8,6 +8,7 @@ import { ADR_LOOKUPS_PER_TICK, GLOSS_MODEL, TICKET_LOOKUPS_PER_TICK, briefBatch,
 import { doingLine, prSummary } from './model';
 import { OPEN_CALL_CAP_MS, OTHER_AGENTS_MAX, TAIL_BYTES, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from './subagents';
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe';
+import { parsePsTerm } from './term';
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs';
 /** An owned PR with no live watcher is re-read from GitHub this often. */
 export const REFRESH_MS = 120_000;
@@ -178,6 +179,8 @@ async function start($) {
     let publishedId = '';
     let isTicking = false;
     let selfPid;
+    // Per pid: a process's terminal does not change while it lives.
+    const terms = new Map();
     const run = async (argv, cwd) => {
         try {
             return await $.process.run(argv, { timeoutMs: 15_000, ...(cwd ? { cwd } : {}) });
@@ -692,10 +695,21 @@ async function start($) {
                     pids.add(f.pid);
         }
         let alive = new Set();
+        // Sessions not yet seen are read with their env in the same ps (ADR 0008).
+        const unread = rows.filter(r => !r.spare && pids.has(r.pid) && !terms.has(r.pid)).map(r => r.pid);
         if (pids.size > 0) {
-            const r = await run(['ps', '-o', 'pid=', '-p', [...pids].join(',')]);
+            const r = await run(['ps', ...(unread.length ? ['eww', '-o', 'pid=,tty=,command='] : ['-o', 'pid=']), '-p', [...pids].join(',')]);
             alive = r ? parsePsPids(r.stdout) : new Set();
+            if (r && unread.length) {
+                const found = parsePsTerm(r.stdout);
+                for (const pid of unread)
+                    if (alive.has(pid))
+                        terms.set(pid, found.get(pid) ?? { env: {} });
+            }
         }
+        for (const pid of terms.keys())
+            if (!alive.has(pid))
+                terms.delete(pid);
         const before = Object.keys(S.claims).length;
         await lookUpBranches();
         if (Object.keys(S.claims).length !== before)
@@ -749,7 +763,7 @@ async function start($) {
         for (const k of metas.keys())
             if (!seenFiles.has(k))
                 metas.delete(k);
-        const fleet = buildFleet(rows, alive, S.sessionId, branches, published, S.now, selfPid, topicMap, agentMap, ctxMap);
+        const fleet = buildFleet(rows, alive, S.sessionId, branches, published, S.now, selfPid, topicMap, agentMap, ctxMap, terms);
         const self = fleet.self;
         S.others = fleet.others;
         const own = await contextOf(S.sessionId, sessionCwd, !S.activity.idle, undefined);

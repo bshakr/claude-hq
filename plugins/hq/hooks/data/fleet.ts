@@ -1,5 +1,5 @@
 // Other Claude sessions on this machine, from ~/.claude/sessions/<pid>.json.
-import type { Flare, OtherAgentVM, OtherSessionVM, PublishedSession, TmuxGroupVM, TodoProgress } from '../model/types'
+import type { Flare, Jump, OtherAgentVM, OtherSessionVM, PublishedSession, TermEnv, TmuxGroupVM, TodoProgress } from '../model/types'
 
 export const PUBLISH_FRESH_MS = 30_000
 
@@ -106,6 +106,7 @@ export function toSessionVM(
   topic: SessionTopic = {},
   transcriptAgents?: readonly OtherAgentVM[],
   ctx: SessionContext = {},
+  term?: TermEnv,
 ): OtherSessionVM {
   const { window } = splitTmux(row.tmux)
   const name = ctx.goal || topic.title || topic.firstPrompt || nameOf(row) || basename(row.cwd) || 'session'
@@ -118,7 +119,8 @@ export function toSessionVM(
     name,
     windowLabel: window ? `${window} ${label}` : label,
     status,
-    ...(row.tmux ? { tmuxTarget: row.tmux, jump: { kind: 'tmux' as const, target: row.tmux } } : {}),
+    ...(row.tmux ? { tmuxTarget: row.tmux } : {}),
+    ...((j => (j ? { jump: j } : {}))(jumpOf(row, term))),
     ...(status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
     ...(typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
     ...(fresh ? { agentsRunning: fresh.agentsRunning, prSummary: fresh.prSummary } : {}),
@@ -130,6 +132,17 @@ export function toSessionVM(
     ...(ctx.prText ? { prText: ctx.prText } : {}),
     ...(ctx.todos ? { todos: ctx.todos } : {}),
     ...(ctx.glosses && Object.keys(ctx.glosses).length ? { glosses: ctx.glosses } : {}),
+  }
+}
+
+/** A detected session focuses through ADR 0008's strategies; an undetected one keeps the plain tmux jump. */
+export function jumpOf(row: RegistryRow, term: TermEnv | undefined): Jump | undefined {
+  if (!term) return row.tmux ? { kind: 'tmux', target: row.tmux } : undefined
+  return {
+    kind: 'session', sessionId: row.sessionId, cwd: row.cwd, pid: row.pid, term,
+    ...(row.tmux ? { tmux: row.tmux } : {}),
+    ...(row.kind === 'bg' ? { bg: true as const } : {}),
+    ...(row.jobId ? { jobId: row.jobId } : {}),
   }
 }
 
@@ -254,10 +267,11 @@ export function buildFleet(
   topics: ReadonlyMap<string, SessionTopic> = new Map(),
   agents: ReadonlyMap<string, readonly OtherAgentVM[]> = new Map(),
   contexts: ReadonlyMap<string, SessionContext> = new Map(),
+  terms: ReadonlyMap<number, TermEnv> = new Map(),
 ): { self?: RegistryRow; others: TmuxGroupVM[] } {
   const self = findSelf(rows, selfId, selfPid)
   const others = rows
     .filter(r => isOtherRow(r, self, selfId, alive))
-    .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId)))
+    .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), terms.get(r.pid)))
   return { ...(self ? { self } : {}), others: groupByTmux(others) }
 }

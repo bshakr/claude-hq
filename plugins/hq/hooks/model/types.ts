@@ -10,10 +10,17 @@ export interface Counts {
   sessions: number
 }
 
-/** Where Enter/click goes. /hq never acts beyond these two. */
+/** A session's terminal, read from its process: tty and the env keys focus strategies use (ADR 0008). */
+export interface TermEnv {
+  tty?: string
+  env: Readonly<Record<string, string>>
+}
+
+/** Where Enter/click goes: focus a session's terminal (else copy its resume command), or open a web URL. */
 export type Jump =
   | { kind: 'tmux'; target: string } // e.g. "ritualpass:@3.%6"
   | { kind: 'url'; url: string }
+  | { kind: 'session'; sessionId: string; cwd: string; pid: number; tmux?: string; bg?: true; jobId?: string; term: TermEnv }
 
 export interface Flare {
   text: string // "rp-api is waiting for your input"

@@ -3,7 +3,7 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import { currentModel, installData } from './data/index'
 import type { HqModel } from './model/types'
-import { runJump } from './ui/jump'
+import { pressJump } from './ui/jump'
 import { layout, scrollFor } from './ui/layout'
 import type { Layout } from './ui/layout'
 import { drawPane } from './ui/pane'
@@ -23,7 +23,7 @@ const HELP = [
   '/hq close    close the pane',
   '/hq help     this list',
   '',
-  'In the pane: j/k or Tab move, Enter or a click opens a PR or switches tmux,',
+  'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
   'Enter on an agent expands it. Esc returns the keys to the prompt.',
 ].join('\n')
 
@@ -92,11 +92,12 @@ async function startPane($: EngineInterface): Promise<void> {
 export async function act($: EngineInterface, key: string, action: Action, last: Layout | undefined): Promise<void> {
   switch (action.kind) {
     case 'jump': {
-      const failed = await runJump(action.jump, argv => $.process.run(argv, { timeoutMs: 5000 }))
-      if (failed !== undefined) {
-        $.ui.toast(`hq: ${failed}`)
-        return
-      }
+      const pressed = await pressJump(action.jump, {
+        run: (argv, init) => $.process.run(argv, { timeoutMs: 3000, ...init }),
+        copy: text => $.ui.copy({ text }).then(r => r.isCopied),
+        toast: text => $.ui.toast(text),
+      })
+      if (!pressed) return
       await update($, cursor, () => key)
       return
     }

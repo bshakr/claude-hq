@@ -1,6 +1,6 @@
 import { atom, read, update } from 'claude-code';
 import { currentModel, installData } from './data/index';
-import { runJump } from './ui/jump';
+import { pressJump } from './ui/jump';
 import { layout, scrollFor } from './ui/layout';
 import { drawPane } from './ui/pane';
 export const PANE = 'hq';
@@ -16,7 +16,7 @@ const HELP = [
     '/hq close    close the pane',
     '/hq help     this list',
     '',
-    'In the pane: j/k or Tab move, Enter or a click opens a PR or switches tmux,',
+    'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
     'Enter on an agent expands it. Esc returns the keys to the prompt.',
 ].join('\n');
 /** Motion only while something visibly runs: the session's own turn, a running agent, checks in progress, a busy session. */
@@ -82,11 +82,13 @@ async function startPane($) {
 export async function act($, key, action, last) {
     switch (action.kind) {
         case 'jump': {
-            const failed = await runJump(action.jump, argv => $.process.run(argv, { timeoutMs: 5000 }));
-            if (failed !== undefined) {
-                $.ui.toast(`hq: ${failed}`);
+            const pressed = await pressJump(action.jump, {
+                run: (argv, init) => $.process.run(argv, { timeoutMs: 3000, ...init }),
+                copy: text => $.ui.copy({ text }).then(r => r.isCopied),
+                toast: text => $.ui.toast(text),
+            });
+            if (!pressed)
                 return;
-            }
             await update($, cursor, () => key);
             return;
         }
