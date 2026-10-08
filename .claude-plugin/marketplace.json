@@ -4,13 +4,13 @@
     "name": "Bassem Shaker"
   },
   "metadata": {
-    "description": "HQ: a Claude Code pane that shows every session on the machine and what needs you."
+    "description": "One pane for every Claude Code session on your machine, and the one that needs you."
   },
   "plugins": [
     {
       "name": "hq",
       "source": "./plugins/hq",
-      "description": "One pane for every Claude Code session on the machine: this session's todos and agents, the others' goals, your PRs, and what needs you."
+      "description": "One pane for every Claude Code session on your machine, and the one that needs you."
     }
   ]
 }

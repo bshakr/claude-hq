@@ -1,17 +1,48 @@
 # claude-hq
 
-**HQ** is a [Claude Code](https://claude.com/claude-code) plugin that puts one pane beside your conversation showing every Claude Code session on the machine, and what needs you:
+**One pane for every Claude Code session on your machine, and the one that needs you.**
 
-- **This session**: what it is doing now, its todo list, and the subagents it is running (model, age, status).
-- **Other sessions**: each one's goal and current step, its own agents and todos, and how long it has been going. Click a session (or press Enter on it) to switch to its tmux pane.
-- **Owned PRs**: the pull requests this session created, pushed or has checked out, with CI and merge state. Click one to open it.
-- **Needs you**: the header counts what is broken (failed agents, red or conflicting PRs) and what is waiting on you (sessions waiting for input, PRs that are behind or blocked).
+Run a few Claude Code sessions, each with its own subagents and pull requests, and it gets hard to tell which one is blocked on a permission prompt, which one's CI just went red, and which one is fine. HQ is a Claude Code mod that docks a pane beside your conversation and answers that at a glance.
 
-HQ only reads and shows. A press opens a PR in the browser or switches tmux; it never types into another session, merges, or pushes.
+<!-- screenshot: docs/hq.png -->
 
-## Screenshots
+```
+ ◆ 1 waiting on you · 2 working                  5h 12% · wk 31%
 
-_Coming soon._
+ ╭─ this session ─────────────────────────────────────────────╮
+ │                                                            │
+ │  Retry flaky checkout webhooks           day 2  ▰▰▰▱▱ 41%  │
+ │  ● fix the retry backoff                               3m  │
+ │    Bash: npm test                                     40s  │
+ │  todos 1/3 ━━━─────  ● Running the webhook specs           │
+ │                                                            │
+ ╰────────────────────────────────────────────────────────────╯
+
+ ╭─ work ─────────────────────────────────────────────────────╮
+ │  api               1 PR · day 1 · ◆ waiting 2m  ▰▰▰▰▱ 63%  │
+ │  Migrating the orders table                                │
+ │  ◆ asks: Bash: rails db:migrate                            │
+ │                                                            │
+ │  docs                                ● busy 6m  ▰▰▱▱▱ 22%  │
+ │  ENG-123 (setup guide): drafting the install steps         │
+ │  ● Check links                                 haiku · 1m  │
+ ╰────────────────────────────────────────────────────────────╯
+
+ ╭─ pull requests ────────────────────────────────────────────╮
+ │  #212  Webhooks: retry with backoff        ▰▰▰▰▰▰▱▱▱▱ 5/9  │
+ │        ci running · no gallery · ci-wait                   │
+ ╰────────────────────────────────────────────────────────────╯
+```
+
+## What you get
+
+- **This session at a glance.** What it is doing right now, its todo list, the background commands it waits on, and each subagent with its model, age and latest step.
+- **Every other session.** A one-line goal and current step (summarised by Haiku), its day count, context fill, PR counts and running agents. Ticket and ADR ids get a few-word gloss.
+- **"Asks: …" when a session waits on you.** A permission prompt, a question or a plan to approve shows on its card, and you get a desktop notification once per new wait.
+- **One press to get there.** Click or Enter on a session brings its terminal forward. If HQ can't find the terminal, it copies the resume command instead.
+- **Your PRs, with checks.** The PRs this session owns, with a checks bar and merge state. Click one to open it.
+- **Wake on CI red, merge or conflict.** When an owned PR goes red, merges, conflicts or falls behind, HQ toasts and starts a turn in the owning session to triage it. It never merges or pushes.
+- **Plan usage in the header.** Your 5-hour and weekly limits, next to the count of what needs you.
 
 ## Install
 
@@ -21,11 +52,9 @@ At the prompt of a Claude Code session in a terminal:
 /plugin install hq --marketplace bshakr/claude-hq
 ```
 
-Answer `y` to add the marketplace, then pick a scope (user scope is first; press Enter). Then type `/hq` to open the pane, `/hq close` to close it, `/hq help` for the keys.
+Answer `y` to add the marketplace, then pick a scope (user scope is first; press Enter). Type `/hq` to open the pane.
 
-### Focus key (recommended)
-
-The pane's buttons sit in the same focus ring as the band above the prompt. Bind a key to reach it in `~/.claude/keybindings.json`:
+**Focus key (recommended).** Plugins can't ship keybindings, so add one yourself to `~/.claude/keybindings.json`. It moves the keys between the prompt and the pane:
 
 ```json
 {
@@ -35,60 +64,62 @@ The pane's buttons sit in the same focus ring as the band above the prompt. Bind
 }
 ```
 
-The pane's own hint says `⌃g focus`; if `ctrl+g` already does something for you, pick another key. Plugins cannot ship keybindings, so this step is manual.
-
-### PR watchers (bundled)
-
-The plugin ships two shell scripts in [`plugins/hq/bin/`](plugins/hq/bin):
-
-- `pr-ci-wait <pr>`: polls a PR until every check settles, then exits once with the result.
-- `pr-merge-wait <pr> [<pr> ...]`: waits until a PR merges, closes, or starts conflicting.
-
-Claude Code puts an enabled plugin's `bin/` folder on the Bash tool's PATH, so once HQ is installed Claude can run them directly (best with `run_in_background`, which costs no tokens while waiting). The PATH is captured when a session starts: restart sessions that were open before the install. Each poll writes `~/.cache/pr-watch/<owner>__<repo>__<n>.<watcher>.json`, and HQ reads those files instead of polling GitHub itself. HQ reads only that default location, so leave `PR_WATCH_STATE_DIR` unset.
-
-To use them from your own shell as well:
-
-```sh
-ln -s "$(claude plugin list --json | jq -r '.[] | select(.id | startswith("hq@")) | .installPath')"/bin/pr-* ~/.local/bin/
-```
+**PR watchers.** The plugin bundles `pr-ci-wait <pr>` (waits until every check settles) and `pr-merge-wait <pr>…` (waits until a PR merges, closes or conflicts). Claude Code puts them on the Bash tool's PATH, so Claude can run them in the background. Each poll writes a small state file under `~/.cache/pr-watch/`, and HQ reads those instead of polling GitHub itself. Sessions open before the install need a restart to see them.
 
 ## Requirements
 
-| Tool | Needed for | Without it |
+| | Needed for | Without it |
 | --- | --- | --- |
-| Claude Code 2.1.295 or newer | the plugin API (function hooks, panes) | does not load. The API is marked early access and may change between releases. |
-| `git` | which repo and branch a session is on, PR ownership | no owned PRs |
-| `gh`, logged in | PR titles and states (`gh pr view`, `gh pr list`, `gh api graphql`) | PRs show as linked, with no state |
-| `grep`, `head`, `tail`, `ps` | reading transcripts, checking which sessions are alive | required (present on macOS and Linux) |
-| `jq` | `pr-ci-wait` (required), `pr-merge-wait` state files (optional) | no watcher state; HQ falls back to `gh` |
-| `tmux` | switching to another session's pane | sessions show, but a press does nothing |
-| `linear` CLI | a few words of title beside Linear ticket ids | ids show bare |
-| `perl` | a hard timeout on each `gh` call in `pr-merge-wait` | calls are unbounded |
+| Claude Code 2.1.295+ | the plugin API (function hooks, panes) | HQ does not load. The API is early access and may change. |
+| `git` | repo, branch and PR ownership | no owned PRs |
+| `gh`, logged in | PR titles, checks and merge state | PRs show with no state |
+| `jq` | `pr-ci-wait` | no watcher state; HQ falls back to `gh` |
+| `tmux` or a supported terminal | bringing a session forward | a press copies the resume command |
+| `linear` CLI (optional) | glossing ticket ids | ids show bare |
 
-**macOS and Linux.** HQ is developed on macOS. Opening a PR uses `open`, which is macOS-only; on Linux, clicking a PR currently fails with a short message (switching tmux works). Everything else is portable.
+Developed on macOS. Linux works for reading and for tmux, but opening a PR uses `open`, which is macOS only.
 
-## How it works
+## What counts as yours
 
-Each session's HQ reads Claude Code's own local files: the session registry in `~/.claude/sessions/`, transcripts in `~/.claude/projects/`, and subagent transcripts beside them. It also publishes a short summary of its own session to `~/.claude/hq/sessions/<sessionId>.json` for the other sessions' panes to read, and removes it when it is stale.
-
-A session **owns** only the PRs it created, pushed, or has checked out; PRs another session is driving do not show up as yours. The decisions, with their reasons and trade-offs, are recorded as ADRs:
-
-- [0001: HQ is one session-scoped pane reading watcher state](plugins/hq/docs/adr/0001-hq-is-one-session-scoped-pane-reading-watcher-state.md)
-- [0002: a session owns only the PRs it created, pushed or has checked out](plugins/hq/docs/adr/0002-a-session-owns-only-the-prs-it-created-pushed-or-has-checked-out.md)
-- [0003: HQ draws each group as a rounded card](plugins/hq/docs/adr/0003-hq-draws-each-group-as-a-rounded-card.md)
-- [0004: a session card names its goal from one cached Haiku summary](plugins/hq/docs/adr/0004-a-session-card-names-its-goal-from-one-cached-haiku-summary.md)
+A session owns only the PRs it created, pushed, or has checked out. A PR another session is driving shows on that session's card, not in your list, and only its owner gets woken when it changes. Other sessions are grouped by tmux session, the ones waiting on you first.
 
 ## Privacy
 
-- HQ reads your local Claude Code transcripts for every session on the machine. Nothing leaves the machine except the two model calls below and `gh` / `linear` calls you are already logged in for.
-- **Goal line.** To name each session's goal, HQ sends at most 6,000 characters drawn from that session's transcript (first prompt, title history, latest compaction summary, PR titles, task subjects, the last few prompts and replies) to Claude Haiku through your own Claude account, the same way Claude Code makes its own calls. It refreshes only when a session moved: on a compaction, after 5 new prompts, or every 30 minutes while busy.
-- **Id glosses.** Titles of the Linear tickets and ADRs a session mentions are sent, in small batches, to Haiku for a few-word brief.
-- **No off switch yet.** There is no setting to turn the model calls off; that is a known gap. Uninstalling or disabling the plugin (`/plugin`) stops them.
+- HQ reads Claude Code's local files: the session registry, transcripts and subagent transcripts under `~/.claude/`. Each HQ writes a short summary of its own session to `~/.claude/hq/sessions/` for the others to read.
+- **Goal line:** up to 6,000 characters from a session's transcript (first prompt, titles, the latest compaction summary, task subjects, recent prompts) go to Haiku through your own Claude account. It refreshes only when the session moved: a compaction, 5 new prompts, or every 30 minutes while busy.
+- **Glosses:** ticket and ADR titles go to Haiku in batches of up to 12.
+- No telemetry. Nothing else leaves the machine, apart from the `gh` and `linear` calls you are already logged in for. There is no switch for the model calls yet; disabling the plugin stops them.
+
+## Works with
+
+A press tries each host that could hold the session, in this order, then falls back to copying `claude --resume` (or `claude attach` for a background session).
+
+| Host | Status |
+| --- | --- |
+| tmux | verified |
+| supacode | verified |
+| Terminal.app | scripts compile; not run on a real machine |
+| zellij, WezTerm, kitty, iTerm2, cmux, VS Code, Cursor | untested |
+| Ghostty and other apps | untested; raises the app, not the tab |
+
+iTerm2 and Terminal.app ask for Automation permission the first time.
+
+## Commands
+
+| Command | Does |
+| --- | --- |
+| `/hq` | open the pane |
+| `/hq close` | close the pane |
+| `/hq wake on` / `off` | start a turn when an owned PR goes red, merges, conflicts or falls behind (on by default); off means toasts only |
+| `/hq notify on` / `off` | a desktop notification when another session starts waiting on you; `/hq notify` shows the setting |
+| `/hq help` | the list above |
+
+In the pane: `j`/`k` or Tab to move, Enter or click to open, Enter on an agent to expand it, Esc to go back to the prompt.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for running it from a checkout and the checks.
 
-## Licence
+## License
 
-[MIT](LICENSE) © Bassem Shaker
+[MIT](LICENSE)
