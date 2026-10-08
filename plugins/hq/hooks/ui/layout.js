@@ -11,6 +11,11 @@ const DIM = { dim: true };
 const tok = (c, extra = {}) => ({ c, ...extra });
 const LIVE = new Set(['running', 'waiting', 'pending']);
 export const agentKey = (a) => `a:${a.id}`;
+/** Item key of the `+N finished` row; its open state rides in `expanded` under FINISHED_ID. */
+export const FINISHED_KEY = 'finished';
+export const FINISHED_ID = '+finished';
+/** The running dot: one glyph, its colour stepping between full and dim with the motion phase. */
+const runDot = (phase) => tok('run', phase % 2 ? { dim: true } : {});
 export const prKey = (p) => `p:${p.repo}#${p.number}`;
 export const sessionKey = (s) => `s:${s.sessionId}`;
 /** Below this width a card drops its border and keeps its title. */
@@ -46,32 +51,17 @@ function card(x, title, tone, inner, padY) {
 }
 const worst = (tones) => (tones.includes('fail') ? 'fail' : tones.includes('wait') ? 'wait' : 'rule');
 // ---------- header and flare ----------
+/** The pinned top row: plan usage right-aligned; narrowing drops the bars, then the week. */
 function header(r, m, focused) {
     if (focused)
         r.put(0, '▌', tok('accent'));
-    const { waiting, broken, inProgress } = m.counts;
-    const parts = [];
-    if (waiting)
-        parts.push([`${waiting} waiting on you`, tok('wait')]);
-    if (broken)
-        parts.push([`${broken} broken`, tok('fail')]);
-    if (inProgress)
-        parts.push([`${inProgress} working`, {}]);
-    if (!waiting && !broken)
-        parts.push(['nothing needs you', DIM]);
-    const [glyph, gs] = waiting ? ['◆', tok('wait')] : broken ? ['✗', tok('fail')] : inProgress ? ['●', tok('run')] : ['○', DIM];
-    let c = r.put(1, glyph, gs) + 1;
-    for (const [i, [t, s]] of parts.entries()) {
-        if (i)
-            c = r.put(c, ' · ', DIM);
-        const shown = clip(t, r.W - c);
-        c = r.put(c, shown, s);
-        if (shown !== t)
-            break;
-    }
     const a = m.account;
-    if (!putRight(r, accountParts(a), c + 2) && a?.week !== undefined)
-        putRight(r, accountParts({ ...a, week: undefined }), c + 2);
+    if (!a)
+        return;
+    const tries = [accountParts(a), accountParts(a, false), accountParts({ ...a, week: undefined }, false)];
+    for (const parts of tries)
+        if (putRight(r, parts, 2))
+            return;
 }
 const tmuxShort = (target) => target.replace(/\.%\d+$/, '');
 function flareRow(r, m, actions) {
@@ -199,8 +189,8 @@ function agentRows(node, depth, x) {
     }
     else {
         const longCall = a.status === 'running' && a.callSince !== undefined && now - a.callSince >= LONG_CALL_MS;
-        const glyph = failed ? '✗' : a.status === 'waiting' || longCall ? '◷' : a.status === 'pending' ? '◦' : x.phase % 2 ? '◦' : '●';
-        r.put(gc, glyph, tok(failed ? 'fail' : 'run'));
+        const glyph = failed ? '✗' : a.status === 'waiting' || longCall ? '◷' : a.status === 'pending' ? '◦' : '●';
+        r.put(gc, glyph, glyph === '●' ? runDot(x.phase) : tok(failed ? 'fail' : 'run'));
         const end = failed ? (a.endedAt ?? now) : now;
         const parts = [shortModel(a.model), elapsed(end - a.startedAt)].filter(Boolean);
         let right = parts.join(' · ');
@@ -247,10 +237,7 @@ function agentRows(node, depth, x) {
                 out.push(e);
             });
         };
-        const end = a.endedAt ?? now;
-        field('agent', [shortModel(a.model), a.background ? 'background' : 'foreground', elapsed(end - a.startedAt), plural(a.toolCount, 'tool')].filter(Boolean).join(' · ') + (a.tokens ? ` · ${a.tokens} tokens` : ''));
-        if ((a.todo || a.now) && !failed)
-            field('doing', a.todo ? `${a.todo.text} · ${a.todo.done}/${a.todo.total}` : (a.now ?? ''));
+        // Only what the header and doing line do not say already.
         const where = [a.worktree, a.files.join(', ')].filter(Boolean).join(' · ');
         if (where)
             field('in', where, DIM);
@@ -260,7 +247,7 @@ function agentRows(node, depth, x) {
     }
     return out;
 }
-/** Live and failed agents, then finished ones after a blank; children follow their parent, indented. */
+/** Live and failed agents, then after a blank the newest finished one and a `+N finished` toggle for the rest. */
 function agentBlock(agents, x) {
     const out = [];
     const roots = agentTree(agents);
@@ -268,28 +255,72 @@ function agentBlock(agents, x) {
         out.push(...agentRows(n, Math.min(depth, 2), x));
         n.kids.forEach(k => walk(k, depth + 1));
     };
-    roots.forEach((n, i) => {
-        if (i > 0 && rank(n.a) === 2 && rank(roots[i - 1].a) !== 2)
-            out.push(new Row(x.IW));
-        walk(n, 0);
-    });
+    const active = roots.filter(n => rank(n.a) !== 2);
+    const finished = roots.filter(n => rank(n.a) === 2);
+    active.forEach(n => walk(n, 0));
+    if (!finished.length)
+        return out;
+    if (active.length)
+        out.push(new Row(x.IW));
+    walk(finished[0], 0);
+    if (finished.length > 1) {
+        const open = x.expanded.has(FINISHED_ID);
+        x.actions[FINISHED_KEY] = { kind: 'toggle', id: FINISHED_ID };
+        const r = new Row(x.IW);
+        r.item = FINISHED_KEY;
+        r.head = true;
+        const n = finished.length - 1;
+        r.button(2, open ? `− ${n} finished` : `+${n} finished`, { key: FINISHED_KEY, action: x.actions[FINISHED_KEY], dim: true }, DIM);
+        out.push(r);
+        if (open)
+            finished.slice(1).forEach(f => walk(f, 0));
+    }
     return out;
 }
 // ---------- this session ----------
-function nowRows(n, x) {
+/** Parts right-aligned as the first that leaves `keep` cells of text; answers the text's room. */
+function fitRight(r, tries, keep = 8) {
+    const fit = tries.find(p => r.W - partsWidth(p) - 2 >= keep) ?? [];
+    putRight(r, fit);
+    return fit.length ? r.W - partsWidth(fit) - 2 : r.W;
+}
+/** What the main loop waits on while idle: its running agents and background shells. */
+function waitingOn(agents, waits) {
+    const ids = new Set(agents.map(a => a.id));
+    // The main loop waits on the agents it started; a nested child is its parent's wait.
+    const live = agents.filter(a => LIVE.has(a.status) && !(a.parentId !== undefined && ids.has(a.parentId)));
+    if (!live.length && !waits.length)
+        return undefined;
+    const what = [live.length ? plural(live.length, 'agent') : '', waits.length ? plural(waits.length, 'background task') : ''];
+    return { text: `waiting on ${what.filter(Boolean).join(' · ')}`, since: Math.min(...live.map(a => a.startedAt), ...waits.map(w => w.since)) };
+}
+/** The now line; `meter` rides on its right when the card has no goal line to carry it. */
+function nowRows(n, x, meter, on) {
     const { IW, now } = x;
     const r = new Row(IW);
-    const room = rightPart(r, 2, age(now - n.since), 8);
-    if (n.idle) {
+    const idle = !n || n.idle;
+    const waiting = idle && on !== undefined;
+    const ago = waiting ? elapsed(now - on.since) : n ? age(now - n.since) : '';
+    const lead = ago ? [{ t: ago, s: DIM }] : [];
+    const room = fitRight(r, [[...lead, ...meter.full], [...lead, ...meter.pct], lead], 10) - 2;
+    if (waiting) {
+        r.put(0, '◷', tok('run'));
+        r.put(2, clip(on.text, room));
+    }
+    else if (!n) {
+        if (!meter.full.length)
+            return [];
+    }
+    else if (n.idle) {
         r.put(0, '○', DIM);
         r.put(2, clip(n.prompt ? `idle · ${n.prompt}` : 'idle', room), DIM);
     }
     else {
-        r.put(0, x.phase % 2 ? '◦' : '●', tok('run'));
+        r.put(0, '●', runDot(x.phase));
         r.put(2, clip(n.prompt ?? 'working', room));
     }
     const out = [r];
-    if (n.tool && !n.idle) {
+    if (n?.tool && !n.idle) {
         const t = new Row(IW);
         const tr = rightPart(t, 2, elapsed(now - n.tool.since), 8);
         t.put(2, clip(n.tool.text, tr), DIM);
@@ -338,22 +369,25 @@ function sessionCard(m, x0) {
     const x = { ...x0, ...(cur.glosses ? { g: cur.glosses } : {}) };
     const inner = [];
     const meter = meterParts(cur.context);
+    const on = waitingOn(cur.agents, cur.waiting ?? []);
     if (cur.goal) {
+        // Summarised like another session's card: goal, then day, status and meter on the right; the step under it.
         const g = new Row(x.IW);
-        const day = cur.goal.day ? [{ t: `day ${cur.goal.day}`, s: DIM }] : [];
-        const right = [[...day, ...meter.full], [...day, ...meter.pct], day].find(p => x.IW - partsWidth(p) - 2 >= 8) ?? [];
-        putRight(g, right);
-        g.put(0, clip(expandIds(cur.goal.text, x.g), right.length ? x.IW - partsWidth(right) - 2 : x.IW), { bold: true });
+        const day = cur.goal.day ? [{ t: `day ${cur.goal.day} · `, s: DIM }] : [];
+        const busy = cur.now !== undefined && !cur.now.idle;
+        const status = busy
+            ? [{ t: '●', s: runDot(x.phase) }, { t: ' busy', s: DIM }]
+            : on ? [{ t: '◷', s: tok('run') }, { t: ' waiting', s: DIM }] : [{ t: 'idle', s: DIM }];
+        const room = fitRight(g, [[...day, ...status, ...meter.full], [...day, ...status, ...meter.pct], [...status, ...meter.pct], status]);
+        g.put(0, clip(expandIds(cur.goal.text, x.g), room), { bold: true });
         inner.push(g);
+        if (cur.goal.step) {
+            const st = new Row(x.IW);
+            st.put(0, clip(expandIds(cur.goal.step, x.g), x.IW), DIM);
+            inner.push(st);
+        }
     }
-    else if (cur.context) {
-        const g = new Row(x.IW);
-        if (!putRight(g, meter.full))
-            putRight(g, meter.pct);
-        inner.push(g);
-    }
-    if (cur.now)
-        inner.push(...nowRows(cur.now, x));
+    inner.push(...nowRows(cur.now, x, cur.goal ? { full: [], pct: [] } : meter, on));
     if (cur.todos?.length)
         inner.push(todoRow(cur.todos, x));
     if (cur.waiting?.length)
@@ -367,7 +401,7 @@ function sessionCard(m, x0) {
         inner.push(r);
     }
     const tone = worst(cur.agents.filter(a => a.status === 'failed').map(() => 'fail'));
-    return card(x, 'this session', tone, inner, true);
+    return card(x, cur.goal && cur.title ? cur.title : 'this session', tone, inner, true);
 }
 // ---------- other sessions ----------
 const OTHER_AGENTS_SHOWN = 3;
@@ -425,7 +459,7 @@ function otherRows(s, x) {
     const status = s.status === 'waiting'
         ? [{ t: '◆', s: tok('wait') }, { t: ` waiting${since}`, s: tok('wait') }]
         : s.status === 'busy'
-            ? [{ t: x.phase % 2 ? '◦' : '●', s: tok('run') }, { t: ` busy${since}`, s: DIM }]
+            ? [{ t: '●', s: runDot(x.phase) }, { t: ` busy${since}`, s: DIM }]
             : [{ t: `${s.wait?.kind === 'turn' ? 'your turn' : 'idle'}${since}`, s: DIM }];
     if (s.day)
         status.unshift({ t: `day ${s.day} · `, s: DIM });

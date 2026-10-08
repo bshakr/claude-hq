@@ -2,7 +2,7 @@ import type { Jump } from '../model/types'
 import { charWidth, cellLen } from './text'
 
 /** Colour tokens of the sheet; dim and bold are attributes, not tokens. */
-export type Tok = 'fail' | 'wait' | 'run' | 'accent' | 'rule'
+export type Tok = 'fail' | 'wait' | 'run' | 'ok' | 'accent' | 'rule'
 
 export type Sty = { c?: Tok; dim?: true; bold?: true; btn?: string; href?: string }
 

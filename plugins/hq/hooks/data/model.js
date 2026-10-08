@@ -89,6 +89,7 @@ export function buildModel(inputs) {
         ...(flare ? { flare } : {}),
         current: {
             label: inputs.label,
+            ...(inputs.title ? { title: inputs.title } : {}),
             ...(inputs.goal ? { goal: inputs.goal } : {}),
             ...(inputs.activity?.now ? { now: inputs.activity.now } : {}),
             ...(inputs.activity?.todos?.length ? { todos: inputs.activity.todos } : {}),

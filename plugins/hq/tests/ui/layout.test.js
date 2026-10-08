@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'claude-code/testing';
-import { FOCUSED_HINT, UNFOCUSED_HINT, layout, scrollFor } from '../../hooks/ui/layout';
+import { FINISHED_ID, FINISHED_KEY, FOCUSED_HINT, UNFOCUSED_HINT, layout, scrollFor } from '../../hooks/ui/layout';
 import { cellLen } from '../../hooks/ui/text';
 import { ACTIVE, BUSY, EMPTY, LONG, QUIET } from './fixtures';
 import * as SHEET from './sheet';
@@ -97,17 +97,11 @@ const BORDER = /^[╭╮╰╯│─]+$/;
 const coloured = (rows) => rows.flatMap(r => r.segs().filter(s => s.s.c && s.t.trim() && !BORDER.test(s.t)));
 const borderTone = (rows, title) => rows.find(r => r.text().startsWith(` ╭─ ${title}`)).cells[1].s.c;
 describe('colour', () => {
-    test('header: one sentence, counts only when non-zero, coloured by what they mean', () => {
-        const rows = layout(BUSY, view()).rows;
-        expect(rows[0].text()).toBe(' ◆ 3 waiting on you · 2 broken · 3 working');
-        expect(runsOf(rows[0]).filter(r => r.tok !== 'dim')).toEqual([
-            { col: 1, t: '◆', tok: 'wait' }, { col: 3, t: '3 waiting on you', tok: 'wait' }, { col: 22, t: '2 broken', tok: 'fail' },
-        ]);
-        expect(lines(QUIET)[0]).toBe(' ○ nothing needs you');
-        const working = { ...QUIET, counts: { waiting: 0, broken: 0, inProgress: 1, sessions: 4 } };
-        expect(lines(working)[0]).toBe(' ● 1 working · nothing needs you');
-        const broken = { ...QUIET, counts: { waiting: 0, broken: 1, inProgress: 0, sessions: 4 } };
-        expect(lines(broken)[0]).toBe(' ✗ 1 broken');
+    test('header: no sentence of counts; the flare under it still says who needs you', () => {
+        expect(lines(BUSY)[0]).toBe('');
+        expect(lines(QUIET)[0]).toBe('');
+        expect(lines(BUSY, { focused: true })[0]).toBe('▌');
+        expect(lines(BUSY)[2].startsWith(' ◆ rp-api is waiting for your input')).toBe(true);
     });
     test('card borders: dim normally, yellow when something needs you, red when broken', () => {
         const rows = layout(BUSY, view({ rows: 90 })).rows;
@@ -197,8 +191,14 @@ describe('targets', () => {
         const open = lines(BUSY, { expanded: ['a3'] });
         expect(open.length).toBe(closed.length);
         const at = open.findIndex(t => t.includes('Adversarial review'));
-        expect(open[at + 1]).toBe(' │    agent   opus · background · 9m 40s · 41 tools                           │');
-        expect(open[at + 2].startsWith(' │    result  3 findings: 1 HIGH')).toBe(true);
+        // Nothing the header already says: no model, elapsed, tool or token counts.
+        expect(open[at + 1].startsWith(' │    result  3 findings: 1 HIGH')).toBe(true);
+        expect(open.some(t => /│ {4}(agent|doing) |\d+ tools\b|tokens/.test(t))).toBe(false);
+        const running = lines(BUSY, { expanded: ['a2'] });
+        const r = running.findIndex(t => t.includes('● Run ledger specs'));
+        expect(running[r + 1].includes('Bash: bin/rspec')).toBe(true);
+        expect(running[r + 2].includes('in      .koh/ledger-refund-reconcile')).toBe(true);
+        expect(running.filter(t => t.includes('bin/rspec')).length).toBe(1);
     });
     test('no pull requests, no card', () => {
         const m = { ...QUIET, current: { ...QUIET.current, prs: [] } };
@@ -209,10 +209,10 @@ describe('targets', () => {
 describe('scrolling and motion', () => {
     test('the below indicator counts lit items, the above one appears once scrolled', () => {
         const top = lines(LONG, { rows: 34 });
-        expect(top[32]).toBe(' ↓ 42 rows below   ✗ 1 broken   ◆ 2 waiting on you');
+        expect(top[32]).toBe(' ↓ 44 rows below   ✗ 1 broken   ◆ 2 waiting on you');
         const mid = lines(LONG, { rows: 34, scroll: 10 });
         expect(mid[3].startsWith(' ↑ 10 rows above   ✗ 1 broken')).toBe(true);
-        expect(mid[32].startsWith(' ↓ 32 rows below')).toBe(true);
+        expect(mid[32].startsWith(' ↓ 34 rows below')).toBe(true);
     });
     test('scrollFor keeps the cursor row inside the window', () => {
         const l = layout(LONG, view({ rows: 34 }));
@@ -272,7 +272,8 @@ describe('this session: one card for now, todos, waiting and agents', () => {
         expect(toks).toEqual(['●=run', '━━━=run', '●=run', '◷=run']);
     });
     test('idle after the turn: dim, reads idle, no tool line', () => {
-        const m = { ...ACTIVE, current: { ...ACTIVE.current, now: { prompt: 'Ship it', since: ACTIVE.now - 60_000, idle: true }, todos: undefined, waiting: undefined } };
+        const quiet = ACTIVE.current.agents.filter(a => a.status !== 'running' && a.status !== 'waiting');
+        const m = { ...ACTIVE, current: { ...ACTIVE.current, agents: quiet, now: { prompt: 'Ship it', since: ACTIVE.now - 60_000, idle: true }, todos: undefined, waiting: undefined } };
         const rows = layout(m, view()).rows;
         expect(rows[6].text()).toBe(' │  ○ idle · Ship it                                                      1m  │');
         expect(coloured([rows[6]])).toEqual([]);
@@ -343,5 +344,77 @@ describe('other sessions: one card per tmux group', () => {
         }, { rows: 90 });
         const at = other.findIndex(l => l.includes('◷ Implement BLO-1941'));
         expect(other[at + 1].startsWith(' │    waiting · Run the spec suite · 9m')).toBe(true);
+    });
+});
+describe('this session: finished agents, the waiting now line, the goal line', () => {
+    const fin = (id, minsAgo) => ({
+        id, title: `Finished ${id}`, status: 'completed', background: true, startedAt: BUSY.now - 20 * 60_000,
+        endedAt: BUSY.now - minsAgo * 60_000, toolCount: 3, files: [], outcome: `outcome ${id}`,
+    });
+    const FIN = { ...BUSY, current: { ...BUSY.current, agents: [...BUSY.current.agents, fin('f1', 1), fin('f2', 7), fin('f3', 9)] } };
+    test('only the newest finished agent shows, then one dim +N finished row that toggles the rest', () => {
+        const closed = layout(FIN, view({ rows: 90 }));
+        const got = closed.rows.map(r => r.text());
+        const at = got.findIndex(l => l.includes('✓ Finished f1'));
+        expect(got[at + 1]).toBe(' │    +3 finished                                                             │');
+        expect(got.some(l => l.includes('Finished f2') || l.includes('Adversarial review'))).toBe(false);
+        expect(closed.items.includes(FINISHED_KEY)).toBe(true);
+        expect(closed.actions[FINISHED_KEY]).toEqual({ kind: 'toggle', id: FINISHED_ID });
+        expect(closed.rows[at + 1].cells[6].s.dim).toBe(true);
+        const open = lines(FIN, { rows: 90, expanded: [FINISHED_ID] });
+        const o = open.findIndex(l => l.includes('✓ Finished f1'));
+        expect(open[o + 1].includes('− 3 finished')).toBe(true);
+        const rest = ['✓ Adversarial review', '✓ Find refund callers', '✓ Finished f2', '✓ Finished f3'];
+        rest.forEach((t, i) => expect(open[o + 2 + i].includes(t)).toBe(true));
+    });
+    test('one finished agent needs no toggle row', () => {
+        expect(lines(BUSY, { rows: 90 }).some(l => l.includes('finished'))).toBe(false);
+    });
+    test('idle with agents running reads ◷ waiting on N agents, timed by the longest-running one', () => {
+        const m = { ...BUSY, current: { ...BUSY.current, now: { prompt: 'agent reported: done', since: BUSY.now - 60_000, idle: true } } };
+        const got = lines(m);
+        expect(got[6]).toBe(' │  ◷ waiting on 1 agent                                             14m 20s  │');
+        expect(got.some(l => l.includes('idle ·'))).toBe(false);
+        const waitsOnly = { ...QUIET, current: { ...QUIET.current, now: { since: QUIET.now, idle: true }, waiting: [{ text: 'pr-ci-wait 276', since: QUIET.now - 3 * 60_000 }] } };
+        expect(lines(waitsOnly)[4].includes('◷ waiting on 1 background task')).toBe(true);
+    });
+    test('without a goal the context meter rides on the now line, not a line of its own', () => {
+        const m = { ...ACTIVE, current: { ...ACTIVE.current, context: { percent: 36, window: 1_000_000, source: 'live' } } };
+        const got = lines(m);
+        expect(got[4].startsWith(' ╭─ this session')).toBe(true);
+        expect(got[6].startsWith(' │  ● Fix the stale PR list')).toBe(true);
+        expect(got[6].endsWith('2m  ▰▰▱▱▱ 36%  │')).toBe(true);
+        expect(got.filter(l => l.includes('36%')).length).toBe(1);
+    });
+    test('with a goal the card takes the repo name, the goal line carries day, status and meter, the step sits under it', () => {
+        const m = {
+            ...ACTIVE,
+            current: { ...ACTIVE.current, title: 'claude-hq', goal: { text: 'Ship the HQ layout fixes', day: 3, step: 'Rewriting the agent rows' }, context: { percent: 36, window: 1_000_000, source: 'live' } },
+        };
+        const got = lines(m);
+        expect(got[4].startsWith(' ╭─ claude-hq ─')).toBe(true);
+        expect(got[6]).toBe(' │  Ship the HQ layout fixes                       day 3 · ● busy  ▰▰▱▱▱ 36%  │');
+        expect(got[7]).toBe(' │  Rewriting the agent rows                                                  │');
+        expect(got[8].startsWith(' │  ● Fix the stale PR list')).toBe(true);
+        expect(got[8].endsWith('2m  │')).toBe(true);
+        const noGoal = lines({ ...m, current: { ...m.current, goal: undefined } });
+        expect(noGoal[4].startsWith(' ╭─ this session')).toBe(true);
+    });
+    test('running dots keep one glyph and step colour between full and dim', () => {
+        for (const m of [BUSY, ACTIVE]) {
+            const a = layout(m, view({ phase: 0, rows: 90 })).rows;
+            const b = layout(m, view({ phase: 1, rows: 90 })).rows;
+            let stepped = 0;
+            a.forEach((r, i) => r.cells.forEach((c, j) => {
+                const d = b[i].cells[j];
+                if (c.ch === '●' || d.ch === '●') {
+                    expect(d.ch).toBe(c.ch);
+                    if (c.s.c === 'run' && !c.s.dim && d.s.c === 'run' && d.s.dim)
+                        stepped++;
+                }
+            }));
+            expect(stepped).toBeGreaterThan(0);
+            expect(b.some(r => r.text().includes('◦ Run') || r.text().includes('◦ busy'))).toBe(false);
+        }
     });
 });

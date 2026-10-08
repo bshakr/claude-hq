@@ -12,7 +12,9 @@ export interface ModelInputs {
   prs: PrVM[]
   others: TmuxGroupVM[]
   activity?: { now?: NowVM; todos?: TodoVM[]; waiting?: WaitingVM[] }
-  goal?: { text: string; day?: number }
+  goal?: { text: string; day?: number; step?: string }
+  /** This session's repo or folder name, the card's title once it has a goal. */
+  title?: string
   glosses?: Record<string, string>
   context?: ContextUsage
   account?: AccountUsage
@@ -110,6 +112,7 @@ export function buildModel(inputs: ModelInputs): HqModel {
     ...(flare ? { flare } : {}),
     current: {
       label: inputs.label,
+      ...(inputs.title ? { title: inputs.title } : {}),
       ...(inputs.goal ? { goal: inputs.goal } : {}),
       ...(inputs.activity?.now ? { now: inputs.activity.now } : {}),
       ...(inputs.activity?.todos?.length ? { todos: inputs.activity.todos } : {}),

@@ -193,8 +193,8 @@ describe('layout: glossed ids', () => {
     });
     test('narrow: the expanded line is clipped with …; without glosses the ids stay bare', () => {
         const got = draw(model(G), 40);
-        const goal = got.find(l => l.includes('Finish ADR 0019'));
-        expect(goal.includes('Finish ADR 0019 (append-…  day 2')).toBe(true);
+        const goal = got[4];
+        expect(goal.includes('Finish ADR 0…  day 2 · ◷ waiting')).toBe(true);
         expect(goal.length).toBeLessThanOrEqual(40);
         const bare = draw(model(undefined), 120);
         expect(bare.some(l => l.includes('Fix batch BLO-1947') && !l.includes('('))).toBe(true);

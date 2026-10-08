@@ -811,7 +811,9 @@ async function start($: EngineInterface): Promise<void> {
       S.dirty = true
     }
     launchBriefs()
-    const goal = ownGoal ? { text: ownGoal, ...(own.ctx.day ? { day: own.ctx.day } : {}) } : undefined
+    const goal = ownGoal
+      ? { text: ownGoal, ...(own.ctx.day ? { day: own.ctx.day } : {}), ...(own.ctx.step ? { step: own.ctx.step } : {}) }
+      : undefined
     if (JSON.stringify(goal) !== JSON.stringify(S.goal)) {
       S.goal = goal
       S.dirty = true
@@ -821,6 +823,7 @@ async function start($: EngineInterface): Promise<void> {
     const target = session ? `${session}${window ? `:${window}` : ''}` : ''
     const branch = await branchOf(sessionCwd)
     S.label = [target, branch].filter(Boolean).join(' · ')
+    S.title = (await repoForDir(sessionCwd))?.split('/').pop() || sessionCwd.replace(/\/+$/, '').split('/').pop() || ''
 
     try {
       reconcile(S.agents, (await $.agent.list()) as ListedAgent[], S.now)

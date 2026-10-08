@@ -7,6 +7,7 @@ export const TOKENS: Record<Tok, string> = {
   fail: 'ansi256(1)',
   wait: 'ansi256(3)',
   run: 'ansi256(4)',
+  ok: 'ansi256(2)',
   accent: 'ansi256(6)',
   rule: 'ansi256(8)',
 }
@@ -20,8 +21,11 @@ export type DrawOpts = {
 
 function textProps(s: Sty, hovered: boolean) {
   const props: { color?: string; dimColor?: boolean; bold?: boolean; hover?: { dimColor?: boolean } } = {}
-  if (s.c !== undefined) props.color = TOKENS[s.c]
-  else if (s.dim) {
+  if (s.c !== undefined) {
+    props.color = TOKENS[s.c]
+    // A colour may be dimmed too: the running dot's motion phase.
+    if (s.dim) props.dimColor = true
+  } else if (s.dim) {
     props.dimColor = true
     // Plain text on hover: dim runs come up to full strength under the pointer.
     if (hovered) props.hover = { dimColor: false }

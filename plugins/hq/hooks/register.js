@@ -22,7 +22,7 @@ const HELP = [
     '/hq help     this list',
     '',
     'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
-    'Enter on an agent expands it. Esc returns the keys to the prompt.',
+    'Enter on an agent expands it, on +N finished shows the rest. Esc returns the keys to the prompt.',
 ].join('\n');
 /** Motion only while something visibly runs: the session's own turn, a running agent, checks in progress, a busy session. */
 export function hasMotion(m) {
