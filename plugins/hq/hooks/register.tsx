@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import { currentModel, installData } from './data/index'
+import { WAKE_KEY, parseWake } from './data/wake'
 import type { HqModel } from './model/types'
 import { pressJump } from './ui/jump'
 import { layout, scrollFor } from './ui/layout'
@@ -21,6 +22,8 @@ const phase = atom({ plugin: 'hq', key: 'phase' } as const, 0)
 const HELP = [
   '/hq          open the pane (⌃g moves the keys between it and the prompt)',
   '/hq close    close the pane',
+  '/hq wake on  wake this session on its own PRs going red, merging, conflicting or behind (default)',
+  '/hq wake off toasts only, never start a turn',
   '/hq help     this list',
   '',
   'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
@@ -80,7 +83,7 @@ async function startPane($: EngineInterface): Promise<void> {
     await $.command.register({
       name: COMMAND,
       description: 'Pane of what needs you: agents, PRs and other sessions',
-      argumentHint: '[close | help]',
+      argumentHint: '[close | wake on|off | help]',
       immediate: true,
     })
   } catch (thrown) {
@@ -164,6 +167,11 @@ export const register: Register = on => {
       return { text: 'hq pane closed.' }
     }
     if (args === 'help') return { text: HELP }
+    const toggle = parseWake(args)
+    if (toggle !== null) {
+      await $.store.set(WAKE_KEY, toggle === 'on')
+      return { text: `hq waking is ${toggle}.` }
+    }
     return { text: `Unknown subcommand "${args}".\n${HELP}` }
   })
 

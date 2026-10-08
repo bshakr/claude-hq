@@ -4,6 +4,7 @@ import { resumeOnly } from './focus';
 import { Row } from './row';
 import { expandIds } from '../data/ids';
 import { age, cellLen, clip, elapsed, plural, wrap } from './text';
+import { accountParts, meterParts, partsWidth, putRight } from './meter';
 export const UNFOCUSED_HINT = '⌃g focus · click a PR to open it, a session to switch to it';
 export const FOCUSED_HINT = '⏎ open, switch or expand · ⌃g prompt';
 const DIM = { dim: true };
@@ -68,6 +69,9 @@ function header(r, m, focused) {
         if (shown !== t)
             break;
     }
+    const a = m.account;
+    if (!putRight(r, accountParts(a), c + 2) && a?.week !== undefined)
+        putRight(r, accountParts({ ...a, week: undefined }), c + 2);
 }
 const tmuxShort = (target) => target.replace(/\.%\d+$/, '');
 function flareRow(r, m, actions) {
@@ -333,9 +337,19 @@ function sessionCard(m, x0) {
     const cur = m.current;
     const x = { ...x0, ...(cur.glosses ? { g: cur.glosses } : {}) };
     const inner = [];
+    const meter = meterParts(cur.context);
     if (cur.goal) {
         const g = new Row(x.IW);
-        g.put(0, clip(expandIds(cur.goal.text, x.g), rightPart(g, 0, cur.goal.day ? `day ${cur.goal.day}` : '', 8)), { bold: true });
+        const day = cur.goal.day ? [{ t: `day ${cur.goal.day}`, s: DIM }] : [];
+        const right = [[...day, ...meter.full], [...day, ...meter.pct], day].find(p => x.IW - partsWidth(p) - 2 >= 8) ?? [];
+        putRight(g, right);
+        g.put(0, clip(expandIds(cur.goal.text, x.g), right.length ? x.IW - partsWidth(right) - 2 : x.IW), { bold: true });
+        inner.push(g);
+    }
+    else if (cur.context) {
+        const g = new Row(x.IW);
+        if (!putRight(g, meter.full))
+            putRight(g, meter.pct);
         inner.push(g);
     }
     if (cur.now)
@@ -434,11 +448,10 @@ function otherRows(s, x) {
     const width = (ps2) => ps2.reduce((n, p) => n + cellLen(p.t), 0);
     const name = expandIds(s.name, s.glosses);
     const keep = Math.min(cellLen(name), 12);
-    let right = [...prs, ...status];
-    if (IW - width(right) - 2 < keep)
-        right = status;
-    if (IW - width(right) - 2 < keep)
-        right = [];
+    // Narrowing drops the meter's cells, then the PR facts, then its percent, then the status.
+    const meter = meterParts(s.context);
+    const right = [[...prs, ...status, ...meter.full], [...prs, ...status, ...meter.pct], [...status, ...meter.pct], status]
+        .find(p => IW - width(p) - 2 >= keep) ?? [];
     let col = IW - width(right);
     for (const p of right)
         col = r.put(col, p.t, p.s);

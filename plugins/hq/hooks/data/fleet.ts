@@ -1,5 +1,5 @@
 // Other Claude sessions on this machine, from ~/.claude/sessions/<pid>.json.
-import type { Flare, Jump, OtherAgentVM, OtherSessionVM, PublishedSession, TermEnv, TmuxGroupVM, TodoProgress } from '../model/types'
+import type { ContextUsage, Flare, Jump, OtherAgentVM, OtherSessionVM, PublishedSession, TermEnv, TmuxGroupVM, TodoProgress } from '../model/types'
 
 export const PUBLISH_FRESH_MS = 30_000
 
@@ -79,6 +79,7 @@ export interface SessionContext {
   prText?: string
   todos?: TodoProgress
   glosses?: Record<string, string>
+  context?: ContextUsage
 }
 
 /** What a session is about, from its transcript: the AI title (or a /rename), else its first prompt. */
@@ -132,6 +133,7 @@ export function toSessionVM(
     ...(ctx.prText ? { prText: ctx.prText } : {}),
     ...(ctx.todos ? { todos: ctx.todos } : {}),
     ...(ctx.glosses && Object.keys(ctx.glosses).length ? { glosses: ctx.glosses } : {}),
+    ...(ctx.context ? { context: ctx.context } : {}),
   }
 }
 

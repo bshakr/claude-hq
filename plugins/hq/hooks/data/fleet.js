@@ -85,6 +85,7 @@ export function toSessionVM(row, branch, published, now, topic = {}, transcriptA
         ...(ctx.prText ? { prText: ctx.prText } : {}),
         ...(ctx.todos ? { todos: ctx.todos } : {}),
         ...(ctx.glosses && Object.keys(ctx.glosses).length ? { glosses: ctx.glosses } : {}),
+        ...(ctx.context ? { context: ctx.context } : {}),
     };
 }
 /** A detected session focuses through ADR 0008's strategies; an undetected one keeps the plain tmux jump. */

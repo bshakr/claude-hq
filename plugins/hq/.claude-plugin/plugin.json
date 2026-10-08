@@ -5,5 +5,8 @@
   "types": "./types/index.d.ts",
   "author": {
     "name": "Bassem Shaker"
-  }
+  },
+  "repository": "https://github.com/bshakr/claude-hq",
+  "homepage": "https://github.com/bshakr/claude-hq",
+  "license": "MIT"
 }
