@@ -28,7 +28,7 @@ import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, 
 import { parsePsTerm } from './term'
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs'
 import type { BranchClaim, OwnedState, PrFiles, StoredClaim } from './prs'
-import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting'
+import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onMainAnswer, onPromptOrigin, otherWait, ownWait } from './waiting'
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify'
 import { WAKE_KEY, newsOf } from './wake'
 
@@ -149,6 +149,7 @@ export function installData(on: On, onChange: () => void): void {
       try {
         S.now = await $.clock.now()
         onTurnEnd(S.activity, S.now)
+        onMainAnswer(e.answer, e.reason, S.now)
         S.dirty = true
         rebuild()
       } catch {

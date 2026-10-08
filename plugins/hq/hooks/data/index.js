@@ -11,7 +11,7 @@ import { accountOf, live, preferred, settingsModel } from './usage';
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe';
 import { parsePsTerm } from './term';
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs';
-import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting';
+import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onMainAnswer, onPromptOrigin, otherWait, ownWait } from './waiting';
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify';
 import { WAKE_KEY, newsOf } from './wake';
 /** An owned PR with no live watcher is re-read from GitHub this often. */
@@ -121,6 +121,7 @@ export function installData(on, onChange) {
             try {
                 S.now = await $.clock.now();
                 onTurnEnd(S.activity, S.now);
+                onMainAnswer(e.answer, e.reason, S.now);
                 S.dirty = true;
                 rebuild();
             }

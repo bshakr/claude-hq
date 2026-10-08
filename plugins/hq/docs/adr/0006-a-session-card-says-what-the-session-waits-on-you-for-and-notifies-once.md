@@ -21,6 +21,8 @@ What is available:
 - **Show.** A permission, question or plan wait makes the session `waiting` (since the wait began): it counts in "N waiting on you", turns its card yellow, leads the flare (`<name> asks: <text>`) and gets a line `◆ asks: <text>` with the options dimmed after it, the text clipped before the options. The line is a Button running the session's existing jump. "your turn" replaces "idle" on the status and stays dim.
 - **Notify.** When another session newly enters a real wait, HQ calls `$.ui.notify("<session name>: <text>", {title: "Claude needs you"})`, once per `sessionId:since`. A wait first seen more than 10 minutes after it began is not sent. Across HQ instances one wins by `mkdir ~/.claude/hq/notified/<key>` (atomic); claim directories older than a day are removed. `/hq notify on|off` stores the setting in `$.store` (`notify`, default on); waits seen while off are not replayed.
 
+- **As built (question replies).** A main-loop reply that ends the turn on a question is a `question` wait too: the last sentence ending in "?" in its final paragraph, outside code, URLs, quotes and headers, clipped to 130 characters. Live from `turn.complete`'s `answer`, from the transcript's last `end_turn` text otherwise; a new user prompt or the session going busy clears it.
+
 ## Consequences
 
 - Easier: a card says what is being asked, and a new ask reaches the person once even with several HQ sessions open.

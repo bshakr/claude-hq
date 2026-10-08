@@ -6,7 +6,8 @@ import { buildFleet } from '../../hooks/data/fleet'
 import type { RegistryRow } from '../../hooks/data/fleet'
 import { dueNotifications, notifyWaits, parseNotifyArg } from '../../hooks/data/notify'
 import {
-  W, onCallEnd, onCallStart, onLoopEnd, onPermissionRequest, otherWait, ownWait, permissionWait, resetWaits,
+  W, onCallEnd, onCallStart, onLoopEnd, onMainAnswer, onPermissionRequest, onPromptOrigin, otherWait, ownWait, permissionWait, resetWaits,
+  trailingQuestion,
 } from '../../hooks/data/waiting'
 import type { PublishedSession, WaitVM } from '../../hooks/model/types'
 
@@ -72,6 +73,40 @@ describe('capture and clear in this session', () => {
   })
 })
 
+const TRAVEL_Q = 'Does that format and layout look right, especially dated homes, and leaving out derived fields so people never write them?'
+const TRAVEL = `I drafted the travel map as one YAML file per trip.\n\n\`\`\`yaml\nhomes:\n  - from: 2024-03-01\n\`\`\`\n\n**${TRAVEL_Q}**`
+
+describe('a reply that ends on a question', () => {
+  test('the travel-map reply asks; its question is the wait text', () => {
+    expect(trailingQuestion(TRAVEL)).toBe(TRAVEL_Q)
+  })
+  test('a reply ending on a statement does not', () => {
+    expect(trailingQuestion('Should we split it?\n\nI split it into two files and the tests pass.')).toBe(undefined)
+  })
+  test('a "?" only in code, a URL, a quote or a header does not', () => {
+    expect(trailingQuestion('Run `grep -n "a?b" x` to see it.')).toBe(undefined)
+    expect(trailingQuestion('See https://example.com/search?q=1 for details.')).toBe(undefined)
+    expect(trailingQuestion('Done.\n\n```ts\nconst ok = a ? b : c\n```')).toBe(undefined)
+    expect(trailingQuestion('You asked "why not cache it?" and it now caches.')).toBe(undefined)
+    expect(trailingQuestion('## Why does this matter?\nIt keeps the ledger exact.')).toBe(undefined)
+  })
+  test('a question followed by a closing statement in the same paragraph still asks', () => {
+    expect(trailingQuestion('Both paths work. Want me to open the PR? I will hold until you say.')).toBe('Want me to open the PR?')
+  })
+  test('this session: the question is the wait until a new prompt; plain idle stays your turn', () => {
+    resetWaits()
+    onMainAnswer(TRAVEL, 'answer', NOW)
+    expect(ownWait({ idle: true, since: NOW, prompt: 'map it' })).toEqual({ kind: 'question', text: TRAVEL_Q, since: NOW })
+    expect(ownWait({ idle: false, since: NOW, prompt: 'map it' })).toBe(undefined)
+    onPromptOrigin('task-notification')
+    expect(ownWait({ idle: true, since: NOW, prompt: 'map it' })?.kind).toBe('question')
+    onPromptOrigin('composer')
+    expect(ownWait({ idle: true, since: NOW, prompt: 'yes' })).toEqual({ kind: 'turn', text: 'your turn', since: NOW })
+    onMainAnswer('All done.', 'answer', NOW + 1)
+    expect(ownWait({ idle: true, since: NOW + 1, prompt: 'yes' })?.kind).toBe('turn')
+  })
+})
+
 const tLine = (v: Record<string, unknown>) => `${JSON.stringify({ timestamp: new Date(NOW).toISOString(), ...v })}\n`
 const askLine = tLine({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 'tu1', name: 'AskUserQuestion', input: QUESTION }], stop_reason: 'tool_use' } })
 const answerLine = tLine({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'tu1', content: 'dayjs' }] } })
@@ -86,6 +121,16 @@ describe('another session read from its transcript', () => {
     expect(d.ask).toBe(undefined)
     expect(otherWait(undefined, d, 'idle', NOW + 9)).toEqual({ kind: 'turn', text: 'your turn', since: NOW + 9 })
     expect(otherWait(undefined, d, 'busy', NOW + 9)).toBe(undefined)
+  })
+  test('a last reply ending on a question is a question wait; the next prompt clears it', () => {
+    const d = emptyDigest()
+    ingest(d, tLine({ type: 'assistant', message: { content: [{ type: 'text', text: TRAVEL }], stop_reason: 'end_turn' } }))
+    expect(otherWait(undefined, d, 'idle', NOW + 9)).toEqual({ kind: 'question', text: TRAVEL_Q, since: NOW })
+    expect(otherWait(undefined, d, 'busy', NOW + 9)).toBe(undefined)
+    ingest(d, tLine({ type: 'user', message: { content: [{ type: 'text', text: 'yes' }] } }))
+    expect(otherWait(undefined, d, 'idle', NOW + 9)).toBe(undefined)
+    ingest(d, replyLine)
+    expect(otherWait(undefined, d, 'idle', NOW + 9)?.kind).toBe('turn')
   })
   test("a session's own published word wins over its transcript", () => {
     const d = emptyDigest()

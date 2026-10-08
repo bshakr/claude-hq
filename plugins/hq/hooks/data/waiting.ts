@@ -17,6 +17,39 @@ function one(text: string, n: number): string {
 
 const baseName = (path: string) => path.replace(/\/+$/, '').split('/').pop() || path
 
+export const ASKED_TEXT_MAX = 130
+
+// Stand-ins for sentence punctuation inside code, URLs and quotes, so a "?" there does not count.
+const MASK: Record<string, string> = { '?': '\uE000', '.': '\uE001', '!': '\uE002' }
+const mask = (t: string) => t.replace(/[?.!]/g, c => MASK[c]!)
+const unmask = (t: string) => t.replace(/\uE000/g, '?').replace(/\uE001/g, '.').replace(/\uE002/g, '!')
+
+/** The question a reply ends on: the last "?" sentence of its final paragraph, outside code, URLs, quotes and headers. */
+export function trailingQuestion(text: string): string | undefined {
+  const paras = text.replace(/(```|~~~)[\s\S]*?(\1|$)/g, '').trim().split(/\n[ \t]*\n/)
+  const last = paras[paras.length - 1] ?? ''
+  const body = last
+    .split('\n')
+    .filter(l => !/^\s*(#{1,6}\s|>)/.test(l))
+    .join(' ')
+    .replace(/`[^`]*`/g, mask)
+    .replace(/\[([^\]]*)\]\(([^)]*)\)/g, (_, label: string) => label)
+    .replace(/\b(?:https?:\/\/|www\.)\S+/g, mask)
+    .replace(/"[^"]*"|“[^”]*”/g, mask)
+    .replace(/[*_]{1,3}(\S(?:.*?\S)?)[*_]{1,3}/g, '$1')
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
+  const qs = body.match(/[^.!?]*\?+/g)
+  const q = qs?.[qs.length - 1]?.replace(/^[\s:;,)\]-]+/, '')
+  if (!q || !/[a-z]/i.test(q)) return undefined
+  return one(unmask(q).replace(/`/g, ''), ASKED_TEXT_MAX)
+}
+
+/** A finished reply that asks the user something waits on them like a question dialog does. */
+export function askedWait(answer: string, since: number): WaitVM | undefined {
+  const text = trailingQuestion(answer)
+  return text ? { kind: 'question', text, since } : undefined
+}
+
 export const isRealWait = (w: WaitVM | undefined): w is WaitVM => w !== undefined && w.kind !== 'turn'
 
 /** `mcp__linear__list_issues` → `linear list_issues`; built-in names as they are. */
@@ -72,11 +105,20 @@ interface Inflight {
 }
 
 // Module state: a reload while a dialog is up forgets it until the next one.
-export const W = { open: [] as Open[], inflight: [] as Inflight[], rev: 0 }
+export const W = { open: [] as Open[], inflight: [] as Inflight[], asked: undefined as WaitVM | undefined, rev: 0 }
 
 export function resetWaits(): void {
   W.open = []
   W.inflight = []
+  W.asked = undefined
+  W.rev++
+}
+
+/** The main loop's turn ended: its reply's question, if any, is the wait until the next prompt. */
+export function onMainAnswer(answer: string, reason: string, now: number): void {
+  const next = reason === 'answer' ? askedWait(answer, now) : undefined
+  if (next?.text === W.asked?.text && next?.since === W.asked?.since) return
+  W.asked = next
   W.rev++
 }
 
@@ -126,6 +168,7 @@ export function onLoopEnd(loop: string): void {
 export function ownWait(activity: { idle: boolean; since: number; prompt?: string }): WaitVM | undefined {
   const real = [...W.open].sort((a, b) => a.wait.since - b.wait.since)[0]
   if (real) return real.wait
+  if (activity.idle && W.asked) return W.asked
   if (activity.idle && activity.prompt !== undefined && activity.since > 0) return { kind: 'turn', text: 'your turn', since: activity.since }
   return undefined
 }
@@ -134,7 +177,12 @@ const HUMAN = new Set(['composer', 'bridge'])
 
 /** The user typing means no dialog holds the main loop; a background task's notice does not. */
 export function onPromptOrigin(kind: string | undefined): void {
-  if (kind === undefined || HUMAN.has(kind)) onLoopEnd(MAIN)
+  if (kind !== undefined && !HUMAN.has(kind)) return
+  onLoopEnd(MAIN)
+  if (W.asked) {
+    W.asked = undefined
+    W.rev++
+  }
 }
 
 export const loopOf = (agentId: unknown) => (typeof agentId === 'string' && agentId ? agentId : MAIN)
@@ -157,6 +205,8 @@ export function installWaits(on: On): void {
 export interface TranscriptWait {
   ask?: { id: string; wait: WaitVM }
   turnEnded?: boolean
+  /** The question the last reply ended on, when it ended the turn. */
+  asked?: WaitVM
 }
 
 /** One parsed main-loop transcript line. */
@@ -172,6 +222,12 @@ export function noteWaitLine(d: TranscriptWait, v: Obj, ts: number | undefined):
       if (wait) d.ask = { id: o.id, wait }
     }
     d.turnEnded = msg?.stop_reason === 'end_turn'
+    delete d.asked
+    if (d.turnEnded) {
+      const texts = content.flatMap(b => (obj(b)?.type === 'text' ? (str(obj(b)?.text) ?? []) : []))
+      const asked = askedWait(texts[texts.length - 1] ?? '', ts ?? 0)
+      if (asked) d.asked = asked
+    }
     return
   }
   if (v.type !== 'user' || v.isMeta === true) return
@@ -180,9 +236,10 @@ export function noteWaitLine(d: TranscriptWait, v: Obj, ts: number | undefined):
     if (o?.type === 'tool_result' && d.ask && o.tool_use_id === d.ask.id) delete d.ask
   }
   d.turnEnded = false
+  delete d.asked
 }
 
-/** Another session's wait: its HQ's own word when it publishes, else its transcript's open question, else "your turn" when idle after a reply. */
+/** Another session's wait: its HQ's own word when it publishes, else its transcript's open question, else the question its last reply ended on, else "your turn" when idle after a reply. */
 export function otherWait(
   pub: PublishedSession | undefined,
   t: TranscriptWait | undefined,
@@ -191,6 +248,7 @@ export function otherWait(
 ): WaitVM | undefined {
   if (pub) return pub.waiting
   if (t?.ask) return t.ask.wait
+  if (status !== 'busy' && status !== 'waiting' && t?.turnEnded && t.asked) return t.asked
   if (status !== 'busy' && status !== 'waiting' && t?.turnEnded) return { kind: 'turn', text: 'your turn', since: statusSince ?? 0 }
   return undefined
 }
