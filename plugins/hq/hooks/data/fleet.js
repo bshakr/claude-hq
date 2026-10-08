@@ -84,6 +84,7 @@ export function toSessionVM(row, branch, published, now, topic = {}, transcriptA
         ...(ctx.prText ? { prText: ctx.prText } : {}),
         ...(ctx.todos ? { todos: ctx.todos } : {}),
         ...(ctx.glosses && Object.keys(ctx.glosses).length ? { glosses: ctx.glosses } : {}),
+        ...(ctx.context ? { context: ctx.context } : {}),
     };
 }
 /** A registry name that is only the session or job id (a spare's, a fresh bg session's) names nothing. */

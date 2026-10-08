@@ -1,4 +1,4 @@
-import type { AgentVM, Counts, HqModel, NowVM, OtherSessionVM, PrVM, PublishedSession, TmuxGroupVM, TodoVM, WaitingVM } from '../model/types'
+import type { AccountUsage, AgentVM, ContextUsage, Counts, HqModel, NowVM, OtherSessionVM, PrVM, PublishedSession, TmuxGroupVM, TodoVM, WaitingVM } from '../model/types'
 import { isLive } from './agents'
 import { pickFlare } from './fleet'
 import { prTone } from './prs'
@@ -14,6 +14,8 @@ export interface ModelInputs {
   activity?: { now?: NowVM; todos?: TodoVM[]; waiting?: WaitingVM[] }
   goal?: { text: string; day?: number }
   glosses?: Record<string, string>
+  context?: ContextUsage
+  account?: AccountUsage
 }
 
 /** "3/7 · Rewriting PR claim rules", or the last prompt while there is no list. */
@@ -115,8 +117,10 @@ export function buildModel(inputs: ModelInputs): HqModel {
       agents: inputs.agents,
       prs: sortPrs(inputs.prs),
       ...(inputs.glosses && Object.keys(inputs.glosses).length ? { glosses: inputs.glosses } : {}),
+      ...(inputs.context ? { context: inputs.context } : {}),
     },
     others: inputs.others,
+    ...(inputs.account ? { account: inputs.account } : {}),
     statusText: withPrStatus(statusTextOf(counts, sessions.filter(s => s.status === 'waiting'), inputs.now), inputs.prs),
   }
 }

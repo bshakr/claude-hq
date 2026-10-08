@@ -96,8 +96,10 @@ export function buildModel(inputs) {
             agents: inputs.agents,
             prs: sortPrs(inputs.prs),
             ...(inputs.glosses && Object.keys(inputs.glosses).length ? { glosses: inputs.glosses } : {}),
+            ...(inputs.context ? { context: inputs.context } : {}),
         },
         others: inputs.others,
+        ...(inputs.account ? { account: inputs.account } : {}),
         statusText: withPrStatus(statusTextOf(counts, sessions.filter(s => s.status === 'waiting'), inputs.now), inputs.prs),
     };
 }
