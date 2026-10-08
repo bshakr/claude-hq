@@ -116,7 +116,7 @@ A change reloads HQ with the new values.
 
 Colours take `#rrggbb`, `ansi256(N)` or a bare palette number `N` (0-255). The defaults are your terminal's own palette slots, so HQ follows your terminal theme. An invalid colour keeps its default and the pane's footer shows one dim line naming it.
 
-`/hq wake`, `/hq notify` and `/hq summaries` on or off are kept per machine and win over these settings on that machine.
+`/hq wake`, `/hq notify` and `/hq summaries` on or off are kept per machine and win over these settings on that machine; `/hq reset` forgets them.
 
 Catppuccin Mocha:
 
@@ -160,6 +160,7 @@ iTerm2 and Terminal.app ask for Automation permission the first time.
 | `/hq wake on` / `off` | start a turn when an owned PR goes red, merges, conflicts or falls behind (on by default); off means toasts only |
 | `/hq notify on` / `off` | a desktop notification when another session starts waiting on you; `/hq notify` shows the setting |
 | `/hq summaries on` / `off` | Haiku goal lines and id glosses on cards; `/hq summaries` shows the setting |
+| `/hq reset` | forget the wake, notify and summaries toggles, so these settings apply again |
 | `/hq help` | the list above |
 
 In the pane: `j`/`k` or Tab to move, Enter or click to open, Enter on an agent to expand it, Esc to go back to the prompt.

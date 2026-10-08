@@ -38,6 +38,10 @@ function host(on: On) {
     h.store.set(e.key, e.value)
     return { value: undefined }
   })
+  on('store.delete', ($, e) => {
+    h.store.delete(e.key)
+    return { value: undefined }
+  })
   return h
 }
 
@@ -116,3 +120,23 @@ test('/hq notify shows the config default when nothing is stored', { options: { 
     }),
   ).toMatchObject({ text: 'hq notifications are off.' })
 })
+
+test(
+  '/hq reset forgets every stored toggle, so the plugin config applies again',
+  { options: { summaries: false, notify: false } },
+  async ($, on) => {
+    const h = host(on)
+    await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+    const cmd = (args: string) =>
+      $.command.run({ command: 'hq', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
+    await cmd('summaries on')
+    await cmd('notify on')
+    await cmd('wake off')
+    h.store.set('unrelated', 1)
+    expect([...h.store.keys()].sort()).toEqual(['notify', 'summaries', 'unrelated', 'wake'])
+    expect(await cmd('reset')).toMatchObject({ text: 'hq toggles reset to the plugin config: wake on, notify off, summaries off.' })
+    expect([...h.store.keys()]).toEqual(['unrelated'])
+    expect(await cmd('summaries')).toMatchObject({ text: 'hq summaries are off.' })
+    expect(await cmd('notify')).toMatchObject({ text: 'hq notifications are off.' })
+  },
+)

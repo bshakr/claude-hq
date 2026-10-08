@@ -30,6 +30,7 @@ const HELP = [
   '/hq notify on|off   a notification when another session starts waiting on you',
   '/hq summaries on|off  Haiku goal lines and id glosses on cards',
   '  wake, notify and summaries default to the plugin config; a toggle here overrides it on this machine.',
+  '/hq reset    forget those toggles, so the plugin config applies again',
   '/hq help     this list',
   '',
   'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
@@ -192,6 +193,14 @@ export const register: Register = (on, options) => {
       return { text: `hq notifications ${notify ? 'on' : 'off'}.` }
     }
     if (args === 'help') return { text: HELP }
+    if (args === 'reset') {
+      for (const key of [WAKE_KEY, NOTIFY_STORE_KEY, SUMMARIES_KEY]) await $.store.delete(key)
+      const c = config()
+      const word = (isOn: boolean) => (isOn ? 'on' : 'off')
+      return {
+        text: `hq toggles reset to the plugin config: wake ${word(c.wake)}, notify ${word(c.notify)}, summaries ${word(c.summaries)}.`,
+      }
+    }
     const summaries = /^summaries(?:\s+(on|off))?$/.exec(args)
     if (summaries) {
       if (summaries[1] === undefined)
