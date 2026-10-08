@@ -3,8 +3,9 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import { currentModel, installData } from './data/index'
 import { NOTIFY_STORE_KEY, parseNotifyArg } from './data/notify'
+import { WAKE_KEY, parseWake } from './data/wake'
 import type { HqModel } from './model/types'
-import { runJump } from './ui/jump'
+import { pressJump } from './ui/jump'
 import { layout, scrollFor } from './ui/layout'
 import type { Layout } from './ui/layout'
 import { drawPane } from './ui/pane'
@@ -22,10 +23,12 @@ const phase = atom({ plugin: 'hq', key: 'phase' } as const, 0)
 const HELP = [
   '/hq          open the pane (⌃g moves the keys between it and the prompt)',
   '/hq close    close the pane',
+  '/hq wake on  wake this session on its own PRs going red, merging, conflicting or behind (default)',
+  '/hq wake off toasts only, never start a turn',
   '/hq notify on|off   a notification when another session starts waiting on you',
   '/hq help     this list',
   '',
-  'In the pane: j/k or Tab move, Enter or a click opens a PR or switches tmux,',
+  'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
   'Enter on an agent expands it. Esc returns the keys to the prompt.',
 ].join('\n')
 
@@ -82,7 +85,7 @@ async function startPane($: EngineInterface): Promise<void> {
     await $.command.register({
       name: COMMAND,
       description: 'Pane of what needs you: agents, PRs and other sessions',
-      argumentHint: '[close | notify on|off | help]',
+      argumentHint: '[close | wake on|off | notify on|off | help]',
       immediate: true,
     })
   } catch (thrown) {
@@ -94,11 +97,12 @@ async function startPane($: EngineInterface): Promise<void> {
 export async function act($: EngineInterface, key: string, action: Action, last: Layout | undefined): Promise<void> {
   switch (action.kind) {
     case 'jump': {
-      const failed = await runJump(action.jump, argv => $.process.run(argv, { timeoutMs: 5000 }))
-      if (failed !== undefined) {
-        $.ui.toast(`hq: ${failed}`)
-        return
-      }
+      const pressed = await pressJump(action.jump, {
+        run: (argv, init) => $.process.run(argv, { timeoutMs: 3000, ...init }),
+        copy: text => $.ui.copy({ text }).then(r => r.isCopied),
+        toast: text => $.ui.toast(text),
+      })
+      if (!pressed) return
       await update($, cursor, () => key)
       return
     }
@@ -171,6 +175,11 @@ export const register: Register = on => {
       return { text: `hq notifications ${notify ? 'on' : 'off'}.` }
     }
     if (args === 'help') return { text: HELP }
+    const toggle = parseWake(args)
+    if (toggle !== null) {
+      await $.store.set(WAKE_KEY, toggle === 'on')
+      return { text: `hq waking is ${toggle}.` }
+    }
     return { text: `Unknown subcommand "${args}".\n${HELP}` }
   })
 

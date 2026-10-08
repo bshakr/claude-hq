@@ -2,6 +2,8 @@
 import type { TodoProgress } from '../model/types'
 import { noteWaitLine } from './waiting'
 import type { TranscriptWait } from './waiting'
+import { newer, sampleOf } from './usage'
+import type { UsageSample } from './usage'
 
 export const GOAL_MODEL = 'haiku'
 export const GOAL_INPUT_MAX = 6_000
@@ -45,6 +47,8 @@ export interface Digest extends TranscriptWait {
   tasks: Task[]
   /** tool_use id of a TaskCreate whose result has not been seen. */
   pendingCreates: Record<string, string>
+  /** The newest main-thread response's input tokens and model (ADR 0007). */
+  usage?: UsageSample
 }
 
 export function emptyDigest(): Digest {
@@ -221,6 +225,7 @@ export function ingestLine(d: Digest, line: string): void {
       if (v.isSidechain === true) return
       const msg = obj(v.message)
       const content = Array.isArray(msg?.content) ? msg.content : []
+      d.usage = newer(d.usage, sampleOf(msg, ts ?? d.lastTs ?? 0))
       for (const b of content) {
         const o = obj(b)
         if (o?.type === 'tool_use') onToolUse(d, o)

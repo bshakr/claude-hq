@@ -10,10 +10,17 @@ export interface Counts {
   sessions: number
 }
 
-/** Where Enter/click goes. /hq never acts beyond these two. */
+/** A session's terminal, read from its process: tty and the env keys focus strategies use (ADR 0008). */
+export interface TermEnv {
+  tty?: string
+  env: Readonly<Record<string, string>>
+}
+
+/** Where Enter/click goes: focus a session's terminal (else copy its resume command), or open a web URL. */
 export type Jump =
   | { kind: 'tmux'; target: string } // e.g. "ritualpass:@3.%6"
   | { kind: 'url'; url: string }
+  | { kind: 'session'; sessionId: string; cwd: string; pid: number; tmux?: string; bg?: true; jobId?: string; term: TermEnv }
 
 export interface Flare {
   text: string // "rp-api is waiting for your input"
@@ -121,6 +128,24 @@ export interface OtherSessionVM {
   glosses?: Record<string, string>
   /** What it waits on the user for; a real wait (not `turn`) also makes `status` waiting. */
   wait?: WaitVM
+  /** Its context window's fill (ADR 0007). */
+  context?: ContextUsage
+}
+
+/** A session's context fill: live from its own HQ, else estimated from its transcript (ADR 0007). */
+export interface ContextUsage {
+  /** Whole percent of `window`, 0 to 100. */
+  percent: number
+  window: number
+  tokens?: number
+  model?: string
+  source: 'live' | 'transcript'
+}
+
+/** The account's rate-limit windows, percent used as the engine reports it. */
+export interface AccountUsage {
+  fiveHour?: number
+  week?: number
 }
 
 /** A task list's progress and its in-progress item. */
@@ -184,8 +209,11 @@ export interface HqModel {
     prs: PrVM[]
     /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("BLO-1947", "ADR 0019"). */
     glosses?: Record<string, string>
+    context?: ContextUsage
   }
   others: TmuxGroupVM[]
+  /** Plan usage, account-wide, shown once in the header. */
+  account?: AccountUsage
   /** plain text for $.ui.status */
   statusText: string
 }
@@ -201,7 +229,7 @@ export interface PublishedSession {
   doing?: string
   /** Its running subagents, newest first, at most a few. */
   agents?: OtherAgentVM[]
-  /** The PRs this session owns (ADR 0002); wave-watcher wakes only for these. */
+  /** The PRs this session owns (ADR 0002). */
   owned?: { repo: string; number: number }[]
   /** Its task list's progress, so others need not reconstruct it from the transcript. */
   todos?: TodoProgress
@@ -209,6 +237,10 @@ export interface PublishedSession {
   goal?: { goal?: string; step?: string; at: number }
   /** What it waits on the user for right now (ADR 0006). */
   waiting?: WaitVM
+  /** Its live context fill, as the engine reports it. */
+  context?: ContextUsage
+  /** The account's rate limits as this session last saw them. */
+  account?: AccountUsage
 }
 
 /** Written by pr-ci-wait / pr-merge-wait to ~/.cache/pr-watch/<owner>__<repo>__<n>.<watcher>.json (owner/repo lowercased) each poll. */

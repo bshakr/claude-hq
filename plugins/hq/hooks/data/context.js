@@ -1,4 +1,5 @@
 import { noteWaitLine } from './waiting';
+import { newer, sampleOf } from './usage';
 export const GOAL_MODEL = 'haiku';
 export const GOAL_INPUT_MAX = 6_000;
 export const BUSY_REFRESH_MS = 30 * 60_000;
@@ -213,6 +214,7 @@ export function ingestLine(d, line) {
                 return;
             const msg = obj(v.message);
             const content = Array.isArray(msg?.content) ? msg.content : [];
+            d.usage = newer(d.usage, sampleOf(msg, ts ?? d.lastTs ?? 0));
             for (const b of content) {
                 const o = obj(b);
                 if (o?.type === 'tool_use')

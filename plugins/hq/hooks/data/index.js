@@ -7,10 +7,13 @@ import { PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, parsePsPids, parseP
 import { ADR_LOOKUPS_PER_TICK, GLOSS_MODEL, TICKET_LOOKUPS_PER_TICK, briefBatch, briefDue, findIds, glossOf, lookUpAdr, lookUpTicket, lookupDue as idLookupDue, } from './ids';
 import { doingLine, prSummary } from './model';
 import { OPEN_CALL_CAP_MS, OTHER_AGENTS_MAX, TAIL_BYTES, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from './subagents';
+import { accountOf, live, preferred, settingsModel } from './usage';
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe';
+import { parsePsTerm } from './term';
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs';
 import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting';
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify';
+import { WAKE_KEY, newsOf } from './wake';
 /** An owned PR with no live watcher is re-read from GitHub this often. */
 export const REFRESH_MS = 120_000;
 /** An owned branch with no open PR yet is looked up after 2 min, then 10, then every 30; a push resets it. */
@@ -194,6 +197,10 @@ async function start($) {
     let prunedAt = 0;
     let isTicking = false;
     let selfPid;
+    // Per pid: a process's terminal does not change while it lives.
+    const terms = new Map();
+    const settingsCache = new Map();
+    let ownAccount;
     const run = async (argv, cwd) => {
         try {
             return await $.process.run(argv, { timeoutMs: 15_000, ...(cwd ? { cwd } : {}) });
@@ -376,6 +383,19 @@ async function start($) {
                 // keep what it had
             }
         }
+    };
+    // User, project, then local settings: the last that names a model wins.
+    const settingModelFor = async (cwd) => {
+        let model;
+        for (const path of [`${S.home}/.claude/settings.json`, `${cwd}/.claude/settings.json`, `${cwd}/.claude/settings.local.json`]) {
+            let hit = settingsCache.get(path);
+            if (!hit || S.now - hit.at >= BRANCH_TTL_MS) {
+                hit = { at: S.now, model: settingsModel(await readText(path)) };
+                settingsCache.set(path, hit);
+            }
+            model = hit.model ?? model;
+        }
+        return model;
     };
     // A transcript is read once in full (sparsely when large), then only the bytes appended since.
     const digestOf = async (sessionId, cwd) => {
@@ -594,10 +614,11 @@ async function start($) {
     /** The summary lines of one session's card. */
     const contextOf = async (sid, cwd, busy, pub) => {
         const d = await digestOf(sid, cwd);
-        if (!d)
-            return { ctx: {}, topic: {} };
-        await lookUpPrStates(d);
         const fresh = pub && S.now - pub.updatedAt < PUBLISH_FRESH_MS ? pub : undefined;
+        if (!d)
+            return { ctx: fresh?.context ? { context: fresh.context } : {}, topic: {} };
+        await lookUpPrStates(d);
+        const context = preferred(fresh, d.usage, await settingModelFor(cwd));
         const prTitles = d.prs.flatMap(p => prStates.get(prStateKey(p.repo, p.number))?.title ?? []);
         const ids = await idsOf(cwd, [d.firstPrompt ?? '', ...d.titles, ...d.prompts.slice(-5).map(p => p.text), ...prTitles, ...d.branches], DIGEST_IDS_MAX);
         const cache = fresh?.goal?.goal ? fresh.goal : await maybeGoal(sid, d, busy, ids);
@@ -614,6 +635,7 @@ async function start($) {
                 ...(cache?.step ? { step: cache.step } : {}),
                 ...(prs ? { prText: prs } : {}),
                 ...(todos && todos.total > 0 ? { todos } : {}),
+                ...(context ? { context } : {}),
             },
         };
     };
@@ -710,10 +732,21 @@ async function start($) {
                     pids.add(f.pid);
         }
         let alive = new Set();
+        // Sessions not yet seen are read with their env in the same ps (ADR 0008).
+        const unread = rows.filter(r => !r.spare && pids.has(r.pid) && !terms.has(r.pid)).map(r => r.pid);
         if (pids.size > 0) {
-            const r = await run(['ps', '-o', 'pid=', '-p', [...pids].join(',')]);
+            const r = await run(['ps', ...(unread.length ? ['eww', '-o', 'pid=,tty=,command='] : ['-o', 'pid=']), '-p', [...pids].join(',')]);
             alive = r ? parsePsPids(r.stdout) : new Set();
+            if (r && unread.length) {
+                const found = parsePsTerm(r.stdout);
+                for (const pid of unread)
+                    if (alive.has(pid))
+                        terms.set(pid, found.get(pid) ?? { env: {} });
+            }
         }
+        for (const pid of terms.keys())
+            if (!alive.has(pid))
+                terms.delete(pid);
         const before = Object.keys(S.claims).length;
         await lookUpBranches();
         if (Object.keys(S.claims).length !== before)
@@ -730,7 +763,13 @@ async function start($) {
                 S.dirty = true;
             }
         }
+        const previousPrs = S.prs;
         S.prs = Object.entries(S.claims).map(([key, claim]) => prFromSources(claim, files.get(key) ?? {}, pid => alive.has(pid)));
+        const news = newsOf(previousPrs, S.prs);
+        for (const text of news.toasts)
+            $.ui.toast(text, { timeoutMs: 8000 });
+        if (news.prompt !== null && (await $.store.get(WAKE_KEY)) !== false)
+            $.prompt.submit({ text: news.prompt }).catch(() => undefined);
         const branches = new Map();
         const published = new Map();
         const topicMap = new Map();
@@ -771,7 +810,7 @@ async function start($) {
         for (const k of metas.keys())
             if (!seenFiles.has(k))
                 metas.delete(k);
-        const fleet = buildFleet(rows, alive, S.sessionId, branches, published, S.now, selfPid, topicMap, agentMap, ctxMap, waits);
+        const fleet = buildFleet(rows, alive, S.sessionId, branches, published, S.now, selfPid, topicMap, agentMap, ctxMap, waits, terms);
         const self = fleet.self;
         S.others = fleet.others;
         if (!notifying) {
@@ -781,6 +820,25 @@ async function start($) {
             });
         }
         const own = await contextOf(S.sessionId, sessionCwd, !S.activity.idle, undefined);
+        // The engine's own figures, else the transcript estimate; plan usage from any fresh publish until this session has a reading.
+        let liveContext = own.ctx.context;
+        let account = [...published.values()]
+            .filter(p => p.account && S.now - p.updatedAt < PUBLISH_FRESH_MS)
+            .sort((a, b) => b.updatedAt - a.updatedAt)[0]?.account;
+        try {
+            const u = await $.session.usage();
+            liveContext = live(u.context, await $.session.model()) ?? liveContext;
+            ownAccount = accountOf(u.rateLimits);
+            account = ownAccount ?? account;
+        }
+        catch {
+            // an engine without the op: the estimate stands
+        }
+        if (JSON.stringify([liveContext, account]) !== JSON.stringify([S.context, S.account])) {
+            S.context = liveContext;
+            S.account = account;
+            S.dirty = true;
+        }
         const ownGoal = own.ctx.goal ?? own.topic.title ?? own.topic.firstPrompt;
         const ownIds = await idsOf(sessionCwd, [ownGoal ?? '', ...S.model.current.agents.flatMap(a => [a.title, a.todo?.text ?? a.now ?? ''])], VISIBLE_IDS_MAX);
         if (JSON.stringify(ownIds.glosses) !== JSON.stringify(S.glosses)) {
@@ -835,6 +893,9 @@ async function start($) {
                 ...((t => (t ? { todos: t } : {}))(todoProgress(todosOf(S.activity).map((x, i) => ({ id: String(i), ...x }))))),
                 ...((g => (g?.goal ? { goal: { goal: g.goal, ...(g.step ? { step: g.step } : {}), at: g.at } } : {}))(goals.get(S.sessionId))),
                 ...((w => (w ? { waiting: w } : {}))(ownWait(S.activity))),
+                ...(S.context?.source === 'live' ? { context: S.context } : {}),
+                // Only its own reading, so a relayed figure never outlives its source.
+                ...(ownAccount ? { account: ownAccount } : {}),
             };
             try {
                 await $.fs.write(`${S.home}/.claude/hq/sessions/${S.sessionId}.json`, JSON.stringify(mine));

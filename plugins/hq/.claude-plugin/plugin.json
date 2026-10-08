@@ -1,9 +1,12 @@
 {
   "name": "hq",
   "version": "0.1.0",
-  "description": "One pane for what needs you: this session's agents and PRs, and every other Claude session on the machine. Enter or click opens a PR or switches tmux; it takes no other action.",
+  "description": "One pane for what needs you: this session's agents and PRs, and every other Claude session on the machine. Enter or click opens a PR or brings a session forward (tmux, supacode, terminal apps, editors; else copies its resume command); it takes no other action.",
   "types": "./types/index.d.ts",
   "author": {
     "name": "Bassem Shaker"
-  }
+  },
+  "repository": "https://github.com/bshakr/claude-hq",
+  "homepage": "https://github.com/bshakr/claude-hq",
+  "license": "MIT"
 }

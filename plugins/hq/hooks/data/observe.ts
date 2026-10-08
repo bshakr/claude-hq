@@ -1,5 +1,5 @@
 // Data-layer state and the pure observers the hooks feed; index.ts wires them to events.
-import type { HqModel, PrVM, TmuxGroupVM } from '../model/types'
+import type { AccountUsage, ContextUsage, HqModel, PrVM, TmuxGroupVM } from '../model/types'
 import { emptyActivity, nowOf, onToolResult, onToolStart, todosOf, waitingOf } from './activity'
 import type { ActivityState } from './activity'
 import { agentList, emptyAgents, onAgentResult, onHandback, onSubagentTool, onSubagentToolEnd } from './agents'
@@ -37,6 +37,8 @@ export const S = {
   label: '',
   goal: undefined as { text: string; day?: number } | undefined,
   glosses: {} as Record<string, string>,
+  context: undefined as ContextUsage | undefined,
+  account: undefined as AccountUsage | undefined,
   agents: emptyAgents() as AgentsState,
   cwd: '',
   claims: {} as Record<string, StoredClaim>,
@@ -68,7 +70,8 @@ export function activityState(): ActivityState {
 
 export function rebuild(): void {
   const model = buildModel({
-    now: S.now, label: S.label, ...(S.goal ? { goal: S.goal } : {}), glosses: S.glosses, agents: agentList(S.agents, S.cwd || undefined), prs: S.prs, others: S.others,
+    now: S.now, label: S.label, ...(S.goal ? { goal: S.goal } : {}), glosses: S.glosses,
+    ...(S.context ? { context: S.context } : {}), ...(S.account ? { account: S.account } : {}), agents: agentList(S.agents, S.cwd || undefined), prs: S.prs, others: S.others,
     activity: { now: nowOf(S.activity), todos: todosOf(S.activity), waiting: waitingOf(S.activity) },
   })
   S.model = model

@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code@2.1.295
+      # validate and test need no login. tsc is not run here: its types are
+      # written by the engine only when a session loads the plugin.
+      - run: claude plugin validate plugins/hq
+      - run: claude plugin validate .
+      - run: claude plugin test plugins/hq
+      - name: Lint bundled scripts
+        run: bash -n plugins/hq/bin/pr-ci-wait && bash -n plugins/hq/bin/pr-merge-wait

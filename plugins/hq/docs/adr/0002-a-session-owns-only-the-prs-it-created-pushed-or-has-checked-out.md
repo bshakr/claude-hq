@@ -1,6 +1,6 @@
 # A session owns only the PRs it created, pushed or has checked out, and wave-watcher wakes only that session
 
-- Status: accepted; the "Other sessions" naming by `aiTitle` is superseded by [0004](0004-a-session-card-names-its-goal-from-one-cached-haiku-summary.md)
+- Status: accepted; the "Other sessions" naming by `aiTitle` is superseded by [0004](0004-a-session-card-names-its-goal-from-one-cached-haiku-summary.md); the "wave-watcher wakes only owners" bullet by [0005](0005-wave-watcher-is-folded-into-hq-and-wakes-only-on-owned-prs.md)
 - Date: 2026-10-08
 
 ## Context

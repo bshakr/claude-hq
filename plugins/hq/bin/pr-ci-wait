@@ -1,0 +1,473 @@
+#!/usr/bin/env bash
+# pr-ci-wait — poll a pull request until every check has settled, then report.
+#
+#   pr-ci-wait <pr-number|pr-url> [--repo owner/name] [--timeout SECONDS] [--interval SECONDS] [--no-state]
+#
+# Exit codes: 0 all green, or no Actions run for a mergeable head commit within
+# NO_CI_GRACE seconds (e.g. a docs-only change filtered by paths); 1 a check
+# failed/was cancelled, the PR conflicts with no run (or a required check
+# was skipped), 2 timeout, 3 PR not found / not open, 64 usage error.
+#
+# State file: after every poll and on exit, writes
+# ${PR_WATCH_STATE_DIR:-~/.cache/pr-watch}/<owner>__<repo>__<number>.ci-wait.json
+# (lowercase) so other tools read this watch instead of polling GitHub again.
+# Best-effort and silent; --no-state turns it off.
+#
+# Why this exists: `gh pr checks --watch` armed before GitHub has registered
+# any check returns green against a stale run, and hand-rolled
+# `sleep 45; for i in 1 2 3 4 5` loops get rewritten session after session.
+# This script waits for checks to
+# actually register, re-reads the head SHA every poll so a new push resets the
+# wait instead of passing on the old run, and refuses to call a skipped
+# required check green (a billing block skips jobs).
+
+set -euo pipefail
+
+PROG=${0##*/}
+
+usage() {
+	cat >&2 <<'USAGE'
+usage: pr-ci-wait <pr-number|pr-url> [--repo owner/name]
+                  [--timeout SECONDS (default 1800)] [--interval SECONDS (default 30)]
+                  [--no-state (do not write the state file)]
+
+exit 0 all green or no CI triggered | 1 failing/conflicting/cancelled/skipped-required | 2 timeout | 3 PR not found or not open
+USAGE
+}
+
+die() {
+	printf '%s: %s\n' "$PROG" "$1" >&2
+	exit "${2:-64}"
+}
+
+progress() { printf '[%s] %s\n' "$PROG" "$1" >&2; }
+
+TARGET=""
+REPO=""
+TIMEOUT=1800
+INTERVAL=30
+NO_CI_GRACE=120
+STATE_ON=1
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--repo)
+		[ $# -ge 2 ] || die "--repo needs a value"
+		REPO=$2
+		shift 2
+		;;
+	--repo=*)
+		REPO=${1#--repo=}
+		shift
+		;;
+	--timeout)
+		[ $# -ge 2 ] || die "--timeout needs a value"
+		TIMEOUT=$2
+		shift 2
+		;;
+	--timeout=*)
+		TIMEOUT=${1#--timeout=}
+		shift
+		;;
+	--interval)
+		[ $# -ge 2 ] || die "--interval needs a value"
+		INTERVAL=$2
+		shift 2
+		;;
+	--interval=*)
+		INTERVAL=${1#--interval=}
+		shift
+		;;
+	--no-state)
+		STATE_ON=0
+		shift
+		;;
+	-*) die "unknown flag: $1" ;;
+	*)
+		[ -z "$TARGET" ] || die "unexpected extra argument: $1"
+		TARGET=$1
+		shift
+		;;
+	esac
+done
+
+[ -n "$TARGET" ] || {
+	usage
+	exit 64
+}
+case "$TIMEOUT" in '' | *[!0-9]*) die "--timeout must be a whole number of seconds" ;; esac
+case "$INTERVAL" in '' | *[!0-9]* | 0) die "--interval must be a positive whole number of seconds" ;; esac
+
+command -v gh >/dev/null 2>&1 || die "gh is not on PATH"
+command -v jq >/dev/null 2>&1 || die "jq is not on PATH"
+
+# --- resolve PR number and repo -------------------------------------------
+PR=""
+case "$TARGET" in
+http://* | https://*)
+	PR=$(printf '%s\n' "$TARGET" | sed -n 's#.*/pull/\([0-9][0-9]*\).*#\1#p')
+	[ -n "$PR" ] || die "could not read a PR number out of URL: $TARGET"
+	if [ -z "$REPO" ]; then
+		REPO=$(printf '%s\n' "$TARGET" | sed -n 's#^https\{0,1\}://[^/]*/\([^/]*\)/\([^/]*\)/pull/.*#\1/\2#p')
+	fi
+	;;
+*[!0-9]*) die "first argument must be a PR number or a PR URL: $TARGET" ;;
+*) PR=$TARGET ;;
+esac
+
+if [ -z "$REPO" ]; then
+	REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) ||
+		die "no --repo given and the current directory has no GitHub remote" 64
+fi
+[ -n "$REPO" ] || die "could not determine the repository" 64
+
+# --- state file and child processes -----------------------------------------
+STATE_FILE="${PR_WATCH_STATE_DIR:-$HOME/.cache/pr-watch}/$(printf '%s' "${REPO//\//__}" | tr '[:upper:]' '[:lower:]')__${PR}.ci-wait.json"
+EXIT_REASON="exited"
+PR_META="" # stdout of the first gh pr view; nothing is written until it is set
+PR_STATE=""
+LAST_OK=""
+STALE=false
+STATE_TMP=""
+CHILD_PID=""
+checks='[]'
+XDIR=$(mktemp -d "${TMPDIR:-/tmp}/pr-ci-wait.XXXXXX") || die "cannot create a temporary directory" 1
+
+# Runs "$@" with stdout in $XDIR/out and stderr in $XDIR/err. With state on it
+# runs as a waited background child: bash holds a trapped signal until a
+# foreground child exits, but `wait` returns at once.
+xrun() {
+	local rc=0
+	if [ "$STATE_ON" = 1 ]; then
+		"$@" </dev/null >"$XDIR/out" 2>"$XDIR/err" &
+		CHILD_PID=$!
+		wait "$CHILD_PID" || rc=$?
+		CHILD_PID=""
+	else
+		"$@" >"$XDIR/out" 2>"$XDIR/err" || rc=$?
+	fi
+	return "$rc"
+}
+
+# A failing sleep still ends the script through set -e, as a foreground one would.
+nap() {
+	if [ "$STATE_ON" = 1 ]; then
+		sleep "$1" &
+		CHILD_PID=$!
+		wait "$CHILD_PID"
+		CHILD_PID=""
+	else
+		sleep "$1"
+	fi
+}
+
+# $1: exit code, or empty while polling. Never fails the script, never prints.
+write_state() {
+	[ "$STATE_ON" = 1 ] && [ -n "$PR_META" ] || return 0
+	case "$PR_STATE" in OPEN | MERGED | CLOSED) ;; *) return 0 ;; esac
+	{
+		mkdir -p "${STATE_FILE%/*}" &&
+			STATE_TMP=$(mktemp "${STATE_FILE}.tmp.XXXXXX") &&
+			printf '%s' "$PR_META" | jq -c \
+				--arg repo "$REPO" --arg number "$PR" --argjson pid "$$" \
+				--arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg sha "${head_sha:-}" \
+				--arg state "$PR_STATE" --argjson stale "$STALE" --arg lastok "$LAST_OK" \
+				--argjson checks "$checks" --arg required "${required_names:-}" \
+				--arg code "${1:-}" --arg reason "$EXIT_REASON" '
+				($required | split("\n") | map(select(. != ""))) as $req
+				| {version: 1, repo: $repo, number: ($number | tonumber), watcher: "ci-wait", pid: $pid,
+				   updatedAt: $now, headSha: (if $sha != "" then $sha else (.headRefOid // "") end),
+				   state: $state, stale: $stale}
+				+ (if $lastok != "" then {lastOkAt: ($lastok | tonumber | todate)} else {} end)
+				+ (if .title then {title} else {} end)
+				+ (if .url then {url} else {} end)
+				+ {checks: [$checks[] | {name,
+				     status: (if .bucket == "pending" then (.state // "PENDING") else "COMPLETED" end),
+				     conclusion: (if .bucket == "pending" then null else .state end),
+				     required: (.name as $n | $req | index($n) != null)}]}
+				+ (if .body then {body} else {} end)
+				| if $code != "" then .exited = {code: ($code | tonumber), at: $now, reason: $reason} else . end
+				' >"$STATE_TMP" &&
+			mv -f "$STATE_TMP" "$STATE_FILE"
+		[ -z "$STATE_TMP" ] || rm -f "$STATE_TMP"
+		STATE_TMP=""
+	} >/dev/null 2>&1 || true
+}
+
+# shellcheck disable=SC2329 # invoked by the EXIT trap
+on_exit() {
+	local code=$?
+	write_state "$code"
+	rm -rf "$XDIR" 2>/dev/null || true
+}
+# shellcheck disable=SC2329 # invoked by the signal traps
+on_signal() { # <signal> <exit code>
+	trap - EXIT "$1"
+	[ -z "$CHILD_PID" ] || kill "$CHILD_PID" 2>/dev/null || true
+	[ -z "$STATE_TMP" ] || rm -f "$STATE_TMP" 2>/dev/null || true
+	STATE_TMP=""
+	EXIT_REASON="killed by SIG$1"
+	write_state "$2"
+	rm -rf "$XDIR" 2>/dev/null || true
+	kill -"$1" $$
+}
+trap on_exit EXIT
+if [ "$STATE_ON" = 1 ]; then
+	trap 'on_signal TERM 143' TERM
+	trap 'on_signal INT 130' INT
+	trap 'on_signal HUP 129' HUP
+fi
+
+# --- confirm the PR exists and is open ------------------------------------
+gh_rc=0
+xrun gh pr view "$PR" --repo "$REPO" --json number,state,url,headRefOid,title,body || gh_rc=$?
+pr_json=$(cat "$XDIR/out" "$XDIR/err")
+if [ "$gh_rc" -ne 0 ]; then
+	printf '%s: PR %s not found in %s\n%s\n' "$PROG" "$PR" "$REPO" "$pr_json" >&2
+	EXIT_REASON="PR not found"
+	exit 3
+fi
+# State is parsed from stdout alone, so a gh warning on stderr cannot break it.
+if PR_STATE=$(jq -r '.state' "$XDIR/out" 2>/dev/null); then
+	PR_META=$(cat "$XDIR/out")
+	LAST_OK=$(date +%s)
+fi
+pr_state=$(printf '%s' "$pr_json" | jq -r '.state')
+pr_url=$(printf '%s' "$pr_json" | jq -r '.url')
+head_sha=$(printf '%s' "$pr_json" | jq -r '.headRefOid')
+if [ "$pr_state" != "OPEN" ]; then
+	printf '%s: PR %s is %s, not open (%s)\n' "$PROG" "$PR" "$pr_state" "$pr_url" >&2
+	EXIT_REASON="PR is $pr_state, not open"
+	exit 3
+fi
+
+progress "watching $pr_url  head=${head_sha:0:7}  timeout=${TIMEOUT}s interval=${INTERVAL}s"
+
+# --- required check names (used for the skipped-required trap) ------------
+xrun gh pr checks "$PR" --repo "$REPO" --required --json name -q '.[].name' || true
+required_names=$(cat "$XDIR/out")
+
+# Normalise `gh pr view --json statusCheckRollup` into the shape gh pr checks
+# --json emits, so the fallback path feeds the same reporting code.
+ROLLUP_TO_CHECKS='
+[ (.statusCheckRollup // [])[] |
+  if (.__typename // "CheckRun") == "StatusContext" then
+    { name: (.context // "status"),
+      state: (.state // "PENDING"),
+      workflow: "",
+      link: (.targetUrl // ""),
+      bucket: (if   (.state // "") == "SUCCESS" then "pass"
+               elif (.state // "") == "PENDING" or (.state // "") == "EXPECTED" then "pending"
+               else "fail" end) }
+  else
+    { name: (.name // "check"),
+      state: (if (.status // "") != "COMPLETED" then (.status // "PENDING") else (.conclusion // "") end),
+      workflow: (.workflowName // ""),
+      link: (.detailsUrl // ""),
+      bucket: (if   (.status // "") != "COMPLETED" then "pending"
+               elif (.conclusion // "") == "SUCCESS" or (.conclusion // "") == "NEUTRAL" then "pass"
+               elif (.conclusion // "") == "SKIPPED" then "skipping"
+               elif (.conclusion // "") == "CANCELLED" then "cancel"
+               else "fail" end) }
+  end ]'
+
+fetch_checks() {
+	# sets checks to a JSON array of {name,state,bucket,link,workflow}; empty
+	# when GitHub has not registered any check yet. CHECKS_OK=0 if both reads failed.
+	local out
+	CHECKS_OK=1
+	if xrun gh pr checks "$PR" --repo "$REPO" --json name,state,bucket,link,workflow &&
+		out=$(cat "$XDIR/out") &&
+		printf '%s' "$out" | jq -e 'type == "array"' >/dev/null 2>&1; then
+		checks=$out
+		return 0
+	fi
+	if xrun gh pr view "$PR" --repo "$REPO" --json statusCheckRollup &&
+		out=$(cat "$XDIR/out") &&
+		printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1; then
+		checks=$(printf '%s' "$out" | jq -c "$ROLLUP_TO_CHECKS")
+		return 0
+	fi
+	CHECKS_OK=0
+	checks='[]'
+}
+
+count_bucket() { printf '%s' "$1" | jq --arg b "$2" '[.[] | select(.bucket == $b)] | length'; }
+
+print_table() {
+	local json=$1
+	printf '\n  %-9s %-46s %-14s %s\n' "RESULT" "CHECK" "STATE" "URL"
+	printf '%s' "$json" |
+		jq -r 'sort_by(.bucket, .name)[] | [.bucket, .name, (.state // ""), (.link // "")] | @tsv' |
+		while IFS=$(printf '\t') read -r b n s l; do
+			printf '  %-9s %-46s %-14s %s\n' "$b" "$n" "$s" "$l"
+		done
+	printf '\n'
+}
+
+is_required() {
+	local name=$1 r
+	[ -n "$required_names" ] || return 1
+	while IFS= read -r r; do
+		[ "$r" = "$name" ] && return 0
+	done <<EOF
+$required_names
+EOF
+	return 1
+}
+
+# --- poll ------------------------------------------------------------------
+start=$(date +%s)
+grace_start=$start
+deadline=$((start + TIMEOUT))
+poll=0
+
+while :; do
+	poll=$((poll + 1))
+	now=$(date +%s)
+	if [ "$now" -ge "$deadline" ]; then
+		total=$(printf '%s' "$checks" | jq 'length')
+		if [ "$total" -eq 0 ]; then
+			progress "TIMEOUT after ${TIMEOUT}s: no check ever registered on ${head_sha:0:7}"
+		else
+			progress "TIMEOUT after ${TIMEOUT}s with checks still pending"
+			print_table "$checks"
+		fi
+		EXIT_REASON="timeout"
+		exit 2
+	fi
+
+	# A push mid-wait invalidates everything seen so far: reset and keep going,
+	# rather than reporting the previous run's result.
+	poll_ok=0
+	if xrun gh pr view "$PR" --repo "$REPO" --json headRefOid,state; then
+		cur_sha=$(jq -r '.headRefOid // empty' "$XDIR/out" 2>/dev/null || true)
+		st=$(jq -r '.state // empty' "$XDIR/out" 2>/dev/null || true)
+		case "$st" in OPEN | MERGED | CLOSED) PR_STATE=$st poll_ok=1 ;; esac
+	else
+		cur_sha=$head_sha
+	fi
+	if [ -n "$cur_sha" ] && [ "$cur_sha" != "$head_sha" ]; then
+		progress "head moved ${head_sha:0:7} -> ${cur_sha:0:7}; restarting the wait against the new commit"
+		head_sha=$cur_sha
+		grace_start=$(date +%s)
+		checks='[]'
+		xrun gh pr checks "$PR" --repo "$REPO" --required --json name -q '.[].name' || true
+		required_names=$(cat "$XDIR/out")
+	fi
+
+	fetch_checks
+	if [ "$poll_ok" = 1 ] && [ "$CHECKS_OK" = 1 ]; then
+		LAST_OK=$(date +%s)
+		STALE=false
+	else
+		STALE=true
+	fi
+	write_state
+	total=$(printf '%s' "$checks" | jq 'length')
+	elapsed=$((now - start))
+
+	if [ "$total" -eq 0 ]; then
+		# A workflow filtered out by paths/branches creates no run at all, so "no
+		# checks and no runs" some time after the head commit appeared means no CI
+		# is coming. A conflicting PR also gets no pull_request run: that is not green.
+		if [ "$STALE" = false ] && [ $((now - grace_start)) -ge "$NO_CI_GRACE" ]; then
+			runs="?"
+			if xrun gh api "repos/$REPO/actions/runs?head_sha=$head_sha&per_page=1" -q .total_count; then
+				runs=$(cat "$XDIR/out")
+			fi
+			if [ "$runs" = "0" ]; then
+				mergeable="?"
+				if xrun gh pr view "$PR" --repo "$REPO" --json mergeable,headRefOid; then
+					# A push after the runs read: leave it to the next poll to restart the grace.
+					if [ "$(jq -r '.headRefOid // empty' "$XDIR/out" 2>/dev/null || true)" = "$head_sha" ]; then
+						mergeable=$(jq -r '.mergeable // empty' "$XDIR/out" 2>/dev/null || true)
+					fi
+				fi
+				if [ "$mergeable" = "CONFLICTING" ]; then
+					progress "no checks on ${head_sha:0:7} and the PR conflicts with its base: CI cannot run until it is rebased"
+					EXIT_REASON="not green: no CI run for the head commit and the PR conflicts with its base"
+					exit 1
+				fi
+				if [ "$mergeable" = "MERGEABLE" ]; then
+					progress "no GitHub Actions run for ${head_sha:0:7} after $((now - grace_start))s (path-filtered or no CI): nothing to wait for; required checks from other apps were not verified — $pr_url"
+					EXIT_REASON="no CI: no GitHub Actions run for the head commit after the grace period; required checks from other apps not verified"
+					exit 0
+				fi
+			fi
+		fi
+		progress "poll $poll (+${elapsed}s) sha=${head_sha:0:7}: no checks registered yet"
+		nap "$INTERVAL"
+		continue
+	fi
+
+	n_pending=$(count_bucket "$checks" pending)
+	n_pass=$(count_bucket "$checks" pass)
+	n_fail=$(count_bucket "$checks" fail)
+	n_cancel=$(count_bucket "$checks" cancel)
+	n_skip=$(count_bucket "$checks" skipping)
+	progress "poll $poll (+${elapsed}s) sha=${head_sha:0:7}: $total checks — pass=$n_pass fail=$n_fail cancel=$n_cancel skip=$n_skip pending=$n_pending"
+
+	[ "$n_pending" -eq 0 ] && break
+	nap "$INTERVAL"
+done
+
+# --- settled: classify -----------------------------------------------------
+print_table "$checks"
+
+bad=0
+
+skipped_required=""
+while IFS= read -r name; do
+	[ -n "$name" ] || continue
+	if is_required "$name"; then
+		skipped_required="$skipped_required$name
+"
+		bad=1
+	fi
+done <<EOF
+$(printf '%s' "$checks" | jq -r '.[] | select(.bucket == "skipping") | .name')
+EOF
+
+if [ -n "$skipped_required" ]; then
+	printf '%s: WARNING — required check(s) reported "skipped", which is NOT green:\n' "$PROG" >&2
+	printf '%s' "$skipped_required" | sed 's/^/    /' >&2
+	printf '  A skipped required check usually means the job never ran (billing block, path filter,\n  or a cancelled workflow). Treat it as red.\n' >&2
+fi
+
+failing=$(printf '%s' "$checks" | jq -c '[.[] | select(.bucket == "fail" or .bucket == "cancel")]')
+n_failing=$(printf '%s' "$failing" | jq 'length')
+
+if [ "$n_failing" -gt 0 ]; then
+	bad=1
+	printf '%s: %s check(s) failed or were cancelled on %s:\n' "$PROG" "$n_failing" "$pr_url" >&2
+	printf '%s' "$failing" | jq -r '.[] | "    " + .name + "  " + (.link // "")' >&2
+
+	shown=0
+	while IFS= read -r link; do
+		[ -n "$link" ] || continue
+		[ "$shown" -ge 2 ] && break
+		run_id=$(printf '%s\n' "$link" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\).*#\1#p')
+		[ -n "$run_id" ] || continue
+		printf '\n--- gh run view %s --log-failed (first 40 lines) ---\n' "$run_id" >&2
+		xrun gh run view "$run_id" --repo "$REPO" --log-failed || true
+		head -40 "$XDIR/out" >&2 || true
+		shown=$((shown + 1))
+	done <<EOF
+$(printf '%s' "$failing" | jq -r '.[] | .link // ""' | sed -n 's#\(.*/actions/runs/[0-9][0-9]*\).*#\1#p' | sort -u)
+EOF
+fi
+
+if [ "$bad" -ne 0 ]; then
+	printf '%s: NOT GREEN — %s\n' "$PROG" "$pr_url" >&2
+	EXIT_REASON="not green: failing, cancelled or skipped-required checks"
+	exit 1
+fi
+
+printf '%s: all %s checks green — %s\n' "$PROG" "$(printf '%s' "$checks" | jq 'length')" "$pr_url" >&2
+EXIT_REASON="all checks green"
+exit 0

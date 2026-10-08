@@ -1,5 +1,5 @@
 // Other Claude sessions on this machine, from ~/.claude/sessions/<pid>.json.
-import type { Flare, OtherAgentVM, OtherSessionVM, PublishedSession, TmuxGroupVM, TodoProgress, WaitVM } from '../model/types'
+import type { ContextUsage, Flare, Jump, OtherAgentVM, OtherSessionVM, PublishedSession, TermEnv, TmuxGroupVM, TodoProgress, WaitVM } from '../model/types'
 import { isRealWait } from './waiting'
 
 export const PUBLISH_FRESH_MS = 30_000
@@ -80,6 +80,7 @@ export interface SessionContext {
   prText?: string
   todos?: TodoProgress
   glosses?: Record<string, string>
+  context?: ContextUsage
 }
 
 /** What a session is about, from its transcript: the AI title (or a /rename), else its first prompt. */
@@ -108,6 +109,7 @@ export function toSessionVM(
   transcriptAgents?: readonly OtherAgentVM[],
   ctx: SessionContext = {},
   wait?: WaitVM,
+  term?: TermEnv,
 ): OtherSessionVM {
   const { window } = splitTmux(row.tmux)
   const real = isRealWait(wait)
@@ -121,7 +123,8 @@ export function toSessionVM(
     name,
     windowLabel: window ? `${window} ${label}` : label,
     status,
-    ...(row.tmux ? { tmuxTarget: row.tmux, jump: { kind: 'tmux' as const, target: row.tmux } } : {}),
+    ...(row.tmux ? { tmuxTarget: row.tmux } : {}),
+    ...((j => (j ? { jump: j } : {}))(jumpOf(row, term))),
     ...(real ? { waitingFor: wait.text, wait } : status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
     ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
     ...(real ? { statusSince: wait.since } : typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
@@ -134,6 +137,18 @@ export function toSessionVM(
     ...(ctx.prText ? { prText: ctx.prText } : {}),
     ...(ctx.todos ? { todos: ctx.todos } : {}),
     ...(ctx.glosses && Object.keys(ctx.glosses).length ? { glosses: ctx.glosses } : {}),
+    ...(ctx.context ? { context: ctx.context } : {}),
+  }
+}
+
+/** A detected session focuses through ADR 0008's strategies; an undetected one keeps the plain tmux jump. */
+export function jumpOf(row: RegistryRow, term: TermEnv | undefined): Jump | undefined {
+  if (!term) return row.tmux ? { kind: 'tmux', target: row.tmux } : undefined
+  return {
+    kind: 'session', sessionId: row.sessionId, cwd: row.cwd, pid: row.pid, term,
+    ...(row.tmux ? { tmux: row.tmux } : {}),
+    ...(row.kind === 'bg' ? { bg: true as const } : {}),
+    ...(row.jobId ? { jobId: row.jobId } : {}),
   }
 }
 
@@ -259,10 +274,11 @@ export function buildFleet(
   agents: ReadonlyMap<string, readonly OtherAgentVM[]> = new Map(),
   contexts: ReadonlyMap<string, SessionContext> = new Map(),
   waits: ReadonlyMap<string, WaitVM> = new Map(),
+  terms: ReadonlyMap<number, TermEnv> = new Map(),
 ): { self?: RegistryRow; others: TmuxGroupVM[] } {
   const self = findSelf(rows, selfId, selfPid)
   const others = rows
     .filter(r => isOtherRow(r, self, selfId, alive))
-    .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId)))
+    .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId), terms.get(r.pid)))
   return { ...(self ? { self } : {}), others: groupByTmux(others) }
 }

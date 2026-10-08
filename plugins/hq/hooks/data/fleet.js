@@ -61,7 +61,7 @@ export function detailOf(row, branch, doing) {
     const text = [where, doing].filter(Boolean).join(' · ');
     return text || undefined;
 }
-export function toSessionVM(row, branch, published, now, topic = {}, transcriptAgents, ctx = {}, wait) {
+export function toSessionVM(row, branch, published, now, topic = {}, transcriptAgents, ctx = {}, wait, term) {
     const { window } = splitTmux(row.tmux);
     const real = isRealWait(wait);
     const name = ctx.goal || topic.title || topic.firstPrompt || nameOf(row) || basename(row.cwd) || 'session';
@@ -74,7 +74,8 @@ export function toSessionVM(row, branch, published, now, topic = {}, transcriptA
         name,
         windowLabel: window ? `${window} ${label}` : label,
         status,
-        ...(row.tmux ? { tmuxTarget: row.tmux, jump: { kind: 'tmux', target: row.tmux } } : {}),
+        ...(row.tmux ? { tmuxTarget: row.tmux } : {}),
+        ...((j => (j ? { jump: j } : {}))(jumpOf(row, term))),
         ...(real ? { waitingFor: wait.text, wait } : status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
         ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
         ...(real ? { statusSince: wait.since } : typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
@@ -87,6 +88,18 @@ export function toSessionVM(row, branch, published, now, topic = {}, transcriptA
         ...(ctx.prText ? { prText: ctx.prText } : {}),
         ...(ctx.todos ? { todos: ctx.todos } : {}),
         ...(ctx.glosses && Object.keys(ctx.glosses).length ? { glosses: ctx.glosses } : {}),
+        ...(ctx.context ? { context: ctx.context } : {}),
+    };
+}
+/** A detected session focuses through ADR 0008's strategies; an undetected one keeps the plain tmux jump. */
+export function jumpOf(row, term) {
+    if (!term)
+        return row.tmux ? { kind: 'tmux', target: row.tmux } : undefined;
+    return {
+        kind: 'session', sessionId: row.sessionId, cwd: row.cwd, pid: row.pid, term,
+        ...(row.tmux ? { tmux: row.tmux } : {}),
+        ...(row.kind === 'bg' ? { bg: true } : {}),
+        ...(row.jobId ? { jobId: row.jobId } : {}),
     };
 }
 /** A registry name that is only the session or job id (a spare's, a fresh bg session's) names nothing. */
@@ -196,10 +209,10 @@ export function selfTmux(rows, self) {
         return undefined;
     return self.tmux ?? rows.find(r => r !== self && isPaired(r, self) && r.tmux)?.tmux;
 }
-export function buildFleet(rows, alive, selfId, branches, published, now, selfPid, topics = new Map(), agents = new Map(), contexts = new Map(), waits = new Map()) {
+export function buildFleet(rows, alive, selfId, branches, published, now, selfPid, topics = new Map(), agents = new Map(), contexts = new Map(), waits = new Map(), terms = new Map()) {
     const self = findSelf(rows, selfId, selfPid);
     const others = rows
         .filter(r => isOtherRow(r, self, selfId, alive))
-        .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId)));
+        .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId), terms.get(r.pid)));
     return { ...(self ? { self } : {}), others: groupByTmux(others) };
 }
