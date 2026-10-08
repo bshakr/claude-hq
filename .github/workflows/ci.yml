@@ -2,11 +2,14 @@ name: ci
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -15,13 +18,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      # Keep in step with the header of types/claude-code/index.d.ts; check:types enforces it.
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code@2.1.295
-      # validate and test need no login. tsc is not run here: its types are
-      # written by the engine only when a session loads the plugin.
-      - run: claude plugin validate plugins/hq
-      - run: claude plugin validate .
-      - run: claude plugin test plugins/hq
-      - name: Lint bundled scripts
-        run: bash -n plugins/hq/bin/pr-ci-wait && bash -n plugins/hq/bin/pr-merge-wait
+      - run: npm run check:types
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run check:scripts
+      - run: npm run validate
+      - run: npm test

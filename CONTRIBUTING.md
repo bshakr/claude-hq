@@ -12,15 +12,23 @@ An interactive session watches the folder and reloads the hooks module when a fi
 
 ## Checks
 
-All of these must pass before a PR:
+Install the dev tools once with `npm ci` (Node 22 or newer, plus `shellcheck`), then run everything CI runs:
 
 ```sh
-claude plugin validate plugins/hq   # manifest and hooks module, as the engine reads them
-claude plugin validate .            # the marketplace file
-claude plugin test plugins/hq       # every *.test.ts under plugins/hq
-tsc -p plugins/hq                   # type-check
+npm run check
 ```
 
-`tsc` needs the API types the engine writes to `plugins/hq/.claude-plugin/types/` (git-ignored) when an interactive session loads the plugin from your folder, so start `claude --plugin-dir plugins/hq` once before type-checking. CI runs `validate` and `test` only, as no command writes those types without a loaded session.
+or one at a time:
 
-The bundled `pr-ci-wait` and `pr-merge-wait` in `plugins/hq/bin` are plain bash: check them with `bash -n` and, if you have it, `shellcheck`.
+```sh
+npm run typecheck      # tsc against the vendored engine types in types/
+npm run lint           # eslint, then prettier --check (npm run format fixes formatting)
+npm run check:types    # types/ was written by the installed Claude Code version
+npm run check:scripts  # bash -n and shellcheck on plugins/hq/bin and scripts
+npm run validate       # claude plugin validate, for the plugin and the marketplace file
+npm test               # claude plugin test plugins/hq
+```
+
+`types/claude-code/index.d.ts` is the API declaration the engine writes beside a plugin it loads, vendored so a fresh clone type-checks without a session. After upgrading Claude Code, start `claude --plugin-dir plugins/hq` once, copy `plugins/hq/.claude-plugin/types/claude-code/index.d.ts` over it, and bump the version CI installs in `.github/workflows/ci.yml` to match its first line. Your editor reads the engine-written copy through `plugins/hq/tsconfig.json`.
+
+The bundled `pr-ci-wait` and `pr-merge-wait` in `plugins/hq/bin` are plain bash, checked by `npm run check:scripts`.
