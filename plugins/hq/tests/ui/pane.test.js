@@ -114,3 +114,21 @@ test('a dimmed running dot and the green plan bars validate as colour plus dimCo
     expect(json.includes('"color":"ansi256(2)"')).toBe(true);
     await ui.unmount();
 });
+test('the +N finished toggle is a Button the engine accepts, open or closed', async ($, on) => {
+    const fin = (id, mins) => ({
+        id, title: `Finished ${id}`, status: 'completed', background: true, startedAt: BUSY.now - 20 * 60_000,
+        endedAt: BUSY.now - mins * 60_000, toolCount: 1, files: [],
+    });
+    const model = { ...BUSY, current: { ...BUSY.current, agents: [...BUSY.current.agents, fin('f1', 1), fin('f2', 2)] } };
+    const p = { model, cursor: null, expanded: [] };
+    probe(on, p);
+    for (const expanded of [[], ['+finished']]) {
+        p.expanded = expanded;
+        const ui = await $.ui.mount({ plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: PROBE, props: props(80, 58) });
+        const drawn = await ui.drawn();
+        expect(JSON.stringify(drawn).includes('backgroundColor')).toBe(false);
+        const buttons = await ui.findAll({ type: 'Button' });
+        expect(buttons.some(b => b.props.key === 'finished' || b.key === 'finished')).toBe(true);
+        await ui.unmount();
+    }
+});

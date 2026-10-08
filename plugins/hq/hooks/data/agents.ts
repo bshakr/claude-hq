@@ -29,7 +29,7 @@ export interface AgentsState {
   byId: Record<string, AgentRecord>
   /** tool_use_id → agentId */
   byToolUse: Record<string, string>
-  /** Ids pruned while the engine still lists them (ended agents stay resumable); never adopted again. */
+  /** Ids pruned while the engine still lists them (ended agents stay resumable); adopted again only as running. */
   pruned?: string[]
 }
 
@@ -302,7 +302,8 @@ export function reconcile(s: AgentsState, listed: readonly ListedAgent[], now: n
     const a = s.byId[l.id]
     const status = mapStatus(l.status, l.type)
     if (!a) {
-      if (!isLive({ status }) || s.pruned?.includes(l.id)) continue
+      // A pruned id comes back only when it truly runs again (a message resumed it).
+      if (!isLive({ status }) || (status !== 'running' && s.pruned?.includes(l.id))) continue
       s.byId[l.id] = {
         id: l.id, title: l.description, status, background: true, startedAt: now, toolCount: 0, files: [],
         ...(l.parentId ? { parentId: l.parentId } : {}),

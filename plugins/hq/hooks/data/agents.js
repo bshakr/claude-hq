@@ -236,7 +236,8 @@ export function reconcile(s, listed, now) {
         const a = s.byId[l.id];
         const status = mapStatus(l.status, l.type);
         if (!a) {
-            if (!isLive({ status }) || s.pruned?.includes(l.id))
+            // A pruned id comes back only when it truly runs again (a message resumed it).
+            if (!isLive({ status }) || (status !== 'running' && s.pruned?.includes(l.id)))
                 continue;
             s.byId[l.id] = {
                 id: l.id, title: l.description, status, background: true, startedAt: now, toolCount: 0, files: [],

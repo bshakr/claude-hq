@@ -173,6 +173,8 @@ test('agents: a handed-back agent pruned after 30 min is not re-adopted as live 
     reconcile(s, listed(status), 540_000 + 30 * 60_000 + 3_000)
     expect(agentList(s).filter(a => a.id === 'pk' && (a.status === 'running' || a.status === 'waiting'))).toEqual([])
   }
+  reconcile(s, listed('running'), 540_000 + 30 * 60_000 + 5_000)
+  expect(s.byId.pk!.status).toBe('running')
 })
 
 test('agents: a live subagent the engine lists as idle has ended; a teammate waiting for a message has not', () => {
