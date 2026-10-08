@@ -1,0 +1,26 @@
+{
+  "name": "claude-hq-dev",
+  "private": true,
+  "description": "Development checks for the hq Claude Code plugin; nothing here ships with the plugin.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint . && prettier --check \"plugins/hq/{hooks,tests}/**/*.{ts,tsx}\" \"*.{js,json}\"",
+    "format": "prettier --write \"plugins/hq/{hooks,tests}/**/*.{ts,tsx}\" \"*.{js,json}\"",
+    "test": "claude plugin test plugins/hq",
+    "validate": "claude plugin validate plugins/hq && claude plugin validate .",
+    "check:types": "bash scripts/check-types-version.sh",
+    "check:scripts": "bash -n plugins/hq/bin/pr-ci-wait && bash -n plugins/hq/bin/pr-merge-wait && shellcheck plugins/hq/bin/pr-ci-wait plugins/hq/bin/pr-merge-wait scripts/*.sh",
+    "check": "npm run typecheck && npm run lint && npm run check:types && npm run check:scripts && npm run validate && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1"
+  }
+}
