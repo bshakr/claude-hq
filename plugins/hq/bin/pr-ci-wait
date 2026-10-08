@@ -198,13 +198,13 @@ write_state() {
 	} >/dev/null 2>&1 || true
 }
 
-# shellcheck disable=SC2329 # invoked by the EXIT trap
+# shellcheck disable=SC2317,SC2329 # invoked by the EXIT trap
 on_exit() {
 	local code=$?
 	write_state "$code"
 	rm -rf "$XDIR" 2>/dev/null || true
 }
-# shellcheck disable=SC2329 # invoked by the signal traps
+# shellcheck disable=SC2317,SC2329 # invoked by the signal traps
 on_signal() { # <signal> <exit code>
 	trap - EXIT "$1"
 	[ -z "$CHILD_PID" ] || kill "$CHILD_PID" 2>/dev/null || true
