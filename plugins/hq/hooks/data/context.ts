@@ -352,7 +352,7 @@ export interface GoalCache {
 
 export interface GoalExtras {
   prTitles?: readonly string[]
-  /** Titles of the tickets and ADRs the session names, as "BLO-1947: <title>". */
+  /** Titles of the tickets and ADRs the session names, as "ENG-1947: <title>". */
   idTitles?: readonly string[]
 }
 

@@ -87,15 +87,15 @@ test('a jump runs only its own commands: tmux switch then pane select, or open f
   }
   expect(await runJump(jumpOf('flare'), ok)).toBe(undefined)
   expect(ran).toEqual([
-    ['tmux', 'switch-client', '-t', 'ritualpass:@3.%6'],
+    ['tmux', 'switch-client', '-t', 'acme-store:@3.%6'],
     ['tmux', 'select-pane', '-t', '%6'],
   ])
   ran.length = 0
-  await runJump(jumpOf('p:bshakr/monolense#212'), ok)
-  expect(ran).toEqual([['open', 'https://github.com/bshakr/monolense/pull/212']])
+  await runJump(jumpOf('p:acmeco/webapp-ui#212'), ok)
+  expect(ran).toEqual([['open', 'https://github.com/acmeco/webapp-ui/pull/212']])
   ran.length = 0
-  await runJump(jumpOf('s:s-rp-admin'), ok)
-  expect(ran[0]).toEqual(['tmux', 'switch-client', '-t', 'ritualpass:@4.%13'])
+  await runJump(jumpOf('s:s-st-admin'), ok)
+  expect(ran[0]).toEqual(['tmux', 'switch-client', '-t', 'acme-store:@4.%13'])
   // Agents expand and j/k move: none of them is a jump.
   for (const key of ['a:a3', 'j', 'k']) expect(l.actions[key]?.kind === 'jump').toBe(false)
   ran.length = 0
@@ -104,9 +104,9 @@ test('a jump runs only its own commands: tmux switch then pane select, or open f
   // A failed switch stops before the pane select.
   const fails = async (argv: string[]) => {
     ran.push(argv)
-    return { exitCode: 1, stderr: "can't find session: ritualpass" }
+    return { exitCode: 1, stderr: "can't find session: acme-store" }
   }
-  expect(await runJump(jumpOf('flare'), fails)).toBe("tmux switch-client failed: can't find session: ritualpass")
+  expect(await runJump(jumpOf('flare'), fails)).toBe("tmux switch-client failed: can't find session: acme-store")
   expect(ran.length).toBe(1)
 })
 

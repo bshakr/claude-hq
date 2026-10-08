@@ -30,8 +30,8 @@ describe('the sheet, cell for cell', () => {
   test("(a') busy, focused, cursor on the flare", () => expectSheet(lines(BUSY, { focused: true, cursor: 'flare' }), SHEET.aFocusFlare))
   test('(b) quiet, unfocused', () => expectSheet(lines(QUIET), SHEET.b80))
   test("(b') quiet, focused, cursor on #433", () =>
-    expectSheet(lines(QUIET, { focused: true, cursor: 'p:ritualpass/admin-web#433' }), SHEET.bFocus433))
-  test('(c) busy, focused, cursor on rp-admin', () => expectSheet(lines(BUSY, { focused: true, cursor: 's:s-rp-admin' }), SHEET.c80))
+    expectSheet(lines(QUIET, { focused: true, cursor: 'p:acme-store/admin-web#433' }), SHEET.bFocus433))
+  test('(c) busy, focused, cursor on st-admin', () => expectSheet(lines(BUSY, { focused: true, cursor: 's:s-st-admin' }), SHEET.c80))
   test('(e) 40 cols', () => expectSheet(lines(BUSY, { width: 40 }), SHEET.e40))
   test('(e) 88 cols', () => expectSheet(lines(BUSY, { width: 88 }), SHEET.e88))
   test('(f) long list', () => expectSheet(lines(LONG), SHEET.f80))
@@ -96,7 +96,7 @@ describe('every state, every width', () => {
   test('truncation ends in one …, names and refs never cut', () => {
     for (const width of [40, 60]) {
       const text = lines(BUSY, { width, rows: 90 }).join('\n')
-      for (const keep of ['#212', '#214', '#431', '#433', '#429', '#522', 'rp-api', 'monolense-research', 'rota-research']) {
+      for (const keep of ['#212', '#214', '#431', '#433', '#429', '#522', 'st-api', 'webapp-ui-research', 'rota-research']) {
         expect(text.includes(keep)).toBe(true)
       }
       expect(text.includes('……')).toBe(false)
@@ -109,11 +109,11 @@ describe('every state, every width', () => {
       const tops = got.filter(l => l.startsWith(' ╭─ '))
       expect(tops.map(l => l.slice(4).split(' ')[0])).toEqual([
         'this',
-        'ritualpass',
-        'bassemshaker',
-        'monolense',
+        'acme-store',
+        'devbox-local',
+        'webapp-ui',
         'travel-map',
-        'rotamonster',
+        'rota-roster',
         'finance',
         'pull',
       ])
@@ -140,14 +140,14 @@ describe('colour', () => {
     expect(lines(BUSY)[0]).toBe('')
     expect(lines(QUIET)[0]).toBe('')
     expect(lines(BUSY, { focused: true })[0]).toBe('▌')
-    expect(lines(BUSY)[2]!.startsWith(' ◆ rp-api is waiting for your input')).toBe(true)
+    expect(lines(BUSY)[2]!.startsWith(' ◆ st-api is waiting for your input')).toBe(true)
   })
 
   test('card borders: dim normally, yellow when something needs you, red when broken', () => {
     const rows = layout(BUSY, view({ rows: 90 })).rows
     expect(borderTone(rows, 'this session')).toBe('fail')
-    expect(borderTone(rows, 'ritualpass')).toBe('wait')
-    expect(borderTone(rows, 'bassemshaker')).toBe('rule')
+    expect(borderTone(rows, 'acme-store')).toBe('wait')
+    expect(borderTone(rows, 'devbox-local')).toBe('rule')
     expect(borderTone(rows, 'pull requests')).toBe('fail')
     const long = layout(LONG, view({ rows: 90 })).rows
     expect(borderTone(long, 'finance')).toBe('fail')
@@ -176,7 +176,7 @@ describe('colour', () => {
 
   test('quiet has no coloured cell but the borders; focus adds only ▌ and ▶', () => {
     expect(coloured(layout(QUIET, view()).rows).length).toBe(0)
-    const focused = layout(QUIET, view({ focused: true, cursor: 'p:ritualpass/admin-web#433' }))
+    const focused = layout(QUIET, view({ focused: true, cursor: 'p:acme-store/admin-web#433' }))
     expect(coloured(focused.rows).map(s => `${s.t}=${s.s.c}`)).toEqual(['▌=accent', '▶=accent'])
   })
 
@@ -201,32 +201,32 @@ describe('targets', () => {
       'a:a2',
       'a:a3',
       'a:a4',
-      's:s-rp-api',
-      's:s-rp-admin',
-      's:s-rp-docs',
+      's:s-st-api',
+      's:s-st-admin',
+      's:s-st-docs',
       's:s-home',
       's:s-mono-r',
       's:s-travel',
       's:s-rota',
       's:s-rota-r',
       's:s-fin',
-      'p:bshakr/monolense#212',
-      'p:bshakr/monolense#214',
-      'p:ritualpass/admin-web#431',
-      'p:ritualpass/admin-web#433',
-      'p:ritualpass/admin-web#429',
-      'p:ritualpass/api#522',
+      'p:acmeco/webapp-ui#212',
+      'p:acmeco/webapp-ui#214',
+      'p:acme-store/admin-web#431',
+      'p:acme-store/admin-web#433',
+      'p:acme-store/admin-web#429',
+      'p:acme-store/api#522',
     ])
     const buttons = l.rows.flatMap(r => r.buttons)
     const shown = l.items.filter(k => l.rows.some(r => r.head && r.item === k))
     for (const key of shown) expect(buttons.filter(b => b.key === key).length).toBe(1)
     expect(buttons.map(b => b.key).filter(k => !l.items.includes(k))).toEqual(['j', 'k'])
-    expect(l.actions.flare).toEqual({ kind: 'jump', jump: { kind: 'tmux', target: 'ritualpass:@3.%6' } })
-    expect(l.actions['p:bshakr/monolense#212']).toEqual({
+    expect(l.actions.flare).toEqual({ kind: 'jump', jump: { kind: 'tmux', target: 'acme-store:@3.%6' } })
+    expect(l.actions['p:acmeco/webapp-ui#212']).toEqual({
       kind: 'jump',
-      jump: { kind: 'url', url: 'https://github.com/bshakr/monolense/pull/212' },
+      jump: { kind: 'url', url: 'https://github.com/acmeco/webapp-ui/pull/212' },
     })
-    expect(l.actions['s:s-rp-admin']).toEqual({ kind: 'jump', jump: { kind: 'tmux', target: 'ritualpass:@4.%13' } })
+    expect(l.actions['s:s-st-admin']).toEqual({ kind: 'jump', jump: { kind: 'tmux', target: 'acme-store:@4.%13' } })
     expect(l.actions['a:a3']).toEqual({ kind: 'toggle', id: 'a3' })
     const all = layout(BUSY, view({ rows: 90 }))
     const hrefs = all.rows.flatMap(r =>
@@ -235,14 +235,14 @@ describe('targets', () => {
         .filter(s => s.s.href)
         .map(s => `${s.t}=${s.s.href}`),
     )
-    expect(hrefs).toContain('#212=https://github.com/bshakr/monolense/pull/212')
+    expect(hrefs).toContain('#212=https://github.com/acmeco/webapp-ui/pull/212')
     expect(hrefs.length).toBe(BUSY.current.prs.length)
   })
 
   test('every line of an item, border cells included, shares its key so hover lights the whole item', () => {
     const rows = layout(ACTIVE, view({ rows: 90 })).rows
-    const at = rows.findIndex(r => r.text().includes('rp-admin'))
-    const group = rows.slice(at).filter((r, i, all) => all.slice(0, i + 1).every(x => x.item === 's:s-rp-admin'))
+    const at = rows.findIndex(r => r.text().includes('st-admin'))
+    const group = rows.slice(at).filter((r, i, all) => all.slice(0, i + 1).every(x => x.item === 's:s-st-admin'))
     expect(group.length).toBe(7)
     expect(group.every(r => r.text().startsWith(' │') && r.text().endsWith('│'))).toBe(true)
     expect(group.filter(r => r.head).length).toBe(1)
@@ -311,7 +311,7 @@ describe('scrolling and motion', () => {
       )
       return n
     }
-    // a2's breath, #214's next check, rp-admin's breath.
+    // a2's breath, #214's next check, st-admin's breath.
     expect(changed(BUSY)).toBe(3)
     expect(changed(QUIET)).toBe(0)
   })
@@ -341,7 +341,7 @@ describe('this session: one card for now, todos, waiting and agents', () => {
       ' ╰────────────────────────────────────────────────────────────────────────────╯',
     ])
     const at = (t: string) => got.findIndex(l => l.includes(t))
-    expect(at('╭─ ritualpass') < at('╭─ pull requests')).toBe(true)
+    expect(at('╭─ acme-store') < at('╭─ pull requests')).toBe(true)
     expect(got.some(l => /agents|[└├┄]/.test(l))).toBe(false)
   })
 
@@ -426,21 +426,21 @@ describe('this session: one card for now, todos, waiting and agents', () => {
 describe('other sessions: one card per tmux group', () => {
   test('sessions of one group share a card, a blank between them; detail and agents sit under each', () => {
     const got = lines(ACTIVE, { rows: 90 })
-    const at = got.findIndex(l => l.includes('╭─ ritualpass'))
+    const at = got.findIndex(l => l.includes('╭─ acme-store'))
     expect(got.slice(at, at + 15)).toEqual([
-      ' ╭─ ritualpass ───────────────────────────────────────────────────────────────╮',
-      ' │  rp-api                           1 agent · 1 PR needs you · ◆ waiting 2m  │',
-      ' │  api · BLO-12 · 3/7 · Rewriting PR claim rules                             │',
+      ' ╭─ acme-store ───────────────────────────────────────────────────────────────╮',
+      ' │  st-api                           1 agent · 1 PR needs you · ◆ waiting 2m  │',
+      ' │  api · ENG-12 · 3/7 · Rewriting PR claim rules                             │',
       ' │                                                                            │',
-      ' │  rp-admin                                 1 of 2 PRs need you · ● busy 6m  │',
-      ' │  ● Implement BLO-1941 card pairing guard                       opus · 12m  │',
+      ' │  st-admin                                 1 of 2 PRs need you · ● busy 6m  │',
+      ' │  ● Implement ENG-1941 card pairing guard                       opus · 12m  │',
       ' │    Run ledger specs                                                        │',
       ' │  ● Review the members table PR                               sonnet · 20m  │',
       ' │  ● Capture screenshot pairs                                           25m  │',
       ' │    editing gallery.html                                                    │',
       ' │    +1 more                                                                 │',
       ' │                                                                            │',
-      ' │  rp-docs                                                          idle 1h  │',
+      ' │  st-docs                                                          idle 1h  │',
       ' ╰────────────────────────────────────────────────────────────────────────────╯',
       '',
     ])
@@ -459,7 +459,7 @@ describe('other sessions: one card per tmux group', () => {
       },
       { rows: 90 },
     )
-    const at = other.findIndex(l => l.includes('◷ Implement BLO-1941'))
+    const at = other.findIndex(l => l.includes('◷ Implement ENG-1941'))
     expect(other[at + 1]!.startsWith(' │    waiting · Run the spec suite · 9m')).toBe(true)
   })
 })

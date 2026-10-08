@@ -21,7 +21,7 @@ import * as SUB from './subagent-fixtures'
 const T0 = Date.parse('2026-10-08T12:00:00.000Z')
 
 test('subagents: the transcript dir follows the projects naming', () => {
-  expect(subagentsDir('/Users/b', '/Users/b/code/monolense', 'sid')).toBe('/Users/b/.claude/projects/-Users-b-code-monolense/sid/subagents')
+  expect(subagentsDir('/Users/b', '/Users/b/code/webapp-ui', 'sid')).toBe('/Users/b/.claude/projects/-Users-b-code-webapp-ui/sid/subagents')
   expect(subagentsDir('/h', '/h/.supacode/repos/a_b', 's')).toBe('/h/.claude/projects/-h--supacode-repos-a-b/s/subagents')
 })
 
@@ -68,8 +68,8 @@ test('subagents: only fresh transcripts are tailed; running ones listed newest f
 const row = (extra: Partial<RegistryRow> = {}): RegistryRow => ({
   pid: 7,
   sessionId: 'm1',
-  cwd: '/Users/b/code/monolense',
-  tmux: 'monolense:@2.%3',
+  cwd: '/Users/b/code/webapp-ui',
+  tmux: 'webapp-ui:@2.%3',
   status: 'busy',
   ...extra,
 })
@@ -97,8 +97,8 @@ test('fleet: a fresh publish with agents wins; otherwise the transcripts give th
 test('fleet: the dim line is dropped when it only repeats the tmux group, kept when it adds a branch or doing', () => {
   expect(toSessionVM(row(), undefined, undefined, 0).detail).toBe(undefined)
   expect(toSessionVM(row(), 'main', undefined, 0).detail).toBe(undefined)
-  expect(toSessionVM(row(), 'BLO-1941-guard', undefined, 0).detail).toBe('monolense · BLO-1941-guard')
-  expect(toSessionVM(row({ cwd: '/Users/b/code/monolense/.koh/BLO-7' }), undefined, undefined, 0).detail).toBe('BLO-7')
+  expect(toSessionVM(row(), 'ENG-1941-guard', undefined, 0).detail).toBe('webapp-ui · ENG-1941-guard')
+  expect(toSessionVM(row({ cwd: '/Users/b/code/webapp-ui/.koh/ENG-7' }), undefined, undefined, 0).detail).toBe('ENG-7')
   const pub: PublishedSession = {
     sessionId: 'm1',
     pid: 7,
@@ -107,7 +107,7 @@ test('fleet: the dim line is dropped when it only repeats the tmux group, kept w
     prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
     doing: '2/4 · Ship',
   }
-  expect(toSessionVM(row(), undefined, pub, 1).detail).toBe('monolense · 2/4 · Ship')
+  expect(toSessionVM(row(), undefined, pub, 1).detail).toBe('webapp-ui · 2/4 · Ship')
 })
 
 test('plain text: markdown is stripped and the first sentence kept', () => {

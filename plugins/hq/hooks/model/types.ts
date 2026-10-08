@@ -18,12 +18,12 @@ export interface TermEnv {
 
 /** Where Enter/click goes: focus a session's terminal (else copy its resume command), or open a web URL. */
 export type Jump =
-  | { kind: 'tmux'; target: string } // e.g. "ritualpass:@3.%6"
+  | { kind: 'tmux'; target: string } // e.g. "acme-store:@3.%6"
   | { kind: 'url'; url: string }
   | { kind: 'session'; sessionId: string; cwd: string; pid: number; tmux?: string; bg?: true; jobId?: string; term: TermEnv }
 
 export interface Flare {
-  text: string // "rp-api is waiting for your input"
+  text: string // "st-api is waiting for your input"
   sinceMs: number
   tmuxTarget: string
   jump: Jump
@@ -104,8 +104,8 @@ export interface WaitVM {
 export interface OtherSessionVM {
   sessionId: string
   name: string // session name or cwd basename
-  tmuxTarget?: string // "monolense:@3.%7"
-  windowLabel: string // "@3 BLO-1940-promote"
+  tmuxTarget?: string // "webapp-ui:@3.%7"
+  windowLabel: string // "@3 ENG-1940-promote"
   status: 'busy' | 'idle' | 'waiting'
   waitingFor?: string // "input needed", "dialog open"
   statusSince?: number
@@ -124,7 +124,7 @@ export interface OtherSessionVM {
   /** "12 PRs merged, 1 open" over the PRs its transcript links. */
   prText?: string
   todos?: TodoProgress
-  /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("BLO-1947", "ADR 0019"). */
+  /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-1947", "ADR 0019"). */
   glosses?: Record<string, string>
   /** What it waits on the user for; a real wait (not `turn`) also makes `status` waiting. */
   wait?: WaitVM
@@ -168,7 +168,7 @@ export interface OtherAgentVM {
 }
 
 export interface TmuxGroupVM {
-  tmuxSession: string // "monolense"
+  tmuxSession: string // "webapp-ui"
   sessions: OtherSessionVM[]
 }
 
@@ -199,7 +199,7 @@ export interface HqModel {
   counts: Counts
   flare?: Flare
   current: {
-    label: string // e.g. "monolense:@1 · BLO-1940-promote"
+    label: string // e.g. "webapp-ui:@1 · ENG-1940-promote"
     /** The session's goal summary and calendar day (ADR 0004). */
     goal?: { text: string; day?: number; step?: string }
     /** Repo or folder name: the card's title once there is a goal. */
@@ -209,7 +209,7 @@ export interface HqModel {
     waiting?: WaitingVM[]
     agents: AgentVM[]
     prs: PrVM[]
-    /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("BLO-1947", "ADR 0019"). */
+    /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-1947", "ADR 0019"). */
     glosses?: Record<string, string>
     context?: ContextUsage
   }

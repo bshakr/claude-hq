@@ -67,7 +67,7 @@ export const AGENTS: AgentVM[] = [
     endedAt: NOW - 1 * M,
     toolCount: 23,
     now: 'port 3000 already in use',
-    worktree: '~/code/monolense',
+    worktree: '~/code/webapp-ui',
   }),
 ]
 
@@ -81,9 +81,9 @@ const pr = (p: Partial<PrVM> & Pick<PrVM, 'repo' | 'number' | 'title'>): PrVM =>
   ...p,
 })
 
-const MONO = 'bshakr/monolense'
-const ADMIN = 'ritualpass/admin-web'
-const API = 'ritualpass/api'
+const MONO = 'acmeco/webapp-ui'
+const ADMIN = 'acme-store/admin-web'
+const API = 'acme-store/api'
 
 export const PRS: PrVM[] = [
   pr({
@@ -137,64 +137,64 @@ const sess = (s: Partial<OtherSessionVM> & Pick<OtherSessionVM, 'sessionId' | 'n
 const group = (tmuxSession: string, sessions: OtherSessionVM[]): TmuxGroupVM => ({ tmuxSession, sessions })
 
 export const OTHERS_BUSY: TmuxGroupVM[] = [
-  group('ritualpass', [
+  group('acme-store', [
     sess(
       {
-        sessionId: 's-rp-api',
-        name: 'rp-api',
+        sessionId: 's-st-api',
+        name: 'st-api',
         status: 'waiting',
         statusSince: NOW - 2 * M,
         waitingFor: 'input needed',
         agentsRunning: 1,
         prSummary: { total: 1, broken: 0, waiting: 1, inProgress: 0 },
       },
-      'ritualpass',
+      'acme-store',
       '@3',
     ),
     sess(
       {
-        sessionId: 's-rp-admin',
-        name: 'rp-admin',
+        sessionId: 's-st-admin',
+        name: 'st-admin',
         status: 'busy',
         statusSince: NOW - 6 * M,
         agentsRunning: 4,
         prSummary: { total: 2, broken: 0, waiting: 1, inProgress: 0 },
       },
-      'ritualpass',
+      'acme-store',
       '@4',
     ),
-    sess({ sessionId: 's-rp-docs', name: 'rp-docs', statusSince: NOW - 1 * H }, 'ritualpass', '@5'),
+    sess({ sessionId: 's-st-docs', name: 'st-docs', statusSince: NOW - 1 * H }, 'acme-store', '@5'),
   ]),
-  group('bassemshaker', [sess({ sessionId: 's-home', name: 'home', statusSince: NOW - 5 * M }, 'bassemshaker')]),
-  group('monolense', [sess({ sessionId: 's-mono-r', name: 'monolense-research', statusSince: NOW - 22 * M }, 'monolense', '@2')]),
+  group('devbox-local', [sess({ sessionId: 's-home', name: 'home', statusSince: NOW - 5 * M }, 'devbox-local')]),
+  group('webapp-ui', [sess({ sessionId: 's-mono-r', name: 'webapp-ui-research', statusSince: NOW - 22 * M }, 'webapp-ui', '@2')]),
   group('travel-map', [
     sess(
       { sessionId: 's-travel', name: 'travel', statusSince: NOW - 40 * M, prSummary: { total: 1, broken: 0, waiting: 0, inProgress: 0 } },
       'travel-map',
     ),
   ]),
-  group('rotamonster', [
-    sess({ sessionId: 's-rota', name: 'rota', statusSince: NOW - 3 * H }, 'rotamonster'),
-    sess({ sessionId: 's-rota-r', name: 'rota-research', statusSince: NOW - 3 * H }, 'rotamonster', '@2'),
+  group('rota-roster', [
+    sess({ sessionId: 's-rota', name: 'rota', statusSince: NOW - 3 * H }, 'rota-roster'),
+    sess({ sessionId: 's-rota-r', name: 'rota-research', statusSince: NOW - 3 * H }, 'rota-roster', '@2'),
   ]),
   group('finance', [sess({ sessionId: 's-fin', name: 'finance', statusSince: NOW - 49 * H }, 'finance')]),
 ]
 
-const LABEL = 'monolense:@1 · monolense-bb · opus · idle'
+const LABEL = 'webapp-ui:@1 · webapp-ui-bb · opus · idle'
 
 /** (a) busy */
 export const BUSY: HqModel = {
   now: NOW,
   counts: { waiting: 3, broken: 2, inProgress: 3, sessions: 10 },
   flare: {
-    text: 'rp-api is waiting for your input',
+    text: 'st-api is waiting for your input',
     sinceMs: NOW - 2 * M,
-    tmuxTarget: 'ritualpass:@3.%6',
-    jump: { kind: 'tmux', target: 'ritualpass:@3.%6' },
+    tmuxTarget: 'acme-store:@3.%6',
+    jump: { kind: 'tmux', target: 'acme-store:@3.%6' },
   },
   current: { label: LABEL, agents: AGENTS, prs: PRS },
   others: OTHERS_BUSY,
-  statusText: 'hq: rp-api waiting 2m · PRs 1 red',
+  statusText: 'hq: st-api waiting 2m · PRs 1 red',
 }
 
 const quietOthers = OTHERS_BUSY.map(g => ({
@@ -204,7 +204,7 @@ const quietOthers = OTHERS_BUSY.map(g => ({
     return {
       ...rest,
       status: 'idle' as const,
-      statusSince: s.name === 'rp-api' ? NOW - 1 * M : s.name === 'rp-admin' ? NOW - 3 * M : s.statusSince,
+      statusSince: s.name === 'st-api' ? NOW - 1 * M : s.name === 'st-admin' ? NOW - 3 * M : s.statusSince,
       ...(s.prSummary ? { prSummary: { total: s.prSummary.total, broken: 0, waiting: 0, inProgress: 0 } } : {}),
     }
   }),
@@ -238,9 +238,9 @@ export const LONG: HqModel = {
   ...BUSY,
   counts: { waiting: 4, broken: 3, inProgress: 4, sessions: 13 },
   others: [
-    group('ritualpass', [
+    group('acme-store', [
       OTHERS_BUSY[0]!.sessions[0]!,
-      sess({ sessionId: 's-rp-mobile', name: 'rp-mobile', status: 'waiting', statusSince: NOW - 1 * M }, 'ritualpass', '@6'),
+      sess({ sessionId: 's-st-mobile', name: 'st-mobile', status: 'waiting', statusSince: NOW - 1 * M }, 'acme-store', '@6'),
       OTHERS_BUSY[0]!.sessions[1]!,
       OTHERS_BUSY[0]!.sessions[2]!,
     ]),
@@ -257,22 +257,22 @@ export const LONG: HqModel = {
       ),
       sess({ sessionId: 's-fin', name: 'finance', statusSince: NOW - 49 * H }, 'finance'),
     ]),
-    group('noryai', [
+    group('acmeai', [
       sess(
         {
-          sessionId: 's-nory',
-          name: 'nory-app',
+          sessionId: 's-acme',
+          name: 'acme-app',
           status: 'busy',
           statusSince: NOW - 12 * M,
           agentsRunning: 2,
           prSummary: { total: 2, broken: 0, waiting: 0, inProgress: 1 },
         },
-        'noryai',
+        'acmeai',
       ),
     ]),
     ...OTHERS_BUSY.slice(1, 5),
   ],
-  statusText: 'hq: 2 waiting, rp-api first 2m',
+  statusText: 'hq: 2 waiting, st-api first 2m',
 }
 
 /** Nothing at all: a fresh session before the first poll. */
@@ -310,15 +310,15 @@ export const ACTIVE: HqModel = {
   others: BUSY.others.map(g => ({
     ...g,
     sessions: g.sessions.map(s =>
-      s.sessionId === 's-rp-api'
-        ? { ...s, detail: 'api · BLO-12 · 3/7 · Rewriting PR claim rules' }
-        : s.sessionId === 's-rp-admin'
+      s.sessionId === 's-st-api'
+        ? { ...s, detail: 'api · ENG-12 · 3/7 · Rewriting PR claim rules' }
+        : s.sessionId === 's-st-admin'
           ? {
               ...s,
               agents: [
                 {
                   id: 'o1',
-                  title: 'Implement BLO-1941 card pairing guard',
+                  title: 'Implement ENG-1941 card pairing guard',
                   model: 'opus',
                   startedAt: NOW - 12 * M,
                   doing: 'Run ledger specs',

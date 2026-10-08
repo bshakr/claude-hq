@@ -29,15 +29,15 @@ import { layout } from '../../hooks/ui/layout'
 const NOW = Date.parse('2026-10-08T20:00:00Z')
 const MIN = 60_000
 
-// The registry as it stood on 2026-10-08: a terminal front-end, the bg session it parked, a spare, and monolense.
+// The registry as it stood on 2026-10-08: a terminal front-end, the bg session it parked, a spare, and webapp-ui.
 const REGISTRY = [
   {
     pid: 29637,
     sessionId: '21e093a4-f5f3',
     cwd: '/Users/me',
     kind: 'interactive',
-    tmux: 'bassemshaker:@0.%1',
-    name: 'bassemshaker-6c',
+    tmux: 'devbox-local:@0.%1',
+    name: 'devbox-local-6c',
     status: 'idle',
     parkedJobId: '990b185e',
   },
@@ -55,10 +55,10 @@ const REGISTRY = [
   {
     pid: 45327,
     sessionId: '1b6016a8-e12d',
-    cwd: '/Users/me/code/monolense',
+    cwd: '/Users/me/code/webapp-ui',
     kind: 'interactive',
-    tmux: 'monolense:@3.%7',
-    name: 'monolense-bb',
+    tmux: 'webapp-ui:@3.%7',
+    name: 'webapp-ui-bb',
     status: 'busy',
   },
 ].map(r => parseRegistryRow(JSON.stringify(r))!)
@@ -70,7 +70,7 @@ describe('self pairing and spares', () => {
     const f = buildFleet(REGISTRY, ALIVE, '990b185e-a2a7', new Map(), new Map(), NOW, 32938)
     expect(f.self?.pid).toBe(32938)
     expect(names(f)).toEqual(['1b6016a8-e12d'])
-    expect(selfTmux(REGISTRY, f.self)).toBe('bassemshaker:@0.%1')
+    expect(selfTmux(REGISTRY, f.self)).toBe('devbox-local:@0.%1')
   })
 
   test('HQ in the front-end: its bg session is self too', () => {
@@ -127,8 +127,8 @@ const prLink = (n: number, min: number) =>
   line({
     type: 'pr-link',
     prNumber: n,
-    prUrl: `https://github.com/bshakr/monolense/pull/${n}`,
-    prRepository: 'bshakr/monolense',
+    prUrl: `https://github.com/acmeco/webapp-ui/pull/${n}`,
+    prRepository: 'acmeco/webapp-ui',
     timestamp: at(min),
   })
 
@@ -144,7 +144,7 @@ function neverCompacted(): Digest {
         type: 'user',
         message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] },
         timestamp: at(2),
-        gitBranch: 'BLO-1941-kind-stage',
+        gitBranch: 'ENG-1941-kind-stage',
       }),
       line({
         type: 'user',
@@ -179,7 +179,7 @@ describe('transcript digest', () => {
     expect(d.prompts.map(p => p.text)).toEqual(['Rebuild the classification pipeline as v2 with a kind stage', 'ok merged'])
     expect(d.titles).toEqual(['Pipeline v2 kickoff', '269 merged whats next'])
     expect(d.prs.map(p => p.number)).toEqual([270, 271])
-    expect(d.branches).toEqual(['BLO-1941-kind-stage'])
+    expect(d.branches).toEqual(['ENG-1941-kind-stage'])
     expect(d.replies).toEqual(['Opened the foundation PR.'])
     expect(d.compact).toBe(undefined)
     expect(dayOf(d.firstTs, NOW)).toBe(4)
@@ -206,11 +206,11 @@ describe('transcript digest', () => {
         timestamp: at(50),
         message: {
           content:
-            'This session is being continued.\n\nSummary:\n1. Primary Request and Intent:\n   Finish epic BLO-1936: v2 pipeline.\n\n2. Key Technical Concepts:\n   - rails',
+            'This session is being continued.\n\nSummary:\n1. Primary Request and Intent:\n   Finish epic ENG-1936: v2 pipeline.\n\n2. Key Technical Concepts:\n   - rails',
         },
       }),
     )
-    expect(d.compact?.text).toBe('Finish epic BLO-1936: v2 pipeline.')
+    expect(d.compact?.text).toBe('Finish epic ENG-1936: v2 pipeline.')
     expect(d.prompts.length).toBe(2)
   })
 
@@ -232,15 +232,15 @@ describe('todos from the transcript', () => {
     ingest(
       d,
       [
-        use('u1', 'TaskCreate', { subject: 'Implement BLO-1947 withhold file', description: '' }),
-        result('u1', { id: '1', subject: 'Implement BLO-1947 withhold file' }),
+        use('u1', 'TaskCreate', { subject: 'Implement ENG-1947 withhold file', description: '' }),
+        result('u1', { id: '1', subject: 'Implement ENG-1947 withhold file' }),
         use('u2', 'TaskCreate', { subject: 'Write the ADR', description: '' }),
         result('u2', { id: '2' }),
-        use('u3', 'TaskUpdate', { taskId: '1', status: 'in_progress', activeForm: 'Implementing BLO-1947 withhold file' }),
+        use('u3', 'TaskUpdate', { taskId: '1', status: 'in_progress', activeForm: 'Implementing ENG-1947 withhold file' }),
         use('u4', 'TaskUpdate', { taskId: '2', status: 'completed' }),
       ].join(''),
     )
-    expect(todoProgress(d.tasks)).toEqual({ done: 1, total: 2, active: 'Implementing BLO-1947 withhold file' })
+    expect(todoProgress(d.tasks)).toEqual({ done: 1, total: 2, active: 'Implementing ENG-1947 withhold file' })
   })
 
   test('TodoWrite replaces the list; no list, no line', () => {
@@ -276,9 +276,9 @@ describe('pr-link counting', () => {
   test('deduped by URL; merged first; unknown ones counted as linked', () => {
     const d = neverCompacted()
     expect(prText(d.prs, new Map())).toBe('2 PRs linked')
-    const states = new Map<string, PrState>([[prKey('bshakr/monolense', 270), 'MERGED']])
+    const states = new Map<string, PrState>([[prKey('acmeco/webapp-ui', 270), 'MERGED']])
     expect(prText(d.prs, states)).toBe('1 PR merged, 1 more linked')
-    states.set(prKey('bshakr/monolense', 271), 'OPEN')
+    states.set(prKey('acmeco/webapp-ui', 271), 'OPEN')
     expect(prText(d.prs, states)).toBe('1 PR merged, 1 open')
     expect(prText([], states)).toBe(undefined)
   })
@@ -290,8 +290,8 @@ describe('pr-link counting', () => {
       'query { repository(owner: "a", name: "b") { p1: pullRequest(number: 1) { state title headRefName } p2: pullRequest(number: 2) { state title headRefName } } }',
     )
     expect(prStateQuery('a/b"x', [1])).toBe(undefined)
-    expect([...parsePrStates('{"data":{"repository":{"p1":{"state":"MERGED","title":"T","headRefName":"BLO-1-x"},"p2":null}}}')]).toEqual([
-      [1, { state: 'MERGED', title: 'T', branch: 'BLO-1-x' }],
+    expect([...parsePrStates('{"data":{"repository":{"p1":{"state":"MERGED","title":"T","headRefName":"ENG-1-x"},"p2":null}}}')]).toEqual([
+      [1, { state: 'MERGED', title: 'T', branch: 'ENG-1-x' }],
     ])
   })
 })
@@ -309,13 +309,13 @@ describe('goal summary', () => {
 
   test('never compacted: the input carries the first request, title history, PRs, tickets, prompts and replies', () => {
     const d = neverCompacted()
-    const input = goalInput(d, { prTitles: ['BLO-1940 evaluation report'] })
+    const input = goalInput(d, { prTitles: ['ENG-1940 evaluation report'] })
     const order = [
       '## First request',
       '## Title history',
       'Pipeline v2 kickoff → 269 merged whats next',
       '## Pull requests',
-      'tickets: BLO-1940, BLO-1941',
+      'tickets: ENG-1940, ENG-1941',
       '## Recent requests',
       '## Latest replies',
     ]
@@ -408,17 +408,17 @@ describe('the card', () => {
       windowLabel: '',
       status: 'busy',
       statusSince: NOW - MIN,
-      tmuxTarget: 'monolense:@3.%7',
-      jump: { kind: 'tmux', target: 'monolense:@3.%7' },
-      detail: 'monolense',
+      tmuxTarget: 'webapp-ui:@3.%7',
+      jump: { kind: 'tmux', target: 'webapp-ui:@3.%7' },
+      detail: 'webapp-ui',
       day: 3,
       step: 'stage 4 of 7: kind stage',
       prText: '12 PRs merged, 1 open',
-      todos: { done: 5, total: 9, active: 'Implement BLO-1947 withhold file' },
+      todos: { done: 5, total: 9, active: 'Implement ENG-1947 withhold file' },
       agents: [
         {
           id: 'a',
-          title: 'Implement BLO-1947 withhold file',
+          title: 'Implement ENG-1947 withhold file',
           model: 'opus',
           startedAt: NOW - 26_000,
           doing: 'Read rake spec patterns and report leaky spec',
@@ -429,17 +429,17 @@ describe('the card', () => {
       now: NOW,
       counts: { waiting: 0, broken: 0, inProgress: 0, sessions: 1 },
       current: { label: '', goal: { text: 'HQ broader context', day: 1 }, agents: [], prs: [] },
-      others: [{ tmuxSession: 'monolense', sessions: [s] }],
+      others: [{ tmuxSession: 'webapp-ui', sessions: [s] }],
       statusText: '',
     }
     const rows = layout(m, { width: 58, rows: 40, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0 }).rows.map(r => r.text())
-    const top = rows.findIndex(l => l.includes('╭─ monolense'))
+    const top = rows.findIndex(l => l.includes('╭─ webapp-ui'))
     expect(rows.slice(top, top + 7)).toEqual([
-      ' ╭─ monolense ──────────────────────────────────────────╮',
+      ' ╭─ webapp-ui ──────────────────────────────────────────╮',
       ' │  Pipeline v2 rearchitecture       day 3 · ● busy 1m  │',
       ' │  stage 4 of 7: kind stage · 12 PRs merged, 1 open    │',
-      ' │  todos 5/9 ● Implement BLO-1947 withhold file        │',
-      ' │  ● Implement BLO-1947 withhold file      opus · 26s  │',
+      ' │  todos 5/9 ● Implement ENG-1947 withhold file        │',
+      ' │  ● Implement ENG-1947 withhold file      opus · 26s  │',
       ' │    Read rake spec patterns and report leaky spec     │',
       ' ╰──────────────────────────────────────────────────────╯',
     ])

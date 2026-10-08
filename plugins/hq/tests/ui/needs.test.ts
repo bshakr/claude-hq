@@ -11,12 +11,12 @@ const M = 60_000
 const view = (width: number): View => ({ width, rows: 64, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0 })
 
 const withWaits = (s: OtherSessionVM): OtherSessionVM =>
-  s.sessionId === 's-rp-api'
+  s.sessionId === 's-st-api'
     ? {
         ...s,
         wait: { kind: 'question', text: 'Which date library should we use?', options: ['date-fns', 'dayjs', 'luxon'], since: NOW - 2 * M },
       }
-    : s.sessionId === 's-rp-admin'
+    : s.sessionId === 's-st-admin'
       ? {
           ...s,
           status: 'waiting',
@@ -24,7 +24,7 @@ const withWaits = (s: OtherSessionVM): OtherSessionVM =>
           waitingFor: 'Bash: rm -rf tmp/',
           wait: { kind: 'permission', text: 'Bash: rm -rf tmp/', since: NOW - 1 * M },
         }
-      : s.sessionId === 's-rp-docs'
+      : s.sessionId === 's-st-docs'
         ? { ...s, wait: { kind: 'turn', text: 'your turn', since: NOW - 60 * M } }
         : s
 
@@ -36,49 +36,49 @@ const NEEDS: HqModel = {
 
 const card = (m: HqModel, width: number) => {
   const rows = layout(m, view(width)).rows.map(r => r.text())
-  const at = rows.findIndex(r => r.includes('╭─ ritualpass'))
+  const at = rows.findIndex(r => r.includes('╭─ acme-store'))
   return rows.slice(at, rows.findIndex((r, i) => i > at && r.includes('╰')) + 1)
 }
 
 test('80 cols: a real wait reads "asks", its options after it; your turn replaces idle', () => {
   expect(card(NEEDS, 80)).toEqual([
-    ' ╭─ ritualpass ───────────────────────────────────────────────────────────────╮',
-    ' │  rp-api                           1 agent · 1 PR needs you · ◆ waiting 2m  │',
+    ' ╭─ acme-store ───────────────────────────────────────────────────────────────╮',
+    ' │  st-api                           1 agent · 1 PR needs you · ◆ waiting 2m  │',
     ' │  ◆ asks: Which date library should we use? · date-fns / dayjs / luxon      │',
     ' │                                                                            │',
-    ' │  rp-admin                   4 agents · 1 of 2 PRs need you · ◆ waiting 1m  │',
+    ' │  st-admin                   4 agents · 1 of 2 PRs need you · ◆ waiting 1m  │',
     ' │  ◆ asks: Bash: rm -rf tmp/                                                 │',
     ' │                                                                            │',
-    ' │  rp-docs                                                     your turn 1h  │',
+    ' │  st-docs                                                     your turn 1h  │',
     ' ╰────────────────────────────────────────────────────────────────────────────╯',
   ])
 })
 
 test('40 cols: the text is clipped first and the options give way', () => {
   expect(card(NEEDS, 40)).toEqual([
-    ' ╭─ ritualpass ───────────────────────╮',
-    ' │  rp-api              ◆ waiting 2m  │',
+    ' ╭─ acme-store ───────────────────────╮',
+    ' │  st-api              ◆ waiting 2m  │',
     ' │  ◆ asks: Which date library shou…  │',
     ' │                                    │',
-    ' │  rp-admin            ◆ waiting 1m  │',
+    ' │  st-admin            ◆ waiting 1m  │',
     ' │  ◆ asks: Bash: rm -rf tmp/         │',
     ' │                                    │',
-    ' │  rp-docs             your turn 1h  │',
+    ' │  st-docs             your turn 1h  │',
     ' ╰────────────────────────────────────╯',
   ])
 })
 
 test('the asks line: yellow border, dim options, a button that jumps to the session, not a second j/k stop', () => {
   const l = layout(NEEDS, view(80))
-  const top = l.rows.find(r => r.text().includes('╭─ ritualpass'))!
+  const top = l.rows.find(r => r.text().includes('╭─ acme-store'))!
   expect(top.cells[1]!.s.c).toBe('wait')
   const asks = l.rows.find(r => r.text().includes('date-fns'))!
-  expect(asks.item).toBe('s:s-rp-api')
+  expect(asks.item).toBe('s:s-st-api')
   expect(asks.head).toBe(undefined)
   const opts = asks.segs().find(sg => sg.t.includes('date-fns'))!
   expect(opts.s.dim).toBe(true)
   expect(asks.buttons.map(b => [b.key, b.action])).toEqual([
-    ['s:s-rp-api:asks', { kind: 'jump', jump: { kind: 'tmux', target: 'ritualpass:@3.%11' } }],
+    ['s:s-st-api:asks', { kind: 'jump', jump: { kind: 'tmux', target: 'acme-store:@3.%11' } }],
   ])
   expect(l.items.filter(k => k.endsWith(':asks'))).toEqual([])
   for (const width of [12, 30, 40, 60, 88]) for (const r of layout(NEEDS, view(width)).rows) expect(cellLen(r.text()) <= width).toBe(true)

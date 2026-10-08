@@ -85,8 +85,8 @@ function fakeHost(on: On, fx: Fake) {
         JSON.stringify({
           data: {
             repository: {
-              p270: { state: 'MERGED', title: 'BLO-1940 evaluation report', headRefName: 'BLO-1940-x' },
-              p271: { state: 'OPEN', title: 'BLO-1941 kind stage', headRefName: 'BLO-1941-y' },
+              p270: { state: 'MERGED', title: 'ENG-1940 evaluation report', headRefName: 'ENG-1940-x' },
+              p271: { state: 'OPEN', title: 'ENG-1941 kind stage', headRefName: 'ENG-1941-y' },
             },
           },
         }),
@@ -141,8 +141,8 @@ function registry(fx: Fake) {
   fx.files[`${HOME}/.claude/sessions/100.abc.key`] = 'k'
   fx.files[`${HOME}/.claude/sessions/200.json`] = row(200, {
     sessionId: 'w1',
-    name: 'rp-api',
-    tmux: 'ritualpass:@3.%6',
+    name: 'st-api',
+    tmux: 'acme-store:@3.%6',
     status: 'waiting',
     waitingFor: 'input needed',
     statusUpdatedAt: 1_000_000 - 120_000,
@@ -150,14 +150,14 @@ function registry(fx: Fake) {
   fx.files[`${HOME}/.claude/sessions/300.json`] = row(300, {
     sessionId: 'dead',
     name: 'gone',
-    tmux: 'ritualpass:@9.%9',
+    tmux: 'acme-store:@9.%9',
     status: 'waiting',
     statusUpdatedAt: 1,
   })
   fx.files[`${HOME}/.claude/sessions/400.json`] = row(400, {
     sessionId: 'b1',
-    name: 'rp-admin',
-    tmux: 'ritualpass:@4.%2',
+    name: 'st-admin',
+    tmux: 'acme-store:@4.%2',
     status: 'busy',
     statusUpdatedAt: 1_000_000 - 60_000,
   })
@@ -283,14 +283,14 @@ test('integration: the branch checked out in the session cwd owns its PR; an unw
   const store = new Map<string, unknown>()
   fakeStore(on, store)
   const fx = newFake()
-  fx.branch = 'BLO-1940'
-  fx.heads['BLO-1940'] = 275
+  fx.branch = 'ENG-1940'
+  fx.heads['ENG-1940'] = 275
   registry(fx)
   fakeHost(on, fx)
   await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
   await clock.settle()
   expect(fx.gh).toEqual([
-    ['gh', 'pr', 'list', '-R', 'acme/app', '--head', 'BLO-1940', '--state', 'open', '--json', 'number,title,url,state', '--limit', '1'],
+    ['gh', 'pr', 'list', '-R', 'acme/app', '--head', 'ENG-1940', '--state', 'open', '--json', 'number,title,url,state', '--limit', '1'],
   ])
   expect(pubOf(fx).owned).toEqual([{ repo: 'acme/app', number: 275 }])
   expect(pubOf(fx).prSummary).toEqual({ total: 1, broken: 0, waiting: 1, inProgress: 0 })
@@ -347,7 +347,7 @@ test('integration: a session without HQ shows its running subagents from their t
     fx.files[`${dir}/${name}`] = text
     fx.mtimes[`${dir}/${name}`] = mtime
   }
-  put('agent-run1.meta.json', SUB.meta('Implement BLO-1941 card pairing guard', 'opus'), 1_000_000 - 12 * 60_000)
+  put('agent-run1.meta.json', SUB.meta('Implement ENG-1941 card pairing guard', 'opus'), 1_000_000 - 12 * 60_000)
   put('agent-run1.jsonl', SUB.running, 1_000_000 - 5_000)
   put('agent-done1.meta.json', SUB.meta('Review PR a', 'opus'), 1_000_000 - 30 * 60_000)
   put('agent-done1.jsonl', SUB.handedBack, 1_000_000 - 10_000)
@@ -369,7 +369,7 @@ test('integration: a session without HQ shows its running subagents from their t
     return text
   }
   const drawn = await pane()
-  expect(drawn.includes('Implement BLO-1941 card pairing guard')).toBe(true)
+  expect(drawn.includes('Implement ENG-1941 card pairing guard')).toBe(true)
   expect(drawn.includes('Run ledger specs')).toBe(true)
   expect(drawn.includes('opus · 12m')).toBe(true)
   expect(drawn.includes('Review PR a')).toBe(false)
@@ -400,7 +400,7 @@ test('integration: a session without HQ shows its running subagents from their t
   fx.mtimes[`${dir}/agent-run1.jsonl`] = 1_000_000 + 1_000
   await clock.advance(2_000)
   expect(fx.tails.length).toBe(5)
-  expect((await pane()).includes('Implement BLO-1941 card pairing guard')).toBe(false)
+  expect((await pane()).includes('Implement ENG-1941 card pairing guard')).toBe(false)
 })
 
 test("integration: another session's agent inside one long call stays listed as waiting, however old its file", async ($, on) => {
@@ -597,7 +597,7 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
   const fx = newFake()
   registry(fx)
   fakeHost(on, fx)
-  fx.linear = { 'BLO-1936': 'Raw bank import: keep every statement line', 'BLO-1947': 'hang' }
+  fx.linear = { 'ENG-1936': 'Raw bank import: keep every statement line', 'ENG-1947': 'hang' }
   fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-bank-data.md`] = '# Raw bank data is append-only\n'
   const asked: { system: string; prompt: string }[] = []
   on('model.complete', ($, e) => {
@@ -608,7 +608,7 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
             e.prompt.split('\n').map(l => [l.split(':')[0], l.includes('Raw bank import') ? 'raw bank import' : 'append-only bank data']),
           ),
         )
-      : '{"goal":"Finish ADR 0019 epic BLO-1936 work","step":"Fix batch BLO-1947 in review"}'
+      : '{"goal":"Finish ADR 0019 epic ENG-1936 work","step":"Fix batch ENG-1947 in review"}'
     return {
       value: {
         isAnswered: true,
@@ -619,10 +619,10 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
   })
   const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
   fx.files[path] =
-    `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic BLO-1936 work, then BLO-1947' }, timestamp: '2026-10-08T09:00:00Z' })}\n`
+    `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic ENG-1936 work, then ENG-1947' }, timestamp: '2026-10-08T09:00:00Z' })}\n`
   await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
   await clock.settle()
-  // BLO-1947 never answers: the goal waits ID_WAIT_MS for it, then goes ahead with what resolved.
+  // ENG-1947 never answers: the goal waits ID_WAIT_MS for it, then goes ahead with what resolved.
   for (let i = 0; i < 4; i++) await clock.advance(2_000)
   expect(asked.filter(a => !a.system.includes('shorten titles')).length).toBe(0)
   for (let i = 0; i < 10; i++) await clock.advance(2_000)
@@ -640,17 +640,17 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
     return text
   }
   const drawn = await pane()
-  expect(drawn.includes('Finish ADR 0019 (append-only bank data) epic BLO-1936 (raw bank import) work')).toBe(true)
-  // BLO-1947 still hangs: bare, and asked once only.
-  expect(drawn.includes('Fix batch BLO-1947 in review')).toBe(true)
-  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'BLO-1947').length).toBe(1)
-  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'BLO-1936').length).toBe(1)
+  expect(drawn.includes('Finish ADR 0019 (append-only bank data) epic ENG-1936 (raw bank import) work')).toBe(true)
+  // ENG-1947 still hangs: bare, and asked once only.
+  expect(drawn.includes('Fix batch ENG-1947 in review')).toBe(true)
+  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'ENG-1947').length).toBe(1)
+  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'ENG-1936').length).toBe(1)
   // The goal waited for the titles it could get, then saw them; one brief call covered both.
   const goals = asked.filter(a => !a.system.includes('shorten titles'))
   expect(goals.length).toBe(1)
-  expect(goals[0]!.prompt.includes('BLO-1936: Raw bank import: keep every statement line')).toBe(true)
+  expect(goals[0]!.prompt.includes('ENG-1936: Raw bank import: keep every statement line')).toBe(true)
   expect(asked.filter(a => a.system.includes('shorten titles')).length).toBe(1)
-  expect((store.get('gloss:BLO-1936') as { brief: string }).brief).toBe('raw bank import')
+  expect((store.get('gloss:ENG-1936') as { brief: string }).brief).toBe('raw bank import')
   expect((store.get(`gloss:adr:${HOME}/code/x:0019`) as { title: string }).title).toBe('Raw bank data is append-only')
 })
 
@@ -666,7 +666,7 @@ for (const how of ['config', 'store'] as const) {
       const fx = newFake()
       registry(fx)
       fakeHost(on, fx)
-      fx.linear = { 'BLO-1936': 'Raw bank import: keep every statement line' }
+      fx.linear = { 'ENG-1936': 'Raw bank import: keep every statement line' }
       fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-bank-data.md`] = '# Raw bank data is append-only\n'
       let calls = 0
       on('model.complete', () => {
@@ -681,8 +681,8 @@ for (const how of ['config', 'store'] as const) {
       })
       const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
       fx.files[path] = [
-        `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic BLO-1936 work' }, timestamp: '2026-10-08T09:00:00Z' })}\n`,
-        `${JSON.stringify({ type: 'ai-title', aiTitle: 'BLO-1936 bank import' })}\n`,
+        `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic ENG-1936 work' }, timestamp: '2026-10-08T09:00:00Z' })}\n`,
+        `${JSON.stringify({ type: 'ai-title', aiTitle: 'ENG-1936 bank import' })}\n`,
       ].join('')
       await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
       await clock.settle()
@@ -707,7 +707,7 @@ for (const how of ['config', 'store'] as const) {
       await ui.unmount()
       expect(calls).toBe(0)
       expect(fx.ran.filter(a => a[0] === 'linear')).toEqual([])
-      expect(drawn.includes('BLO-1936 bank import')).toBe(true)
+      expect(drawn.includes('ENG-1936 bank import')).toBe(true)
       expect(drawn.includes('should not show')).toBe(false)
       expect(drawn.includes('(raw bank import)')).toBe(false)
       expect([...store.keys()].some(k => k.startsWith('goal:') || k.startsWith('gloss:'))).toBe(false)

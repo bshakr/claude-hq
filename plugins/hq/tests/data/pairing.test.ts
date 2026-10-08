@@ -6,14 +6,14 @@ import type { OtherAgentVM, TermEnv, WaitVM } from '../../hooks/model/types'
 
 const NOW = Date.parse('2026-10-08T22:00:00Z')
 
-// A terminal front-end in tmux group bassemshaker driving bg worker 990b185e, a spare, a third session, and an unpaired bg session.
+// A terminal front-end in tmux group devbox-local driving bg worker 990b185e, a spare, a third session, and an unpaired bg session.
 const FRONT = {
   pid: 29637,
   sessionId: '21e093a4-f5f3',
   cwd: '/Users/me',
   kind: 'interactive',
-  tmux: 'bassemshaker:@0.%1',
-  name: 'bassemshaker-6c',
+  tmux: 'devbox-local:@0.%1',
+  name: 'devbox-local-6c',
   status: 'idle',
   statusUpdatedAt: NOW - 60_000,
   parkedJobId: '990b185e',
@@ -41,10 +41,10 @@ const SPARE = {
 const THIRD = {
   pid: 45327,
   sessionId: '1b6016a8-e12d',
-  cwd: '/Users/me/code/monolense',
+  cwd: '/Users/me/code/webapp-ui',
   kind: 'interactive',
-  tmux: 'monolense:@3.%7',
-  name: 'monolense-bb',
+  tmux: 'webapp-ui:@3.%7',
+  name: 'webapp-ui-bb',
   status: 'busy',
 }
 const LONE = {
@@ -78,14 +78,14 @@ const cards = (f: ReturnType<typeof buildFleet>) => f.others.flatMap(g => g.sess
 describe('a front-end and its bg worker are one card for every viewer', () => {
   test('seen from a third session: one card in the front-end group, worker content, front-end jump', () => {
     const f = fleetFrom(THIRD.sessionId, THIRD.pid)
-    const paired = f.others.find(g => g.tmuxSession === 'bassemshaker')!.sessions
+    const paired = f.others.find(g => g.tmuxSession === 'devbox-local')!.sessions
     expect(paired.length).toBe(1)
     const c = paired[0]!
     expect(c.sessionId).toBe(WORKER.sessionId)
     expect(c.name).toBe('HQ dashboard polish')
     expect(c.step).toBe('pairing rows')
     expect(c.agents).toEqual([agent])
-    expect(c.tmuxTarget).toBe('bassemshaker:@0.%1')
+    expect(c.tmuxTarget).toBe('devbox-local:@0.%1')
     expect(c.status).toBe('busy')
     expect(c.statusSince).toBe(NOW - 5_000)
     expect(c.jump).toEqual({
@@ -94,7 +94,7 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
       cwd: '/Users/me',
       pid: 29637,
       term: GHOSTTY,
-      tmux: 'bassemshaker:@0.%1',
+      tmux: 'devbox-local:@0.%1',
     })
     expect(cards(f).some(s => s.sessionId === FRONT.sessionId)).toBe(false)
   })
@@ -160,7 +160,7 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
 
     const noWorker = cards(fleetFrom(THIRD.sessionId, THIRD.pid, new Set([29637, 45327, 50001])))
     const fr = noWorker.find(s => s.sessionId === FRONT.sessionId)!
-    expect(fr.tmuxTarget).toBe('bassemshaker:@0.%1')
+    expect(fr.tmuxTarget).toBe('devbox-local:@0.%1')
     expect(fr.status).toBe('idle')
     expect(noWorker.some(s => s.sessionId === WORKER.sessionId)).toBe(false)
   })
