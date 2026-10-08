@@ -675,7 +675,7 @@ async function start($: EngineInterface): Promise<void> {
 
   const readRegistry = async (): Promise<RegistryRow[]> => {
     const dir = `${S.home}/.claude/sessions`
-    let entries: { name: string; kind: string }[] = []
+    let entries: { name: string; kind: string }[]
     try {
       entries = await $.fs.list(dir)
     } catch {

@@ -129,7 +129,7 @@ export const STRATEGIES: readonly Strategy[] = [
     name: 'cmux',
     applies: j => !muxed(j) && !!env(j, 'CMUX_PANE_ID'),
     run: async (j, exec) => {
-      let help = ''
+      let help: string
       try {
         help = (await exec(['cmux', '--help'])).stdout ?? ''
       } catch {
