@@ -26,6 +26,7 @@ import type { AgentMeta, AgentTail, ListedFile, RunningAgent } from './subagents
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe'
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs'
 import type { BranchClaim, OwnedState, PrFiles, StoredClaim } from './prs'
+import { WAKE_KEY, newsOf } from './wake'
 
 /** An owned PR with no live watcher is re-read from GitHub this often. */
 export const REFRESH_MS = 120_000
@@ -686,9 +687,13 @@ async function start($: EngineInterface): Promise<void> {
         S.dirty = true
       }
     }
+    const previousPrs = S.prs
     S.prs = Object.entries(S.claims).map(([key, claim]) =>
       prFromSources(claim, files.get(key) ?? {}, pid => alive.has(pid)),
     )
+    const news = newsOf(previousPrs, S.prs)
+    for (const text of news.toasts) $.ui.toast(text, { timeoutMs: 8000 })
+    if (news.prompt !== null && (await $.store.get(WAKE_KEY)) !== false) $.prompt.submit({ text: news.prompt }).catch(() => undefined)
 
     const branches = new Map<string, string | undefined>()
     const published = new Map<string, PublishedSession>()

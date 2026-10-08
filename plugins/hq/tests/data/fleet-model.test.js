@@ -70,7 +70,7 @@ test('model: counts reproduce the sheet (3 waiting, 2 broken, 3 in progress, 10 
 });
 test('model: status line names the one waiting session, counts otherwise, empty when quiet', () => {
     const m = buildModel({ now: NOW, label: 'monolense:@1 · BLO-1940-promote', ...sheetA() });
-    expect(m.statusText).toBe('hq: rp-api waiting 2m · 2 broken · 3 in progress');
+    expect(m.statusText).toBe('hq: rp-api waiting 2m · 2 broken · 3 in progress · PRs 3 green · 1 running · 1 red · 1 rebase · 1 merged');
     expect(m.flare?.text).toBe('rp-api is waiting for your input');
     expect(m.current.prs.map(p => p.number)).toEqual([212, 214, 431, 433, 429, 522]);
     const two = [session('a', 'x:@1.%1', 'waiting', NOW - 1), session('b', 'x:@2.%2', 'waiting', NOW - 2)];
