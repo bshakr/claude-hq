@@ -82,6 +82,18 @@ export interface PrVM {
   stale?: boolean
 }
 
+/** What a session waits on the user for (ADR 0006); `turn` is the low-priority "your turn" after a reply. */
+export type WaitKind = 'permission' | 'question' | 'plan' | 'turn'
+
+export interface WaitVM {
+  kind: WaitKind
+  /** "Bash: rm -rf tmp/", a question's text, "approve the plan". */
+  text: string
+  /** A question's option labels. */
+  options?: string[]
+  since: number
+}
+
 export interface OtherSessionVM {
   sessionId: string
   name: string // session name or cwd basename
@@ -107,6 +119,8 @@ export interface OtherSessionVM {
   todos?: TodoProgress
   /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("BLO-1947", "ADR 0019"). */
   glosses?: Record<string, string>
+  /** What it waits on the user for; a real wait (not `turn`) also makes `status` waiting. */
+  wait?: WaitVM
 }
 
 /** A task list's progress and its in-progress item. */
@@ -193,6 +207,8 @@ export interface PublishedSession {
   todos?: TodoProgress
   /** Its own goal summary, so other sessions reuse it instead of asking the model again. */
   goal?: { goal?: string; step?: string; at: number }
+  /** What it waits on the user for right now (ADR 0006). */
+  waiting?: WaitVM
 }
 
 /** Written by pr-ci-wait / pr-merge-wait to ~/.cache/pr-watch/<owner>__<repo>__<n>.<watcher>.json (owner/repo lowercased) each poll. */

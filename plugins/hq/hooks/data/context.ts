@@ -1,5 +1,7 @@
 // Broader context for a session card (ADR 0004): facts read from its transcript, and the goal summary built from them.
 import type { TodoProgress } from '../model/types'
+import { noteWaitLine } from './waiting'
+import type { TranscriptWait } from './waiting'
 
 export const GOAL_MODEL = 'haiku'
 export const GOAL_INPUT_MAX = 6_000
@@ -27,7 +29,7 @@ export interface Task {
 }
 
 /** What one transcript has said so far; serialisable so it can be tested and kept. */
-export interface Digest {
+export interface Digest extends TranscriptWait {
   /** Bytes of the file consumed, up to the last whole line. */
   offset: number
   carry: string
@@ -169,6 +171,7 @@ export function ingestLine(d: Digest, line: string): void {
   if (ts !== undefined) noteTs(d, ts)
   const branch = str(v.gitBranch)
   if (branch && !DEFAULT_BRANCHES.has(branch)) pushDistinct(d.branches, branch, BRANCHES_KEPT)
+  if (v.type === 'user' || v.type === 'assistant') noteWaitLine(d, v, ts)
   switch (v.type) {
     case 'ai-title':
     case 'custom-title': {

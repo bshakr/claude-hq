@@ -9,6 +9,8 @@ import { doingLine, prSummary } from './model';
 import { OPEN_CALL_CAP_MS, OTHER_AGENTS_MAX, TAIL_BYTES, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from './subagents';
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe';
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs';
+import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting';
+import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify';
 /** An owned PR with no live watcher is re-read from GitHub this often. */
 export const REFRESH_MS = 120_000;
 /** An owned branch with no open PR yet is looked up after 2 min, then 10, then every 30; a push resets it. */
@@ -36,6 +38,7 @@ export function currentModel() {
 }
 export function installData(on, onChange) {
     S.onChange = onChange;
+    installWaits(on);
     on('session.start', async ($, e, next) => {
         try {
             await start($);
@@ -72,11 +75,18 @@ export function installData(on, onChange) {
         try {
             S.now = await $.clock.now();
             beforeTool(input);
+            onCallStart(e.tool_use_id, e.tool, loopOf(e.agentId), e, S.now);
         }
         catch {
             // observation only
         }
-        const r = await next(e);
+        let r;
+        try {
+            r = await next(e);
+        }
+        finally {
+            onCallEnd(e.tool_use_id, e.tool, loopOf(e.agentId));
+        }
         try {
             S.now = await $.clock.now();
             afterTool(input, r);
@@ -89,6 +99,7 @@ export function installData(on, onChange) {
     });
     on('prompt.submit', async ($, e, next) => {
         try {
+            onPromptOrigin(e.origin?.kind);
             S.now = await $.clock.now();
             onPrompt(S.activity, e.text, e.origin?.kind, S.now);
             if (S.activity.prompt !== undefined && e.origin?.kind !== 'task-notification')
@@ -102,6 +113,7 @@ export function installData(on, onChange) {
         return next(e);
     });
     on('turn.complete', async ($, e, next) => {
+        onLoopEnd(loopOf(e.agentId));
         if (!e.agentId) {
             try {
                 S.now = await $.clock.now();
@@ -176,6 +188,10 @@ async function start($) {
     let written = { id: '', owned: '', activity: '', agents: '' };
     let publishedAt = 0;
     let publishedId = '';
+    let publishedWaitRev = -1;
+    const notified = new Set();
+    let notifying = false;
+    let prunedAt = 0;
     let isTicking = false;
     let selfPid;
     const run = async (argv, cwd) => {
@@ -393,6 +409,8 @@ async function start($) {
             if (br && br.exitCode === 0)
                 ingestLines(d, [...new Set(br.stdout.split('\n').filter(Boolean))].map(l => `{"type":"user","isMeta":true,${l}}`).join('\n'));
             const tail = await run(['tail', '-c', String(DIGEST_TAIL_BYTES), path]);
+            // A question seen in the head may have its answer in the unread middle.
+            delete d.ask;
             if (tail && tail.exitCode === 0)
                 ingestLines(d, tail.stdout, size > DIGEST_TAIL_BYTES);
             d.offset = size;
@@ -718,6 +736,7 @@ async function start($) {
         const topicMap = new Map();
         const ctxMap = new Map();
         const agentMap = new Map();
+        const waits = new Map();
         const seenFiles = new Set();
         for (const row of rows) {
             if (!isOtherRow(row, self0, S.sessionId, alive))
@@ -738,6 +757,9 @@ async function start($) {
                 ...shownAgents.flatMap(a => [a.title, a.waiting?.text ?? a.doing ?? '']),
             ], VISIBLE_IDS_MAX);
             ctxMap.set(row.sessionId, { ...c.ctx, glosses: seen.glosses });
+            const wait = otherWait(pubFresh ? pub : undefined, digests.get(row.sessionId)?.d, row.status, row.statusUpdatedAt);
+            if (wait)
+                waits.set(row.sessionId, wait);
         }
         const shown = new Set([S.sessionId, ...ctxMap.keys()]);
         for (const k of digests.keys())
@@ -749,9 +771,15 @@ async function start($) {
         for (const k of metas.keys())
             if (!seenFiles.has(k))
                 metas.delete(k);
-        const fleet = buildFleet(rows, alive, S.sessionId, branches, published, S.now, selfPid, topicMap, agentMap, ctxMap);
+        const fleet = buildFleet(rows, alive, S.sessionId, branches, published, S.now, selfPid, topicMap, agentMap, ctxMap, waits);
         const self = fleet.self;
         S.others = fleet.others;
+        if (!notifying) {
+            notifying = true;
+            void notifyOthers().finally(() => {
+                notifying = false;
+            });
+        }
         const own = await contextOf(S.sessionId, sessionCwd, !S.activity.idle, undefined);
         const ownGoal = own.ctx.goal ?? own.topic.title ?? own.topic.firstPrompt;
         const ownIds = await idsOf(sessionCwd, [ownGoal ?? '', ...S.model.current.agents.flatMap(a => [a.title, a.todo?.text ?? a.now ?? ''])], VISIBLE_IDS_MAX);
@@ -777,7 +805,8 @@ async function start($) {
         }
         prune(S.agents, S.now);
         rebuild();
-        if (S.now - publishedAt >= PUBLISH_MS || publishedId !== S.sessionId) {
+        if (S.now - publishedAt >= PUBLISH_MS || publishedId !== S.sessionId || publishedWaitRev !== W.rev) {
+            publishedWaitRev = W.rev;
             if (publishedId && publishedId !== S.sessionId)
                 await run(['rm', '-f', `${S.home}/.claude/hq/sessions/${publishedId}.json`]);
             publishedAt = S.now;
@@ -805,6 +834,7 @@ async function start($) {
                 ...(doing ? { doing } : {}),
                 ...((t => (t ? { todos: t } : {}))(todoProgress(todosOf(S.activity).map((x, i) => ({ id: String(i), ...x }))))),
                 ...((g => (g?.goal ? { goal: { goal: g.goal, ...(g.step ? { step: g.step } : {}), at: g.at } } : {}))(goals.get(S.sessionId))),
+                ...((w => (w ? { waiting: w } : {}))(ownWait(S.activity))),
             };
             try {
                 await $.fs.write(`${S.home}/.claude/hq/sessions/${S.sessionId}.json`, JSON.stringify(mine));
@@ -832,6 +862,24 @@ async function start($) {
                 await $.store.set(storeKey('agents'), JSON.parse(agentsText));
             written = { id: storeId, owned: ownedText, activity: activityText, agents: agentsText };
         }
+    };
+    const notifiedDir = () => `${S.home}/.claude/hq/notified`;
+    const notifyOthers = async () => {
+        const due = dueNotifications(S.others, notified, S.sessionId, S.now);
+        if (due.length === 0)
+            return;
+        await run(['mkdir', '-p', notifiedDir()]);
+        if (S.now - prunedAt >= NOTIFIED_PRUNE_MS) {
+            prunedAt = S.now;
+            await run(['find', notifiedDir(), '-mindepth', '1', '-maxdepth', '1', '-mmin', '+1440', '-exec', 'rmdir', '{}', '+']);
+        }
+        await notifyWaits(due, notified, {
+            enabled: async () => (await $.store.get(NOTIFY_STORE_KEY)) !== false,
+            claim: async (key) => (await run(['mkdir', `${notifiedDir()}/${claimName(key)}`]))?.exitCode === 0,
+            send: async (text) => {
+                await $.ui.notify(text, { title: NOTIFY_TITLE });
+            },
+        });
     };
     const tick = async () => {
         if (isTicking)

@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import { currentModel, installData } from './data/index'
+import { NOTIFY_STORE_KEY, parseNotifyArg } from './data/notify'
 import type { HqModel } from './model/types'
 import { runJump } from './ui/jump'
 import { layout, scrollFor } from './ui/layout'
@@ -21,6 +22,7 @@ const phase = atom({ plugin: 'hq', key: 'phase' } as const, 0)
 const HELP = [
   '/hq          open the pane (⌃g moves the keys between it and the prompt)',
   '/hq close    close the pane',
+  '/hq notify on|off   a notification when another session starts waiting on you',
   '/hq help     this list',
   '',
   'In the pane: j/k or Tab move, Enter or a click opens a PR or switches tmux,',
@@ -80,7 +82,7 @@ async function startPane($: EngineInterface): Promise<void> {
     await $.command.register({
       name: COMMAND,
       description: 'Pane of what needs you: agents, PRs and other sessions',
-      argumentHint: '[close | help]',
+      argumentHint: '[close | notify on|off | help]',
       immediate: true,
     })
   } catch (thrown) {
@@ -161,6 +163,12 @@ export const register: Register = on => {
       isPaneOpen = false
       await syncMotion?.()
       return { text: 'hq pane closed.' }
+    }
+    const notify = parseNotifyArg(args)
+    if (notify === 'show') return { text: `hq notifications are ${(await $.store.get(NOTIFY_STORE_KEY)) === false ? 'off' : 'on'}.` }
+    if (notify !== undefined) {
+      await $.store.set(NOTIFY_STORE_KEY, notify)
+      return { text: `hq notifications ${notify ? 'on' : 'off'}.` }
     }
     if (args === 'help') return { text: HELP }
     return { text: `Unknown subcommand "${args}".\n${HELP}` }

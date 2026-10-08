@@ -1,3 +1,4 @@
+import { noteWaitLine } from './waiting';
 export const GOAL_MODEL = 'haiku';
 export const GOAL_INPUT_MAX = 6_000;
 export const BUSY_REFRESH_MS = 30 * 60_000;
@@ -153,6 +154,8 @@ export function ingestLine(d, line) {
     const branch = str(v.gitBranch);
     if (branch && !DEFAULT_BRANCHES.has(branch))
         pushDistinct(d.branches, branch, BRANCHES_KEPT);
+    if (v.type === 'user' || v.type === 'assistant')
+        noteWaitLine(d, v, ts);
     switch (v.type) {
         case 'ai-title':
         case 'custom-title': {

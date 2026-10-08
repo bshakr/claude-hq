@@ -409,7 +409,7 @@ function otherRows(s, x) {
         ? [{ t: '◆', s: tok('wait') }, { t: ` waiting${since}`, s: tok('wait') }]
         : s.status === 'busy'
             ? [{ t: x.phase % 2 ? '◦' : '●', s: tok('run') }, { t: ` busy${since}`, s: DIM }]
-            : [{ t: `idle${since}`, s: DIM }];
+            : [{ t: `${s.wait?.kind === 'turn' ? 'your turn' : 'idle'}${since}`, s: DIM }];
     if (s.day)
         status.unshift({ t: `day ${s.day} · `, s: DIM });
     const ps = s.prSummary;
@@ -448,6 +448,8 @@ function otherRows(s, x) {
     else
         r.put(0, clip(name, room), sty);
     const out = [r];
+    if (s.status === 'waiting' && s.wait && s.wait.kind !== 'turn')
+        out.push(asksRow(s, s.wait, under(), x));
     const second = expandIds([s.step, s.prText].filter(Boolean).join(' · ') || s.detail || '', s.glosses);
     if (second) {
         const d = under();
@@ -466,6 +468,24 @@ function otherRows(s, x) {
     }
     out.push(...otherAgentRows(s, under, x));
     return out;
+}
+/** "◆ asks: <what>", the options dimmed after it; clicking it jumps like the name does. */
+function asksRow(s, w, a, x) {
+    const { IW } = x;
+    let c = a.put(0, '◆', tok('wait'));
+    c = a.put(c + 1, 'asks: ', tok('wait'));
+    const text = clip(w.text, IW - c);
+    if (s.jump) {
+        const key = `${sessionKey(s)}:asks`;
+        x.actions[key] = { kind: 'jump', jump: s.jump };
+        c = a.button(c, text, { key, action: x.actions[key] });
+    }
+    else
+        c = a.put(c, text);
+    const opts = w.options?.length ? ` · ${w.options.join(' / ')}` : '';
+    if (opts && IW - c >= 6)
+        a.put(c, clip(opts, IW - c), DIM);
+    return a;
 }
 function groupCard(group, x) {
     const inner = [];

@@ -1,5 +1,6 @@
 // Other Claude sessions on this machine, from ~/.claude/sessions/<pid>.json.
-import type { Flare, OtherAgentVM, OtherSessionVM, PublishedSession, TmuxGroupVM, TodoProgress } from '../model/types'
+import type { Flare, OtherAgentVM, OtherSessionVM, PublishedSession, TmuxGroupVM, TodoProgress, WaitVM } from '../model/types'
+import { isRealWait } from './waiting'
 
 export const PUBLISH_FRESH_MS = 30_000
 
@@ -106,11 +107,13 @@ export function toSessionVM(
   topic: SessionTopic = {},
   transcriptAgents?: readonly OtherAgentVM[],
   ctx: SessionContext = {},
+  wait?: WaitVM,
 ): OtherSessionVM {
   const { window } = splitTmux(row.tmux)
+  const real = isRealWait(wait)
   const name = ctx.goal || topic.title || topic.firstPrompt || nameOf(row) || basename(row.cwd) || 'session'
   const label = branch || basename(row.cwd)
-  const status = mapStatus(row.status)
+  const status = real ? 'waiting' : mapStatus(row.status)
   const fresh = published && now - published.updatedAt < PUBLISH_FRESH_MS ? published : undefined
   const agents = fresh?.agents ?? transcriptAgents
   return {
@@ -119,8 +122,9 @@ export function toSessionVM(
     windowLabel: window ? `${window} ${label}` : label,
     status,
     ...(row.tmux ? { tmuxTarget: row.tmux, jump: { kind: 'tmux' as const, target: row.tmux } } : {}),
-    ...(status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
-    ...(typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
+    ...(real ? { waitingFor: wait.text, wait } : status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
+    ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
+    ...(real ? { statusSince: wait.since } : typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
     ...(fresh ? { agentsRunning: fresh.agentsRunning, prSummary: fresh.prSummary } : {}),
     ...(!fresh && agents?.length ? { agentsRunning: agents.length } : {}),
     ...(agents?.length ? { agents: [...agents] } : {}),
@@ -210,7 +214,7 @@ export function pickFlare(sessions: readonly OtherSessionVM[]): Flare | undefine
   const top = waiting[0]
   if (!top || !top.tmuxTarget) return undefined
   return {
-    text: `${top.name} is waiting for your input`,
+    text: isRealWait(top.wait) ? `${top.name} asks: ${top.wait.text}` : `${top.name} is waiting for your input`,
     sinceMs: top.statusSince ?? 0,
     tmuxTarget: top.tmuxTarget,
     jump: { kind: 'tmux', target: top.tmuxTarget },
@@ -254,10 +258,11 @@ export function buildFleet(
   topics: ReadonlyMap<string, SessionTopic> = new Map(),
   agents: ReadonlyMap<string, readonly OtherAgentVM[]> = new Map(),
   contexts: ReadonlyMap<string, SessionContext> = new Map(),
+  waits: ReadonlyMap<string, WaitVM> = new Map(),
 ): { self?: RegistryRow; others: TmuxGroupVM[] } {
   const self = findSelf(rows, selfId, selfPid)
   const others = rows
     .filter(r => isOtherRow(r, self, selfId, alive))
-    .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId)))
+    .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId)))
   return { ...(self ? { self } : {}), others: groupByTmux(others) }
 }
