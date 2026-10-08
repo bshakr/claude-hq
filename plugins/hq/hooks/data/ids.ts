@@ -56,7 +56,13 @@ export interface GlossEntry {
   briefFailedAt?: number
 }
 
-export const words = (s: string, n: number) => s.trim().split(/\s+/).slice(0, n).join(' ').replace(/[.;:,]+$/, '')
+export const words = (s: string, n: number) =>
+  s
+    .trim()
+    .split(/\s+/)
+    .slice(0, n)
+    .join(' ')
+    .replace(/[.;:,]+$/, '')
 
 /** The model's brief, else the title's first words. */
 export function glossOf(e: GlossEntry | undefined): string | undefined {
@@ -153,7 +159,9 @@ export type Complete = (req: { system: string; prompt: string; maxTokens: number
 
 /** One model call for every title without a brief; a key the reply misses keeps its fallback and backs off. */
 export async function briefBatch(
-  entries: ReadonlyMap<string, GlossEntry>, now: number, complete: Complete,
+  entries: ReadonlyMap<string, GlossEntry>,
+  now: number,
+  complete: Complete,
 ): Promise<Map<string, GlossEntry>> {
   const due = [...entries].filter(([, e]) => briefDue(e, now)).slice(0, BRIEF_BATCH_MAX)
   // Short keys: a store key carries a repo path the model need not see.
@@ -163,7 +171,11 @@ export async function briefBatch(
   let got: Record<string, string> = {}
   try {
     const r = await complete({ system: BRIEF_SYSTEM, prompt: briefPrompt(items), maxTokens: 40 + 30 * items.length })
-    if (r.isAnswered && r.text) got = parseBriefReply(r.text, items.map(i => i.key))
+    if (r.isAnswered && r.text)
+      got = parseBriefReply(
+        r.text,
+        items.map(i => i.key),
+      )
   } catch {
     // every key backs off below
   }

@@ -8,10 +8,7 @@ export type Sty = { c?: Tok; dim?: true; bold?: true; btn?: string; href?: strin
 
 /** What pressing an element does. /hq never acts beyond a jump. */
 export type Action =
-  | { kind: 'jump'; jump: Jump }
-  | { kind: 'toggle'; id: string }
-  | { kind: 'move'; dir: 1 | -1 }
-  | { kind: 'scroll'; dir: 1 | -1 }
+  { kind: 'jump'; jump: Jump } | { kind: 'toggle'; id: string } | { kind: 'move'; dir: 1 | -1 } | { kind: 'scroll'; dir: 1 | -1 }
 
 export type ButtonSpec = { key: string; label: string; action: Action; hotkey?: string; dim?: true }
 
@@ -19,8 +16,7 @@ type Cell = { ch: string; s: Sty }
 
 export type Seg = { col: number; t: string; s: Sty }
 
-const same = (a: Sty, b: Sty) =>
-  a.c === b.c && a.dim === b.dim && a.bold === b.bold && a.btn === b.btn && a.href === b.href
+const same = (a: Sty, b: Sty) => a.c === b.c && a.dim === b.dim && a.bold === b.bold && a.btn === b.btn && a.href === b.href
 
 /** One pane row placed cell by cell, so widths are exact; never wider than W. */
 export class Row {
@@ -71,7 +67,10 @@ export class Row {
     if (text === '' || col >= this.W) return col
     const end = this.put(col, text, { ...s, btn: spec.key })
     // A label cut at the edge stays what is drawn.
-    const drawn = this.cells.slice(col, end).map(cell => cell.ch).join('')
+    const drawn = this.cells
+      .slice(col, end)
+      .map(cell => cell.ch)
+      .join('')
     this.buttons.push({ ...spec, label: spec.label ?? drawn })
     return end
   }
@@ -89,7 +88,10 @@ export class Row {
   }
 
   text(): string {
-    return this.cells.map(cell => cell.ch).join('').trimEnd()
+    return this.cells
+      .map(cell => cell.ch)
+      .join('')
+      .trimEnd()
   }
 
   /** Neighbouring cells of one style merge into a run; trailing blanks dropped. */

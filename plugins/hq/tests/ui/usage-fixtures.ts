@@ -29,7 +29,17 @@ export const METERED: HqModel = {
     {
       tmuxSession: 'work',
       sessions: [
-        sess({ sessionId: 's-api', name: 'rp-api', status: 'busy', statusSince: NOW - 6 * M, context: ctx(55), prSummary: { total: 2, broken: 0, waiting: 0, inProgress: 0 } }, '@2'),
+        sess(
+          {
+            sessionId: 's-api',
+            name: 'rp-api',
+            status: 'busy',
+            statusSince: NOW - 6 * M,
+            context: ctx(55),
+            prSummary: { total: 2, broken: 0, waiting: 0, inProgress: 0 },
+          },
+          '@2',
+        ),
         sess({ sessionId: 's-docs', name: 'rp-docs', statusSince: NOW - 60 * M, context: ctx(85) }, '@3'),
         sess({ sessionId: 's-new', name: 'fresh', statusSince: NOW - 1 * M }, '@4'),
       ],

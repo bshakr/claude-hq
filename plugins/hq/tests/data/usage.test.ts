@@ -7,14 +7,30 @@ import type { PublishedSession } from '../../hooks/model/types'
 
 const asst = (ts: string, usage: Record<string, number>, extra: Record<string, unknown> = {}, model = 'claude-opus-5-5') =>
   JSON.stringify({
-    type: 'assistant', timestamp: ts, ...extra,
-    message: { model, role: 'assistant', stop_reason: 'tool_use', content: [{ type: 'text', text: 'x' }], usage: { output_tokens: 900, ...usage } },
+    type: 'assistant',
+    timestamp: ts,
+    ...extra,
+    message: {
+      model,
+      role: 'assistant',
+      stop_reason: 'tool_use',
+      content: [{ type: 'text', text: 'x' }],
+      usage: { output_tokens: 900, ...usage },
+    },
   })
-const U = (input: number, read: number, write: number) => ({ input_tokens: input, cache_read_input_tokens: read, cache_creation_input_tokens: write })
+const U = (input: number, read: number, write: number) => ({
+  input_tokens: input,
+  cache_read_input_tokens: read,
+  cache_creation_input_tokens: write,
+})
 
 describe('transcript derivation', () => {
   test('the last main-thread response counts input, cache read and cache write; output is left out', () => {
-    expect(sampleOf({ model: 'm', usage: { ...U(2, 261_031, 1_437), output_tokens: 5_000 } }, 1)).toEqual({ tokens: 262_470, model: 'm', ts: 1 })
+    expect(sampleOf({ model: 'm', usage: { ...U(2, 261_031, 1_437), output_tokens: 5_000 } }, 1)).toEqual({
+      tokens: 262_470,
+      model: 'm',
+      ts: 1,
+    })
   })
 
   test('synthetic and empty usages are not a reading', () => {
@@ -24,13 +40,16 @@ describe('transcript derivation', () => {
 
   test('the digest keeps the newest main-thread usage; a subagent line never counts', () => {
     const d = emptyDigest()
-    ingest(d, [
-      asst('2026-10-08T10:00:00Z', U(2, 40_000, 1_000)),
-      asst('2026-10-08T10:01:00Z', U(2, 55_000, 500)),
-      asst('2026-10-08T10:02:00Z', U(9, 900_000, 0), { isSidechain: true }),
-      JSON.stringify({ type: 'user', timestamp: '2026-10-08T10:03:00Z', message: { content: 'next' } }),
-      '',
-    ].join('\n'))
+    ingest(
+      d,
+      [
+        asst('2026-10-08T10:00:00Z', U(2, 40_000, 1_000)),
+        asst('2026-10-08T10:01:00Z', U(2, 55_000, 500)),
+        asst('2026-10-08T10:02:00Z', U(9, 900_000, 0), { isSidechain: true }),
+        JSON.stringify({ type: 'user', timestamp: '2026-10-08T10:03:00Z', message: { content: 'next' } }),
+        '',
+      ].join('\n'),
+    )
     expect(d.usage).toEqual({ tokens: 55_502, model: 'claude-opus-5-5', ts: Date.parse('2026-10-08T10:01:00Z') })
   })
 
@@ -80,21 +99,36 @@ describe('window rule', () => {
 
 describe('publish and prefer', () => {
   const pub = (context?: PublishedSession['context']): PublishedSession => ({
-    sessionId: 'b1', pid: 1, updatedAt: 0, agentsRunning: 0, prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 }, ...(context ? { context } : {}),
+    sessionId: 'b1',
+    pid: 1,
+    updatedAt: 0,
+    agentsRunning: 0,
+    prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
+    ...(context ? { context } : {}),
   })
   const sample = { tokens: 150_000, model: 'claude-opus-5-5', ts: 1 }
 
   test('the engine figure is published as it is', () => {
     expect(live({ tokens: 280_000, window: 1_000_000, percent: 28 }, 'claude-opus-5-5[1m]')).toEqual({
-      percent: 28, window: 1_000_000, tokens: 280_000, model: 'claude-opus-5-5[1m]', source: 'live',
+      percent: 28,
+      window: 1_000_000,
+      tokens: 280_000,
+      model: 'claude-opus-5-5[1m]',
+      source: 'live',
     })
     expect(live({ window: 200_000 }, 'm')).toBeUndefined()
   })
 
-  test("a fresh publish wins over the transcript; without one the transcript stands", () => {
+  test('a fresh publish wins over the transcript; without one the transcript stands', () => {
     const own = live({ tokens: 280_000, window: 1_000_000, percent: 28 }, 'm')!
     expect(preferred(pub(own), sample)).toEqual(own)
-    expect(preferred(pub(), sample)).toEqual({ percent: 75, window: 200_000, tokens: 150_000, model: 'claude-opus-5-5', source: 'transcript' })
+    expect(preferred(pub(), sample)).toEqual({
+      percent: 75,
+      window: 200_000,
+      tokens: 150_000,
+      model: 'claude-opus-5-5',
+      source: 'transcript',
+    })
     expect(preferred(undefined, sample, 'opus[1m]')?.percent).toBe(15)
     expect(preferred(undefined, undefined)).toBeUndefined()
   })
@@ -107,7 +141,13 @@ describe('publish and prefer', () => {
   })
 
   test('plan usage reads five_hour and seven_day; other windows are ignored', () => {
-    expect(accountOf([{ kind: 'five_hour', percentUsed: 5 }, { kind: 'seven_day', percentUsed: 18.5 }, { kind: 'spend_limit', percentUsed: 90 }])).toEqual({ fiveHour: 5, week: 18.5 })
+    expect(
+      accountOf([
+        { kind: 'five_hour', percentUsed: 5 },
+        { kind: 'seven_day', percentUsed: 18.5 },
+        { kind: 'spend_limit', percentUsed: 90 },
+      ]),
+    ).toEqual({ fiveHour: 5, week: 18.5 })
     expect(accountOf([{ kind: 'seven_day', percentUsed: 1 }])).toEqual({ week: 1 })
     expect(accountOf([])).toBeUndefined()
   })

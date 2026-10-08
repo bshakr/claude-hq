@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { parseOwnership, repoOfRemote } from '../../hooks/data/claims'
 
 const PUSH_NEW = [
-  'remote: Create a pull request for \'feat-x\' on GitHub by visiting:',
+  "remote: Create a pull request for 'feat-x' on GitHub by visiting:",
   'remote:      https://github.com/acme/app/pull/new/feat-x',
   'To github.com:acme/app.git',
   ' * [new branch]      feat-x -> feat-x',
@@ -17,7 +17,9 @@ test('ownership: gh pr create owns the URL it printed', () => {
 })
 
 test('ownership: gh pr create read from the engine gitOperation when the output has no URL', () => {
-  const o = parseOwnership('gh pr create --fill', '', '', { pr: { number: 9, url: 'https://github.com/acme/app/pull/9', action: 'created' } })
+  const o = parseOwnership('gh pr create --fill', '', '', {
+    pr: { number: 9, url: 'https://github.com/acme/app/pull/9', action: 'created' },
+  })
   expect(o.created).toEqual([{ repo: 'acme/app', number: 9 }])
 })
 
@@ -64,7 +66,9 @@ for (const command of [
 }
 
 test('ownership: a merge this session ran is reported from gitOperation, without owning it', () => {
-  const o = parseOwnership('gh pr merge 9 --squash', '', '', { pr: { number: 9, url: 'https://github.com/acme/app/pull/9', action: 'merged' } })
+  const o = parseOwnership('gh pr merge 9 --squash', '', '', {
+    pr: { number: 9, url: 'https://github.com/acme/app/pull/9', action: 'merged' },
+  })
   expect(o.merged).toEqual([{ repo: 'acme/app', number: 9 }])
   expect(o.created).toEqual([])
 })

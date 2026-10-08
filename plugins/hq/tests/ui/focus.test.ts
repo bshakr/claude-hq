@@ -10,7 +10,12 @@ import { RESUME_HINT, layout } from '../../hooks/ui/layout'
 import { EMPTY } from './fixtures'
 
 const jump = (term: TermEnv, extra: Partial<SessionJump> = {}): SessionJump => ({
-  kind: 'session', sessionId: 'sid-1', cwd: '/Users/me/code/app', pid: 4242, term, ...extra,
+  kind: 'session',
+  sessionId: 'sid-1',
+  cwd: '/Users/me/code/app',
+  pid: 4242,
+  term,
+  ...extra,
 })
 
 type Reply = { exitCode?: number; stdout?: string; throws?: boolean }
@@ -29,13 +34,15 @@ function host(replies: Record<string, Reply> = {}) {
 
 describe('reading a session terminal', () => {
   test('ps eww lines: tty, allowlisted env only, no tty for ?? and ?', () => {
-    const out = parsePsTerm([
-      '31106 ttys007  claude --resume x TERM=screen-256color TERM_PROGRAM=tmux TMUX=/private/tmp/tmux-501/default,31775,2 __CFBundleIdentifier=com.mitchellh.ghostty HOME=/Users/me',
-      '33267 ??       claude bg-pty-host GHOSTTY_BIN_DIR=/Applications/Ghostty.app CLAUDE_CODE_SESSION_KIND=bg',
-      '  501 pts/3    claude WEZTERM_PANE=12 WEZTERM_UNIX_SOCKET=/run/user/1000/wezterm/sock',
-      '  777 ?        claude',
-      'garbage',
-    ].join('\n'))
+    const out = parsePsTerm(
+      [
+        '31106 ttys007  claude --resume x TERM=screen-256color TERM_PROGRAM=tmux TMUX=/private/tmp/tmux-501/default,31775,2 __CFBundleIdentifier=com.mitchellh.ghostty HOME=/Users/me',
+        '33267 ??       claude bg-pty-host GHOSTTY_BIN_DIR=/Applications/Ghostty.app CLAUDE_CODE_SESSION_KIND=bg',
+        '  501 pts/3    claude WEZTERM_PANE=12 WEZTERM_UNIX_SOCKET=/run/user/1000/wezterm/sock',
+        '  777 ?        claude',
+        'garbage',
+      ].join('\n'),
+    )
     expect(out.get(31106)).toEqual({
       tty: '/dev/ttys007',
       env: { TERM_PROGRAM: 'tmux', TMUX: '/private/tmp/tmux-501/default,31775,2', __CFBundleIdentifier: 'com.mitchellh.ghostty' },
@@ -51,14 +58,25 @@ describe('reading a session terminal', () => {
     expect(jumpOf(row, undefined)).toEqual({ kind: 'tmux', target: 'a:@1.%2' })
     expect(jumpOf({ ...row, tmux: undefined }, undefined)).toBe(undefined)
     const bg = parseRegistryRow(JSON.stringify({ pid: 9, sessionId: 's', cwd: '/w', kind: 'bg', jobId: 'ab12' }))!
-    expect(jumpOf(bg, { env: {} })).toEqual({ kind: 'session', sessionId: 's', cwd: '/w', pid: 9, term: { env: {} }, bg: true, jobId: 'ab12' })
+    expect(jumpOf(bg, { env: {} })).toEqual({
+      kind: 'session',
+      sessionId: 's',
+      cwd: '/w',
+      pid: 9,
+      term: { env: {} },
+      bg: true,
+      jobId: 'ab12',
+    })
   })
 })
 
 describe('the strategy chain', () => {
   test('tmux: switch the client, select the pane, raise the outer app; the stale outer pane env is ignored', async () => {
     const h = host()
-    const j = jump({ tty: '/dev/ttys007', env: { TMUX: '/tmp/t,1,2', WEZTERM_PANE: '3', __CFBundleIdentifier: 'com.mitchellh.ghostty' } }, { tmux: 'mono:@3.%7' })
+    const j = jump(
+      { tty: '/dev/ttys007', env: { TMUX: '/tmp/t,1,2', WEZTERM_PANE: '3', __CFBundleIdentifier: 'com.mitchellh.ghostty' } },
+      { tmux: 'mono:@3.%7' },
+    )
     expect(strategiesFor(j).map(s => s.name)).toEqual(['tmux'])
     expect(await runJump(j, h.exec)).toBe(undefined)
     expect(h.argvs()).toEqual([
@@ -122,10 +140,17 @@ describe('the strategy chain', () => {
     const env = { CMUX_PANE_ID: 'p9', __CFBundleIdentifier: 'com.cmuxterm.app' }
     const has = host({ 'cmux --help': { stdout: 'commands: focus-pane, list' } })
     expect(await runJump(jump({ env }), has.exec)).toBe(undefined)
-    expect(has.argvs()).toEqual([['cmux', '--help'], ['cmux', 'focus-pane', '--pane', 'p9'], ['open', '-b', 'com.cmuxterm.app']])
+    expect(has.argvs()).toEqual([
+      ['cmux', '--help'],
+      ['cmux', 'focus-pane', '--pane', 'p9'],
+      ['open', '-b', 'com.cmuxterm.app'],
+    ])
     const lacks = host({ 'cmux --help': { stdout: 'commands: list' } })
     expect(await runJump(jump({ env }), lacks.exec)).toBe(undefined)
-    expect(lacks.argvs()).toEqual([['cmux', '--help'], ['open', '-b', 'com.cmuxterm.app']])
+    expect(lacks.argvs()).toEqual([
+      ['cmux', '--help'],
+      ['open', '-b', 'com.cmuxterm.app'],
+    ])
   })
 
   test('VS Code and Cursor open the session folder in their own CLI', async () => {
@@ -133,7 +158,10 @@ describe('the strategy chain', () => {
     await runJump(jump({ env: { TERM_PROGRAM: 'vscode' } }), code.exec)
     expect(code.argvs()).toEqual([['code', '/Users/me/code/app']])
     const cursor = host()
-    await runJump(jump({ env: { TERM_PROGRAM: 'vscode', VSCODE_GIT_ASKPASS_NODE: '/Applications/Cursor.app/Contents/Frameworks/x' } }), cursor.exec)
+    await runJump(
+      jump({ env: { TERM_PROGRAM: 'vscode', VSCODE_GIT_ASKPASS_NODE: '/Applications/Cursor.app/Contents/Frameworks/x' } }),
+      cursor.exec,
+    )
     expect(cursor.argvs()).toEqual([['cursor', '/Users/me/code/app']])
   })
 
@@ -166,10 +194,15 @@ describe('the strategy chain', () => {
 describe('the card and the press', () => {
   const model = (term: TermEnv): HqModel => ({
     ...EMPTY,
-    others: [{ tmuxSession: '', sessions: [{ sessionId: 'x', name: 'loose', windowLabel: '', status: 'idle', detail: 'app', jump: jump(term) }] }],
+    others: [
+      { tmuxSession: '', sessions: [{ sessionId: 'x', name: 'loose', windowLabel: '', status: 'idle', detail: 'app', jump: jump(term) }] },
+    ],
   })
   const view = { width: 60, rows: 30, focused: true, cursor: null, expanded: [], scroll: 0, phase: 0 }
-  const text = (m: HqModel) => layout(m, view).rows.map(r => r.cells.map(c => c.ch).join('')).join('\n')
+  const text = (m: HqModel) =>
+    layout(m, view)
+      .rows.map(r => r.cells.map(c => c.ch).join(''))
+      .join('\n')
 
   test('a card that can only copy its resume command says so; one with a host does not', () => {
     const l = layout(model({ env: {} }), view)
@@ -189,7 +222,12 @@ describe('the card and the press', () => {
     expect(toasts).toEqual(['hq: copied resume command: cd /Users/me/code/app && claude --resume sid-1'])
     // No clipboard: the toast carries the command instead.
     toasts.length = 0
-    await pressJump(jump({ env: {} }), { ...io, copy: async () => { throw new Error('no clipboard') } })
+    await pressJump(jump({ env: {} }), {
+      ...io,
+      copy: async () => {
+        throw new Error('no clipboard')
+      },
+    })
     expect(toasts).toEqual(["hq: can't focus it; run cd /Users/me/code/app && claude --resume sid-1"])
     // A focused session toasts nothing.
     toasts.length = 0

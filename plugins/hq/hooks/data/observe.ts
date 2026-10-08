@@ -71,8 +71,16 @@ export function activityState(): ActivityState {
 
 export function rebuild(): void {
   const model = buildModel({
-    now: S.now, label: S.label, ...(S.goal ? { goal: S.goal } : {}), ...(S.title ? { title: S.title } : {}), glosses: S.glosses,
-    ...(S.context ? { context: S.context } : {}), ...(S.account ? { account: S.account } : {}), agents: agentList(S.agents, S.cwd || undefined), prs: S.prs, others: S.others,
+    now: S.now,
+    label: S.label,
+    ...(S.goal ? { goal: S.goal } : {}),
+    ...(S.title ? { title: S.title } : {}),
+    glosses: S.glosses,
+    ...(S.context ? { context: S.context } : {}),
+    ...(S.account ? { account: S.account } : {}),
+    agents: agentList(S.agents, S.cwd || undefined),
+    prs: S.prs,
+    others: S.others,
     activity: { now: nowOf(S.activity), todos: todosOf(S.activity), waiting: waitingOf(S.activity) },
   })
   S.model = model

@@ -16,12 +16,21 @@ function hostOf(url: string): string {
   return m ? m[1]! : url
 }
 
-const TESTS = /(^|\s|\/)(rspec|jest|vitest|pytest|mocha|ava)(\s|$)|\b(bun|npm|pnpm|yarn|go|cargo|deno|mix) test\b|\bnpx (jest|vitest|playwright test)\b|\bclaude plugin test\b|\brails test\b/
+const TESTS =
+  /(^|\s|\/)(rspec|jest|vitest|pytest|mocha|ava)(\s|$)|\b(bun|npm|pnpm|yarn|go|cargo|deno|mix) test\b|\bnpx (jest|vitest|playwright test)\b|\bclaude plugin test\b|\brails test\b/
 
 /** Words of a command past `cd …&&`, `env`/assignments, `timeout N`, and a leading `!`. */
 function lead(command: string): string[] {
-  const words = command.trim().replace(/^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(?:&&|;)\s*/, '').split(/\s+/).filter(Boolean)
-  while (words.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0]!) || ['env', 'time', 'nohup', '!', 'command', 'exec'].includes(words[0]!))) words.shift()
+  const words = command
+    .trim()
+    .replace(/^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(?:&&|;)\s*/, '')
+    .split(/\s+/)
+    .filter(Boolean)
+  while (
+    words.length &&
+    (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0]!) || ['env', 'time', 'nohup', '!', 'command', 'exec'].includes(words[0]!))
+  )
+    words.shift()
   if (words[0] === 'timeout') words.splice(0, words[1] && /^\d/.test(words[1]) ? 2 : 1)
   return words
 }
@@ -33,7 +42,8 @@ function phrase(command: string): string | undefined {
   const sub = w[1]
   const text = w.join(' ')
   if (!p) return undefined
-  if (/^(pr-ci-wait)$/.test(p) || (p === 'gh' && sub === 'pr' && w[2] === 'checks') || (p === 'gh' && sub === 'run' && w[2] === 'watch')) return 'checking CI'
+  if (/^(pr-ci-wait)$/.test(p) || (p === 'gh' && sub === 'pr' && w[2] === 'checks') || (p === 'gh' && sub === 'run' && w[2] === 'watch'))
+    return 'checking CI'
   if (p === 'pr-merge-wait') return 'waiting for a merge'
   if (TESTS.test(` ${text} `) || (p === 'bundle' && w.includes('rspec'))) return 'running tests'
   if (p === 'tsc' || (p === 'npx' && w.includes('tsc'))) return 'type-checking'
@@ -42,9 +52,22 @@ function phrase(command: string): string | undefined {
   if (/^(npm|pnpm|yarn|bun)$/.test(p) && /build/.test(text)) return 'building'
   if (p === 'git') {
     const git: Record<string, string> = {
-      status: 'checking git status', diff: 'reading a diff', log: 'reading git history', show: 'reading a commit', commit: 'committing',
-      push: 'pushing', pull: 'pulling', fetch: 'fetching from git', rebase: 'rebasing', merge: 'merging a branch', checkout: 'switching branch',
-      switch: 'switching branch', worktree: 'managing worktrees', add: 'staging changes', stash: 'stashing changes', branch: 'checking branches',
+      status: 'checking git status',
+      diff: 'reading a diff',
+      log: 'reading git history',
+      show: 'reading a commit',
+      commit: 'committing',
+      push: 'pushing',
+      pull: 'pulling',
+      fetch: 'fetching from git',
+      rebase: 'rebasing',
+      merge: 'merging a branch',
+      checkout: 'switching branch',
+      switch: 'switching branch',
+      worktree: 'managing worktrees',
+      add: 'staging changes',
+      stash: 'stashing changes',
+      branch: 'checking branches',
     }
     return git[sub ?? ''] ?? 'running git'
   }
@@ -84,7 +107,10 @@ function thingOf(cond: string): string | undefined {
     return u ? hostOf(u.replace(/^['"]/, '')) : 'a server'
   }
   if (p === 'test' || p === '-f' || p === '-e' || p === '-d' || p === '-s' || p === 'ls') {
-    const f = w.slice(1).reverse().find(x => !x.startsWith('-'))
+    const f = w
+      .slice(1)
+      .reverse()
+      .find(x => !x.startsWith('-'))
     return f ? baseName(f.replace(/^['"]|['"]$/g, '')) : 'a file'
   }
   if (p === 'grep' || p === 'rg') {

@@ -19,7 +19,10 @@ const isHeading = (l: string) => /^#{1,6}\s/.test(l)
 /** The first sentence of the first line with words, a heading only when nothing else has any. */
 export function summaryLine(text: string | undefined, max = 200): string | undefined {
   if (!text) return undefined
-  const lines = text.split('\n').map(l => l.trim()).filter(l => plainText(l).length > 0)
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => plainText(l).length > 0)
   const line = lines.find(l => !isHeading(l)) ?? lines[0]
   if (line === undefined) return undefined
   const plain = plainText(line)
@@ -43,7 +46,12 @@ export function promptSummary(text: string): string {
   const plugin = /^\s*The (\S+) plugin sent a message:\s*([\s\S]*)$/.exec(text)
   if (plugin) {
     const name = plugin[1]!
-    const first = (plugin[2] ?? '').replace(TAG, ' ').split('\n').map(plainText).find(l => l.length > 0) ?? ''
+    const first =
+      (plugin[2] ?? '')
+        .replace(TAG, ' ')
+        .split('\n')
+        .map(plainText)
+        .find(l => l.length > 0) ?? ''
     // Plugins often repeat their own name as a "[name]" prefix.
     const said = first.replace(new RegExp(`^\\[${name.replace(/[^\w-]/g, '')}\\]\\s*`), '')
     return said ? `${name}: ${said}` : name

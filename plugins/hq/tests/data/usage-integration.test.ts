@@ -20,7 +20,9 @@ function host(on: On, files: Files, writes: Files, usage: () => unknown) {
     const prefix = `${e.path}/`
     const names = Object.keys(files).filter(p => p.startsWith(prefix) && !p.slice(prefix.length).includes('/'))
     if (names.length === 0) throw new Error(`ENOENT ${e.path}`)
-    return { value: names.map(p => ({ name: p.slice(prefix.length), kind: 'file' as const, size: files[p]!.length, mtimeMs: 0, isLink: false })) }
+    return {
+      value: names.map(p => ({ name: p.slice(prefix.length), kind: 'file' as const, size: files[p]!.length, mtimeMs: 0, isLink: false })),
+    }
   })
   on('fs.read', ($, e) => {
     if (files[e.path] === undefined) throw new Error(`ENOENT ${e.path}`)
@@ -59,7 +61,11 @@ function fleet(files: Files) {
   files[`${HOME}/.claude/sessions/300.json`] = row(300, 'w2', 'no-hq', '@3')
   // w1 runs HQ and publishes its live figure; its transcript says otherwise and must lose.
   files[`${HOME}/.claude/hq/sessions/w1.json`] = JSON.stringify({
-    sessionId: 'w1', pid: 200, updatedAt: NOW - 1_000, agentsRunning: 0, prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
+    sessionId: 'w1',
+    pid: 200,
+    updatedAt: NOW - 1_000,
+    agentsRunning: 0,
+    prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
     context: { percent: 61, window: 1_000_000, tokens: 610_000, source: 'live' },
   })
   files[`${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`] = asst(20_000, '2026-10-08T10:00:00Z')
@@ -70,7 +76,10 @@ function fleet(files: Files) {
 
 async function drawn($: Engine) {
   const ui = await $.ui.mount({
-    plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq',
+    plugin: 'hq',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'hq',
     props: { title: 'hq', isFocused: false, bodyColumns: 80, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
   })
   const text = JSON.stringify(await ui.drawn())
@@ -87,7 +96,10 @@ test('integration: this session publishes its live context and plan usage; other
   host(on, files, writes, () => ({
     startedAt: 0,
     context: { tokens: 280_000, window: 1_000_000, percent: 28 },
-    rateLimits: [{ kind: 'five_hour', percentUsed: 5 }, { kind: 'seven_day', percentUsed: 18 }],
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 5 },
+      { kind: 'seven_day', percentUsed: 18 },
+    ],
   }))
   await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
   await clock.settle()
@@ -112,7 +124,8 @@ test('integration: without an engine reading, the own card falls back to its tra
   const writes: Files = {}
   fleet(files)
   files[`${HOME}/.claude/hq/sessions/w1.json`] = JSON.stringify({
-    ...JSON.parse(files[`${HOME}/.claude/hq/sessions/w1.json`]!), account: { fiveHour: 55, week: 81 },
+    ...JSON.parse(files[`${HOME}/.claude/hq/sessions/w1.json`]!),
+    account: { fiveHour: 55, week: 81 },
   })
   files[`${HOME}/.claude/projects/-home-u-code-app/${SID}.jsonl`] = asst(50_000, '2026-10-08T10:00:00Z')
   host(on, files, writes, () => ({ startedAt: 0, context: { window: 1_000_000 }, rateLimits: [] }))

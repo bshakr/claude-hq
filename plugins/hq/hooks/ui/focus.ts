@@ -78,7 +78,14 @@ export const STRATEGIES: readonly Strategy[] = [
     name: 'zellij',
     applies: j => !j.tmux && !!env(j, 'ZELLIJ_PANE_ID') && !!env(j, 'ZELLIJ_SESSION_NAME'),
     run: async (j, exec) => {
-      const done = await ok(exec, ['zellij', '--session', env(j, 'ZELLIJ_SESSION_NAME')!, 'action', 'focus-pane-id', `terminal_${env(j, 'ZELLIJ_PANE_ID')}`])
+      const done = await ok(exec, [
+        'zellij',
+        '--session',
+        env(j, 'ZELLIJ_SESSION_NAME')!,
+        'action',
+        'focus-pane-id',
+        `terminal_${env(j, 'ZELLIJ_PANE_ID')}`,
+      ])
       if (done) await activate(j, exec)
       return done
     },
@@ -88,8 +95,17 @@ export const STRATEGIES: readonly Strategy[] = [
     applies: j => !muxed(j) && !!(env(j, 'SUPACODE_WORKTREE_ID') && env(j, 'SUPACODE_TAB_ID') && env(j, 'SUPACODE_SURFACE_ID')),
     run: async (j, exec) => {
       const done = await ok(exec, [
-        'supacode', 'surface', 'focus', '-w', env(j, 'SUPACODE_WORKTREE_ID')!, '-t', env(j, 'SUPACODE_TAB_ID')!,
-        '-s', env(j, 'SUPACODE_SURFACE_ID')!, '--timeout', '2',
+        'supacode',
+        'surface',
+        'focus',
+        '-w',
+        env(j, 'SUPACODE_WORKTREE_ID')!,
+        '-t',
+        env(j, 'SUPACODE_TAB_ID')!,
+        '-s',
+        env(j, 'SUPACODE_SURFACE_ID')!,
+        '--timeout',
+        '2',
       ])
       if (done) await activate(j, exec)
       return done
@@ -100,7 +116,11 @@ export const STRATEGIES: readonly Strategy[] = [
     applies: j => !muxed(j) && !!env(j, 'WEZTERM_PANE'),
     run: async (j, exec) => {
       const sock = env(j, 'WEZTERM_UNIX_SOCKET')
-      const done = await ok(exec, ['wezterm', 'cli', 'activate-pane', '--pane-id', env(j, 'WEZTERM_PANE')!], sock ? { env: { WEZTERM_UNIX_SOCKET: sock } } : undefined)
+      const done = await ok(
+        exec,
+        ['wezterm', 'cli', 'activate-pane', '--pane-id', env(j, 'WEZTERM_PANE')!],
+        sock ? { env: { WEZTERM_UNIX_SOCKET: sock } } : undefined,
+      )
       if (done) await activate(j, exec)
       return done
     },
@@ -110,7 +130,14 @@ export const STRATEGIES: readonly Strategy[] = [
     applies: j => !muxed(j) && !!env(j, 'KITTY_WINDOW_ID'),
     run: async (j, exec) => {
       const to = env(j, 'KITTY_LISTEN_ON')
-      const done = await ok(exec, ['kitten', '@', ...(to ? ['--to', to] : []), 'focus-window', '--match', `id:${env(j, 'KITTY_WINDOW_ID')}`])
+      const done = await ok(exec, [
+        'kitten',
+        '@',
+        ...(to ? ['--to', to] : []),
+        'focus-window',
+        '--match',
+        `id:${env(j, 'KITTY_WINDOW_ID')}`,
+      ])
       if (done) await activate(j, exec)
       return done
     },

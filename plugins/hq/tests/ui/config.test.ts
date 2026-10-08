@@ -6,8 +6,22 @@ import { layout } from '../../hooks/ui/layout'
 import { drawPane } from '../../hooks/ui/pane'
 import { BUSY } from './fixtures'
 
-const MOCHA = { colorBroken: '#f38ba8', colorWaiting: '#f9e2af', colorWorking: '#89b4fa', colorDone: '#a6e3a1', colorAccent: '#94e2d5', colorDim: '#6c7086' }
-const props = (isFocused: boolean) => ({ title: 'hq', isFocused, bodyColumns: 80, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 40 }, view: {} })
+const MOCHA = {
+  colorBroken: '#f38ba8',
+  colorWaiting: '#f9e2af',
+  colorWorking: '#89b4fa',
+  colorDone: '#a6e3a1',
+  colorAccent: '#94e2d5',
+  colorDim: '#6c7086',
+}
+const props = (isFocused: boolean) => ({
+  title: 'hq',
+  isFocused,
+  bodyColumns: 80,
+  placement: 'dock' as const,
+  scroll: { offset: 0, bodyRows: 40 },
+  view: {},
+})
 
 function host(on: On) {
   const h = { opens: [] as string[], store: new Map<string, unknown>() }
@@ -43,15 +57,19 @@ test('the engine accepts hex tokens on every coloured element, the dimmed runnin
   }
 })
 
-test('the plugin paints with its configured colours and shows a bad one as a dim footer line', { options: { colorAccent: '#94e2d5', colorDone: 'mauve' } }, async ($, on) => {
-  host(on)
-  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
-  const ui = await $.ui.mount({ plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq', props: props(true) })
-  const json = JSON.stringify(await ui.drawn())
-  expect(json.includes('"color":"#94e2d5"')).toBe(true)
-  expect(json.includes('hq: ignored colour done (use #rrggbb, ansi256(N) or N)')).toBe(true)
-  await ui.unmount()
-})
+test(
+  'the plugin paints with its configured colours and shows a bad one as a dim footer line',
+  { options: { colorAccent: '#94e2d5', colorDone: 'mauve' } },
+  async ($, on) => {
+    host(on)
+    await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+    const ui = await $.ui.mount({ plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq', props: props(true) })
+    const json = JSON.stringify(await ui.drawn())
+    expect(json.includes('"color":"#94e2d5"')).toBe(true)
+    expect(json.includes('hq: ignored colour done (use #rrggbb, ansi256(N) or N)')).toBe(true)
+    await ui.unmount()
+  },
+)
 
 test('autoOpen: the pane opens by itself once per session, never again on a second start', async ($, on) => {
   const h = host(on)
@@ -77,7 +95,8 @@ test('a -p run never opens the pane', async ($, on) => {
 test('/hq summaries shows the config default, then on|off persists and wins over it', { options: { summaries: false } }, async ($, on) => {
   const h = host(on)
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
-  const cmd = (args: string) => $.command.run({ command: 'hq', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
+  const cmd = (args: string) =>
+    $.command.run({ command: 'hq', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
   expect(await cmd('summaries')).toMatchObject({ text: 'hq summaries are off.' })
   expect(await cmd('summaries on')).toMatchObject({ text: 'hq summaries on.' })
   expect(h.store.get('summaries')).toBe(true)
@@ -88,5 +107,12 @@ test('/hq summaries shows the config default, then on|off persists and wins over
 test('/hq notify shows the config default when nothing is stored', { options: { notify: false } }, async ($, on) => {
   host(on)
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
-  expect(await $.command.run({ command: 'hq', args: 'notify', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })).toMatchObject({ text: 'hq notifications are off.' })
+  expect(
+    await $.command.run({
+      command: 'hq',
+      args: 'notify',
+      origin: { kind: 'composer' },
+      presentation: { isFullscreen: true, columns: 160 },
+    }),
+  ).toMatchObject({ text: 'hq notifications are off.' })
 })

@@ -57,20 +57,35 @@ export function percentOf(tokens: number, window: number): number {
 export function derived(sample: UsageSample | undefined, settingModel?: string): ContextUsage | undefined {
   if (!sample) return undefined
   const window = windowFor(sample, settingModel)
-  return { percent: percentOf(sample.tokens, window), window, tokens: sample.tokens, ...(sample.model ? { model: sample.model } : {}), source: 'transcript' }
+  return {
+    percent: percentOf(sample.tokens, window),
+    window,
+    tokens: sample.tokens,
+    ...(sample.model ? { model: sample.model } : {}),
+    source: 'transcript',
+  }
 }
 
 /** What the engine reports for this session, in the shape others read. */
 export function live(context: { tokens?: number; window: number; percent?: number }, model: string | undefined): ContextUsage | undefined {
-  const percent = context.percent ?? (context.tokens !== undefined && context.window > 0 ? percentOf(context.tokens, context.window) : undefined)
+  const percent =
+    context.percent ?? (context.tokens !== undefined && context.window > 0 ? percentOf(context.tokens, context.window) : undefined)
   if (percent === undefined) return undefined
   return {
-    percent, window: context.window, ...(context.tokens !== undefined ? { tokens: context.tokens } : {}), ...(model ? { model } : {}), source: 'live',
+    percent,
+    window: context.window,
+    ...(context.tokens !== undefined ? { tokens: context.tokens } : {}),
+    ...(model ? { model } : {}),
+    source: 'live',
   }
 }
 
 /** A fresh publish from the session's own HQ wins over the transcript estimate. */
-export function preferred(fresh: PublishedSession | undefined, sample: UsageSample | undefined, settingModel?: string): ContextUsage | undefined {
+export function preferred(
+  fresh: PublishedSession | undefined,
+  sample: UsageSample | undefined,
+  settingModel?: string,
+): ContextUsage | undefined {
   return fresh?.context ?? derived(sample, settingModel)
 }
 

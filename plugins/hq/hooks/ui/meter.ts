@@ -28,7 +28,10 @@ export function meterParts(ctx: ContextUsage | undefined): { full: Part[]; pct: 
   if (!ctx) return { full: [], pct: [] }
   const tone = usageTone(ctx.percent)
   const on = filledCells(ctx.percent)
-  const pct: Part[] = [{ t: '  ', s: {} }, { t: `${ctx.percent}%`, s: tone }]
+  const pct: Part[] = [
+    { t: '  ', s: {} },
+    { t: `${ctx.percent}%`, s: tone },
+  ]
   const full: Part[] = [{ t: '  ', s: {} }]
   if (on) full.push({ t: '▰'.repeat(on), s: tone })
   if (on < METER_CELLS) full.push({ t: '▱'.repeat(METER_CELLS - on), s: DIM })
@@ -47,7 +50,10 @@ export function planTone(percent: number): Sty {
 export function accountParts(a: AccountUsage | undefined, bars = true): Part[] {
   if (!a) return []
   const out: Part[] = []
-  for (const [label, v] of [['5h', a.fiveHour], ['wk', a.week]] as const) {
+  for (const [label, v] of [
+    ['5h', a.fiveHour],
+    ['wk', a.week],
+  ] as const) {
     if (v === undefined) continue
     if (out.length) out.push({ t: ' · ', s: DIM })
     const tone = planTone(v)

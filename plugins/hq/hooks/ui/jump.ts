@@ -13,7 +13,7 @@ export function jumpCommands(jump: Jump): string[][] {
   return cmds
 }
 
-export const jumpLabel = (jump: Jump) => (jump.kind === 'url' ? jump.url : jump.kind === 'tmux' ? jump.target : jump.tmux ?? jump.cwd)
+export const jumpLabel = (jump: Jump) => (jump.kind === 'url' ? jump.url : jump.kind === 'tmux' ? jump.target : (jump.tmux ?? jump.cwd))
 
 export type Runner = Exec
 

@@ -2,7 +2,6 @@
 
 const PR_URL_SRC = String.raw`https?://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\d+)`
 
-
 /** Splits on whitespace honouring single/double quotes and backslashes; operators become their own tokens. */
 export function tokenize(command: string): string[] {
   const out: string[] = []

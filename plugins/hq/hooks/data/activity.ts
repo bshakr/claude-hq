@@ -52,12 +52,7 @@ export function onToolStart(s: ActivityState, e: { tool: string } & Record<strin
 }
 
 /** A main-loop tool's result: todo lists, background shells, a stopped task. */
-export function onToolResult(
-  s: ActivityState,
-  e: { tool: string } & Record<string, unknown>,
-  result: unknown,
-  now: number,
-): void {
+export function onToolResult(s: ActivityState, e: { tool: string } & Record<string, unknown>, result: unknown, now: number): void {
   if (s.tool && s.tool.id === String(e.tool_use_id ?? '')) s.tool = undefined
   const r = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>
   switch (e.tool) {

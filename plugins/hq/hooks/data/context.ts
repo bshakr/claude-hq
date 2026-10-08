@@ -158,8 +158,12 @@ function onToolUse(d: Digest, block: Obj): void {
 export function ingestLine(d: Digest, line: string): void {
   // Most lines are tool traffic; parse only the kinds this reads.
   if (
-    !line.includes('"type":"user"') && !line.includes('"type":"assistant"') && !line.includes('"type":"ai-title"') &&
-    !line.includes('"type":"pr-link"') && !line.includes('"customTitle"') && !line.includes('"queued_command"')
+    !line.includes('"type":"user"') &&
+    !line.includes('"type":"assistant"') &&
+    !line.includes('"type":"ai-title"') &&
+    !line.includes('"type":"pr-link"') &&
+    !line.includes('"customTitle"') &&
+    !line.includes('"queued_command"')
   ) {
     const t = /"timestamp":"([^"]+)"/.exec(line)
     if (t) noteTs(d, Date.parse(t[1]!))
@@ -292,7 +296,11 @@ export function prText(prs: Digest['prs'], states: ReadonlyMap<string, PrState>)
   if (prs.length === 0) return undefined
   const n = { MERGED: 0, OPEN: 0, CLOSED: 0, unknown: 0 }
   for (const p of prs) n[states.get(prKey(p.repo, p.number)) ?? 'unknown']++
-  const parts: [number, string][] = [[n.MERGED, 'merged'], [n.OPEN, 'open'], [n.CLOSED, 'closed']]
+  const parts: [number, string][] = [
+    [n.MERGED, 'merged'],
+    [n.OPEN, 'open'],
+    [n.CLOSED, 'closed'],
+  ]
   const known = parts.filter(([k]) => k > 0)
   if (known.length === 0) return `${plural(prs.length, 'PR')} linked`
   const [first, ...rest] = known
@@ -317,7 +325,11 @@ export function parsePrStates(stdout: string): Map<number, { state: PrState; tit
       const o = obj(v)
       const state = str(o?.state)
       if (!o || !/^p\d+$/.test(k) || (state !== 'OPEN' && state !== 'MERGED' && state !== 'CLOSED')) continue
-      out.set(Number(k.slice(1)), { state, ...(str(o.title) ? { title: str(o.title)! } : {}), ...(str(o.headRefName) ? { branch: str(o.headRefName)! } : {}) })
+      out.set(Number(k.slice(1)), {
+        state,
+        ...(str(o.title) ? { title: str(o.title)! } : {}),
+        ...(str(o.headRefName) ? { branch: str(o.headRefName)! } : {}),
+      })
     }
   } catch {
     // partial or failed reply: nothing known
@@ -358,7 +370,14 @@ export function goalInput(d: Digest, extras: GoalExtras = {}): string {
     ['Pull requests', prLines.join('\n'), 800],
     ['Tickets and ADRs referenced', (extras.idTitles ?? []).map(t => `- ${t}`).join('\n'), 600],
     ['Task list', d.tasks.map(t => `- [${t.status}] ${t.text}`).join('\n'), 400],
-    ['Recent requests', d.prompts.slice(-5).map(p => `- ${p.text}`).join('\n'), 1_000],
+    [
+      'Recent requests',
+      d.prompts
+        .slice(-5)
+        .map(p => `- ${p.text}`)
+        .join('\n'),
+      1_000,
+    ],
     ['Latest replies', d.replies.map(r => `- ${r}`).join('\n'), 900],
   ]
   let left = GOAL_INPUT_MAX
@@ -379,7 +398,13 @@ export const GOAL_SYSTEM =
   '{"goal": "<the overall goal of the session, at most 6 words>", "step": "<where the work is now, at most 8 words>"}. ' +
   'The goal is what the whole session is for, not the latest request.'
 
-const words = (s: string, n: number) => s.trim().split(/\s+/).slice(0, n).join(' ').replace(/[.;,]+$/, '')
+const words = (s: string, n: number) =>
+  s
+    .trim()
+    .split(/\s+/)
+    .slice(0, n)
+    .join(' ')
+    .replace(/[.;,]+$/, '')
 
 export function parseGoalReply(text: string): { goal: string; step?: string } | undefined {
   const m = /\{[\s\S]*\}/.exec(text)
@@ -413,7 +438,13 @@ export function goalDue(c: GoalCache | undefined, d: Digest, busy: boolean, now:
 export type Complete = (req: { system: string; prompt: string }) => Promise<{ isAnswered: boolean; text?: string }>
 
 /** One model call; a failure keeps the old summary and backs off. */
-export async function refreshGoal(d: Digest, cache: GoalCache | undefined, extras: GoalExtras, now: number, complete: Complete): Promise<GoalCache> {
+export async function refreshGoal(
+  d: Digest,
+  cache: GoalCache | undefined,
+  extras: GoalExtras,
+  now: number,
+  complete: Complete,
+): Promise<GoalCache> {
   const failed: GoalCache = { ...(cache ?? { at: 0 }), failedAt: now }
   let reply: { isAnswered: boolean; text?: string }
   try {
@@ -425,8 +456,11 @@ export async function refreshGoal(d: Digest, cache: GoalCache | undefined, extra
   if (!g) return failed
   const promptTs = d.prompts.length ? d.prompts[d.prompts.length - 1]!.ts : undefined
   return {
-    goal: g.goal, ...(g.step ? { step: g.step } : {}), at: now,
-    ...(d.compact ? { compactTs: d.compact.ts } : {}), ...(promptTs !== undefined ? { promptTs } : {}),
+    goal: g.goal,
+    ...(g.step ? { step: g.step } : {}),
+    at: now,
+    ...(d.compact ? { compactTs: d.compact.ts } : {}),
+    ...(promptTs !== undefined ? { promptTs } : {}),
   }
 }
 
@@ -435,6 +469,9 @@ export function goalText(c: GoalCache | undefined, d: Digest | undefined): strin
   if (c?.goal) return c.goal
   const title = d?.titles[d.titles.length - 1]
   if (title) return title
-  const first = d?.firstPrompt?.split('\n').map(l => l.trim()).find(Boolean)
+  const first = d?.firstPrompt
+    ?.split('\n')
+    .map(l => l.trim())
+    .find(Boolean)
   return first ? (first.length > 80 ? `${first.slice(0, 79)}…` : first) : undefined
 }

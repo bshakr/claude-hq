@@ -13,7 +13,12 @@ type PaneEvent = RenderInput<'Pane'>
 
 const PROBE = 'hq-probe'
 const props = (bodyColumns: number, bodyRows: number, isFocused = false) => ({
-  title: 'hq', isFocused, bodyColumns, placement: 'dock' as const, scroll: { offset: 0, bodyRows }, view: {},
+  title: 'hq',
+  isFocused,
+  bodyColumns,
+  placement: 'dock' as const,
+  scroll: { offset: 0, bodyRows },
+  view: {},
 })
 
 type Probe = { model: HqModel; cursor: string | null; expanded: string[]; phase?: number; last?: Layout }
@@ -24,8 +29,13 @@ function probe(on: On, p: Probe) {
 
 function draw($: EngineInterface, e: PaneEvent, p: Probe) {
   const l = layout(p.model, {
-    width: e.props.bodyColumns, rows: e.props.scroll.bodyRows, focused: e.props.isFocused,
-    cursor: p.cursor, expanded: p.expanded, scroll: 0, phase: p.phase ?? 0,
+    width: e.props.bodyColumns,
+    rows: e.props.scroll.bodyRows,
+    focused: e.props.isFocused,
+    cursor: p.cursor,
+    expanded: p.expanded,
+    scroll: 0,
+    phase: p.phase ?? 0,
   })
   p.last = l
   return drawPane(l.rows, { el: $.ui.resolve(e), autoFocusKey: l.items[0], onAction: () => undefined })
@@ -36,7 +46,12 @@ test('the engine validates every state on terminal and desktop, with no backgrou
   probe(on, p)
   for (const surface of ['terminal', 'desktop'] as const) {
     for (const [model, w, r, focused] of [
-      [BUSY, 80, 58, false], [BUSY, 72, 58, true], [QUIET, 88, 58, true], [LONG, 80, 34, false], [EMPTY, 60, 20, true], [BUSY, 40, 10, true],
+      [BUSY, 80, 58, false],
+      [BUSY, 72, 58, true],
+      [QUIET, 88, 58, true],
+      [LONG, 80, 34, false],
+      [EMPTY, 60, 20, true],
+      [BUSY, 40, 10, true],
     ] as const) {
       p.model = model
       p.expanded = ['a3', 'a1']
@@ -129,8 +144,14 @@ test('a dimmed running dot and the green plan bars validate as colour plus dimCo
 
 test('the +N finished toggle is a Button the engine accepts, open or closed', async ($, on) => {
   const fin = (id: string, mins: number) => ({
-    id, title: `Finished ${id}`, status: 'completed' as const, background: true, startedAt: BUSY.now - 20 * 60_000,
-    endedAt: BUSY.now - mins * 60_000, toolCount: 1, files: [],
+    id,
+    title: `Finished ${id}`,
+    status: 'completed' as const,
+    background: true,
+    startedAt: BUSY.now - 20 * 60_000,
+    endedAt: BUSY.now - mins * 60_000,
+    toolCount: 1,
+    files: [],
   })
   const model: HqModel = { ...BUSY, current: { ...BUSY.current, agents: [...BUSY.current.agents, fin('f1', 1), fin('f2', 2)] } }
   const p: Probe = { model, cursor: null, expanded: [] }

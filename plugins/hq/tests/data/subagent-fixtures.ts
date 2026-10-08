@@ -42,7 +42,10 @@ export const openCall = (at: number) =>
     type: 'assistant',
     timestamp: new Date(at).toISOString(),
     message: {
-      role: 'assistant', type: 'message', model: 'claude-opus-5-5', stop_reason: null,
+      role: 'assistant',
+      type: 'message',
+      model: 'claude-opus-5-5',
+      stop_reason: null,
       content: [{ type: 'tool_use', id: 't9', name: 'Bash', input: { command: 'pr-ci-wait 275', description: 'Wait for CI on #275' } }],
     },
   })

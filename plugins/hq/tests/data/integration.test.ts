@@ -38,7 +38,15 @@ function fakeHost(on: On, fx: Fake) {
     const prefix = `${e.path}/`
     const names = Object.keys(fx.files).filter(p => p.startsWith(prefix) && !p.slice(prefix.length).includes('/'))
     if (names.length === 0) throw new Error(`ENOENT ${e.path}`)
-    return { value: names.map(p => ({ name: p.slice(prefix.length), kind: 'file' as const, size: fx.files[p]!.length, mtimeMs: fx.mtimes[p] ?? 0, isLink: false })) }
+    return {
+      value: names.map(p => ({
+        name: p.slice(prefix.length),
+        kind: 'file' as const,
+        size: fx.files[p]!.length,
+        mtimeMs: fx.mtimes[p] ?? 0,
+        isLink: false,
+      })),
+    }
   })
   on('fs.read', ($, e) => {
     const text = fx.files[e.path]
@@ -60,13 +68,27 @@ function fakeHost(on: On, fx: Fake) {
     if (argv[0] === 'ps') {
       fx.ps++
       const asked = argv[argv.length - 1]!.split(',').map(Number)
-      return ok(asked.filter(p => fx.alive.includes(p)).map(p => `${p}\n`).join(''))
+      return ok(
+        asked
+          .filter(p => fx.alive.includes(p))
+          .map(p => `${p}\n`)
+          .join(''),
+      )
     }
     if (argv[0] === 'git' && argv[1] === 'remote') return ok('git@github.com:acme/app.git\n')
     if (argv[0] === 'git' && argv[1] === 'branch') return ok(`${fx.branch}\n`)
     if (argv[0] === 'gh' && argv[1] === 'api') {
       fx.gh.push(argv)
-      return ok(JSON.stringify({ data: { repository: { p270: { state: 'MERGED', title: 'BLO-1940 evaluation report', headRefName: 'BLO-1940-x' }, p271: { state: 'OPEN', title: 'BLO-1941 kind stage', headRefName: 'BLO-1941-y' } } } }))
+      return ok(
+        JSON.stringify({
+          data: {
+            repository: {
+              p270: { state: 'MERGED', title: 'BLO-1940 evaluation report', headRefName: 'BLO-1940-x' },
+              p271: { state: 'OPEN', title: 'BLO-1941 kind stage', headRefName: 'BLO-1941-y' },
+            },
+          },
+        }),
+      )
     }
     if (argv[0] === 'gh') {
       fx.gh.push(argv)
@@ -87,7 +109,9 @@ function fakeHost(on: On, fx: Fake) {
       fx.ran.push(argv)
       const t = fx.linear[argv[3]!]
       if (t === 'hang') return new Promise<never>(() => {})
-      return t ? ok(`# ${argv[3]}: ${t}\n\nbody\n`) : { value: { exitCode: 1, stdout: '', stderr: 'not found', isStdoutTruncated: false, isStderrTruncated: false } }
+      return t
+        ? ok(`# ${argv[3]}: ${t}\n\nbody\n`)
+        : { value: { exitCode: 1, stdout: '', stderr: 'not found', isStdoutTruncated: false, isStderrTruncated: false } }
     }
     if (argv[0] === 'rm') {
       fx.ran.push(argv)
@@ -113,15 +137,53 @@ function registry(fx: Fake) {
   const row = (pid: number, extra: Record<string, unknown>) => JSON.stringify({ pid, cwd: `${HOME}/code/x`, ...extra })
   fx.files[`${HOME}/.claude/sessions/100.json`] = row(100, { sessionId: SID, tmux: 'work:@1.%1', status: 'busy' })
   fx.files[`${HOME}/.claude/sessions/100.abc.key`] = 'k'
-  fx.files[`${HOME}/.claude/sessions/200.json`] = row(200, { sessionId: 'w1', name: 'rp-api', tmux: 'ritualpass:@3.%6', status: 'waiting', waitingFor: 'input needed', statusUpdatedAt: 1_000_000 - 120_000 })
-  fx.files[`${HOME}/.claude/sessions/300.json`] = row(300, { sessionId: 'dead', name: 'gone', tmux: 'ritualpass:@9.%9', status: 'waiting', statusUpdatedAt: 1 })
-  fx.files[`${HOME}/.claude/sessions/400.json`] = row(400, { sessionId: 'b1', name: 'rp-admin', tmux: 'ritualpass:@4.%2', status: 'busy', statusUpdatedAt: 1_000_000 - 60_000 })
-  fx.files[`${HOME}/.claude/hq/sessions/b1.json`] = JSON.stringify({ sessionId: 'b1', pid: 400, updatedAt: 1_000_000 - 1_000, agentsRunning: 3, prSummary: { total: 2, broken: 1, waiting: 0, inProgress: 1 } })
+  fx.files[`${HOME}/.claude/sessions/200.json`] = row(200, {
+    sessionId: 'w1',
+    name: 'rp-api',
+    tmux: 'ritualpass:@3.%6',
+    status: 'waiting',
+    waitingFor: 'input needed',
+    statusUpdatedAt: 1_000_000 - 120_000,
+  })
+  fx.files[`${HOME}/.claude/sessions/300.json`] = row(300, {
+    sessionId: 'dead',
+    name: 'gone',
+    tmux: 'ritualpass:@9.%9',
+    status: 'waiting',
+    statusUpdatedAt: 1,
+  })
+  fx.files[`${HOME}/.claude/sessions/400.json`] = row(400, {
+    sessionId: 'b1',
+    name: 'rp-admin',
+    tmux: 'ritualpass:@4.%2',
+    status: 'busy',
+    statusUpdatedAt: 1_000_000 - 60_000,
+  })
+  fx.files[`${HOME}/.claude/hq/sessions/b1.json`] = JSON.stringify({
+    sessionId: 'b1',
+    pid: 400,
+    updatedAt: 1_000_000 - 1_000,
+    agentsRunning: 3,
+    prSummary: { total: 2, broken: 1, waiting: 0, inProgress: 1 },
+  })
   fx.alive.push(100, 200, 400)
 }
 
 const newFake = (): Fake => ({
-  files: {}, alive: [], gh: [], ps: 0, writes: {}, sid: SID, branch: 'main', heads: {}, states: {}, bash: {}, ran: [], mtimes: {}, tails: [], linear: {},
+  files: {},
+  alive: [],
+  gh: [],
+  ps: 0,
+  writes: {},
+  sid: SID,
+  branch: 'main',
+  heads: {},
+  states: {},
+  bash: {},
+  ran: [],
+  mtimes: {},
+  tails: [],
+  linear: {},
 })
 
 const pubOf = (fx: Fake, sid = SID) => JSON.parse(fx.writes[`${HOME}/.claude/hq/sessions/${sid}.json`]!)
@@ -138,8 +200,13 @@ test('integration: publishes this session from its own registry row, one ps per 
   const published = pubOf(fx)
   expect(Object.keys(published).sort()).toEqual(['agents', 'agentsRunning', 'owned', 'pid', 'prSummary', 'sessionId', 'updatedAt'])
   expect(published).toEqual({
-    sessionId: SID, pid: 100, updatedAt: 1_000_000, agentsRunning: 0,
-    prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 }, agents: [], owned: [],
+    sessionId: SID,
+    pid: 100,
+    updatedAt: 1_000_000,
+    agentsRunning: 0,
+    prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
+    agents: [],
+    owned: [],
   })
   expect(fx.ps).toBe(1)
   // on main: no branch to own, no GitHub call
@@ -173,7 +240,10 @@ test('integration: viewing or waiting on a PR does not own it; creating one does
 test('integration: ownership kept in the store comes back on a cold start', async ($, on) => {
   const clock = mock.clock(on, { now: 1_000_000 })
   const store = new Map<string, unknown>()
-  store.set(`owned:${SID}`, { claims: [{ repo: 'acme/app', number: 40, claimedBy: 'main', claimedAt: 1, reason: 'created' }], branches: [] })
+  store.set(`owned:${SID}`, {
+    claims: [{ repo: 'acme/app', number: 40, claimedBy: 'main', claimedAt: 1, reason: 'created' }],
+    branches: [],
+  })
   fakeStore(on, store)
   const fx = newFake()
   registry(fx)
@@ -251,7 +321,14 @@ test('integration: after /clear the new session id is published, the old file re
   expect(pubOf(fx).pid).toBe(100)
 
   fx.sid = 'after-clear'
-  fx.files[`${HOME}/.claude/sessions/100.json`] = JSON.stringify({ pid: 100, sessionId: 'after-clear', cwd: `${HOME}/code/x`, tmux: 'work:@1.%1', status: 'busy', name: 'home-b9' })
+  fx.files[`${HOME}/.claude/sessions/100.json`] = JSON.stringify({
+    pid: 100,
+    sessionId: 'after-clear',
+    cwd: `${HOME}/code/x`,
+    tmux: 'work:@1.%1',
+    status: 'busy',
+    name: 'home-b9',
+  })
   await clock.advance(2_000)
   expect(pubOf(fx, 'after-clear')).toMatchObject({ sessionId: 'after-clear', pid: 100 })
   expect(fx.ran).toEqual([['rm', '-f', `${HOME}/.claude/hq/sessions/${SID}.json`]])
@@ -279,7 +356,10 @@ test('integration: a session without HQ shows its running subagents from their t
 
   const pane = async () => {
     const ui = await $.ui.mount({
-      plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq',
+      plugin: 'hq',
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'hq',
       props: { title: 'hq', isFocused: false, bodyColumns: 80, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
     })
     const text = JSON.stringify(await ui.drawn())
@@ -302,7 +382,9 @@ test('integration: a session without HQ shows its running subagents from their t
   // A transcript past 2 h is a candidate only while its session is busy; it is tailed once across the flips.
   put('agent-ancient.jsonl', SUB.running, 1_000_000 - 3 * 60 * 60_000)
   const w1 = `${HOME}/.claude/sessions/200.json`
-  const status = (st: string) => { fx.files[w1] = fx.files[w1]!.replace(/"status":"\w+"/, `"status":"${st}"`) }
+  const status = (st: string) => {
+    fx.files[w1] = fx.files[w1]!.replace(/"status":"\w+"/, `"status":"${st}"`)
+  }
   status('busy')
   await clock.advance(2_000)
   expect(fx.tails.length).toBe(4)
@@ -319,7 +401,7 @@ test('integration: a session without HQ shows its running subagents from their t
   expect((await pane()).includes('Implement BLO-1941 card pairing guard')).toBe(false)
 })
 
-test('integration: another session\'s agent inside one long call stays listed as waiting, however old its file', async ($, on) => {
+test("integration: another session's agent inside one long call stays listed as waiting, however old its file", async ($, on) => {
   const clock = mock.clock(on, { now: 1_000_000 })
   mock.store(on)
   const fx = newFake()
@@ -334,7 +416,10 @@ test('integration: another session\'s agent inside one long call stays listed as
   await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({
-    plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq',
+    plugin: 'hq',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'hq',
     props: { title: 'hq', isFocused: false, bodyColumns: 80, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
   })
   const drawn = JSON.stringify(await ui.drawn())
@@ -416,7 +501,13 @@ test('integration: another session card carries its goal, day and PR counts; the
   const asked: string[] = []
   on('model.complete', ($, e) => {
     asked.push(e.prompt)
-    return { value: { isAnswered: true, text: '{"goal":"Pipeline v2 rearchitecture","step":"stage 4 of 7: kind stage"}', usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } } as never
+    return {
+      value: {
+        isAnswered: true,
+        text: '{"goal":"Pipeline v2 rearchitecture","step":"stage 4 of 7: kind stage"}',
+        usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    } as never
   })
   const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
   const line = (v: Record<string, unknown>) => `${JSON.stringify(v)}\n`
@@ -424,9 +515,27 @@ test('integration: another session card carries its goal, day and PR counts; the
   fx.files[path] = [
     prompt('Rebuild the pipeline as v2', '2026-10-06T09:00:00Z'),
     line({ type: 'ai-title', aiTitle: '269 merged whats next' }),
-    line({ type: 'pr-link', prNumber: 270, prUrl: 'https://github.com/acme/app/pull/270', prRepository: 'acme/app', timestamp: '2026-10-07T09:00:00Z' }),
-    line({ type: 'pr-link', prNumber: 271, prUrl: 'https://github.com/acme/app/pull/271', prRepository: 'acme/app', timestamp: '2026-10-08T09:00:00Z' }),
-    line({ type: 'pr-link', prNumber: 271, prUrl: 'https://github.com/acme/app/pull/271', prRepository: 'acme/app', timestamp: '2026-10-08T09:01:00Z' }),
+    line({
+      type: 'pr-link',
+      prNumber: 270,
+      prUrl: 'https://github.com/acme/app/pull/270',
+      prRepository: 'acme/app',
+      timestamp: '2026-10-07T09:00:00Z',
+    }),
+    line({
+      type: 'pr-link',
+      prNumber: 271,
+      prUrl: 'https://github.com/acme/app/pull/271',
+      prRepository: 'acme/app',
+      timestamp: '2026-10-08T09:00:00Z',
+    }),
+    line({
+      type: 'pr-link',
+      prNumber: 271,
+      prUrl: 'https://github.com/acme/app/pull/271',
+      prRepository: 'acme/app',
+      timestamp: '2026-10-08T09:01:00Z',
+    }),
   ].join('')
   await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
   await clock.settle()
@@ -435,7 +544,10 @@ test('integration: another session card carries its goal, day and PR counts; the
 
   const pane = async () => {
     const ui = await $.ui.mount({
-      plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq',
+      plugin: 'hq',
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'hq',
       props: { title: 'hq', isFocused: false, bodyColumns: 80, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
     })
     const text = JSON.stringify(await ui.drawn())
@@ -465,7 +577,7 @@ test('integration: another session card carries its goal, day and PR counts; the
   expect(fx.tails.filter(p => p === path).length).toBeGreaterThan(1)
 })
 
-test('integration: ids on a card are glossed from linear and the repo\'s ADRs; a hung lookup never stalls the tick', async ($, on) => {
+test("integration: ids on a card are glossed from linear and the repo's ADRs; a hung lookup never stalls the tick", async ($, on) => {
   const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
   const store = new Map<string, unknown>()
   fakeStore(on, store)
@@ -478,12 +590,23 @@ test('integration: ids on a card are glossed from linear and the repo\'s ADRs; a
   on('model.complete', ($, e) => {
     asked.push({ system: e.system ?? '', prompt: e.prompt })
     const text = (e.system ?? '').includes('shorten titles')
-      ? JSON.stringify(Object.fromEntries(e.prompt.split('\n').map(l => [l.split(':')[0], l.includes('Raw bank import') ? 'raw bank import' : 'append-only bank data'])))
+      ? JSON.stringify(
+          Object.fromEntries(
+            e.prompt.split('\n').map(l => [l.split(':')[0], l.includes('Raw bank import') ? 'raw bank import' : 'append-only bank data']),
+          ),
+        )
       : '{"goal":"Finish ADR 0019 epic BLO-1936 work","step":"Fix batch BLO-1947 in review"}'
-    return { value: { isAnswered: true, text, usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } } as never
+    return {
+      value: {
+        isAnswered: true,
+        text,
+        usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    } as never
   })
   const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
-  fx.files[path] = `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic BLO-1936 work, then BLO-1947' }, timestamp: '2026-10-08T09:00:00Z' })}\n`
+  fx.files[path] =
+    `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic BLO-1936 work, then BLO-1947' }, timestamp: '2026-10-08T09:00:00Z' })}\n`
   await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
   await clock.settle()
   // BLO-1947 never answers: the goal waits ID_WAIT_MS for it, then goes ahead with what resolved.
@@ -493,7 +616,10 @@ test('integration: ids on a card are glossed from linear and the repo\'s ADRs; a
 
   const pane = async () => {
     const ui = await $.ui.mount({
-      plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq',
+      plugin: 'hq',
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'hq',
       props: { title: 'hq', isFocused: false, bodyColumns: 120, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
     })
     const text = JSON.stringify(await ui.drawn())
@@ -516,42 +642,62 @@ test('integration: ids on a card are glossed from linear and the repo\'s ADRs; a
 })
 
 for (const how of ['config', 'store'] as const) {
-  test(`integration: summaries off by ${how} makes no model call and no id lookup; cards fall back to the AI title, ids bare`, { options: { summaries: how === 'store' } }, async ($, on) => {
-    const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
-    const store = new Map<string, unknown>()
-    if (how === 'store') store.set('summaries', false)
-    fakeStore(on, store)
-    const fx = newFake()
-    registry(fx)
-    fakeHost(on, fx)
-    fx.linear = { 'BLO-1936': 'Raw bank import: keep every statement line' }
-    fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-bank-data.md`] = '# Raw bank data is append-only\n'
-    let calls = 0
-    on('model.complete', () => {
-      calls++
-      return { value: { isAnswered: true, text: '{"goal":"should not show","step":"nor this"}', usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } } as never
-    })
-    const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
-    fx.files[path] = [
-      `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic BLO-1936 work' }, timestamp: '2026-10-08T09:00:00Z' })}\n`,
-      `${JSON.stringify({ type: 'ai-title', aiTitle: 'BLO-1936 bank import' })}\n`,
-    ].join('')
-    await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
-    await clock.settle()
-    for (let i = 0; i < 20; i++) await clock.advance(2_000)
-    await clock.advance(60 * 60_000)
+  test(
+    `integration: summaries off by ${how} makes no model call and no id lookup; cards fall back to the AI title, ids bare`,
+    { options: { summaries: how === 'store' } },
+    async ($, on) => {
+      const clock = mock.clock(on, { now: Date.parse('2026-10-08T12:00:00Z') })
+      const store = new Map<string, unknown>()
+      if (how === 'store') store.set('summaries', false)
+      fakeStore(on, store)
+      const fx = newFake()
+      registry(fx)
+      fakeHost(on, fx)
+      fx.linear = { 'BLO-1936': 'Raw bank import: keep every statement line' }
+      fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-bank-data.md`] = '# Raw bank data is append-only\n'
+      let calls = 0
+      on('model.complete', () => {
+        calls++
+        return {
+          value: {
+            isAnswered: true,
+            text: '{"goal":"should not show","step":"nor this"}',
+            usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+          },
+        } as never
+      })
+      const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
+      fx.files[path] = [
+        `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic BLO-1936 work' }, timestamp: '2026-10-08T09:00:00Z' })}\n`,
+        `${JSON.stringify({ type: 'ai-title', aiTitle: 'BLO-1936 bank import' })}\n`,
+      ].join('')
+      await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
+      await clock.settle()
+      for (let i = 0; i < 20; i++) await clock.advance(2_000)
+      await clock.advance(60 * 60_000)
 
-    const ui = await $.ui.mount({
-      plugin: 'hq', surface: 'terminal', component: 'Pane', requestId: 'hq',
-      props: { title: 'hq', isFocused: false, bodyColumns: 120, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 60 }, view: {} },
-    })
-    const drawn = JSON.stringify(await ui.drawn())
-    await ui.unmount()
-    expect(calls).toBe(0)
-    expect(fx.ran.filter(a => a[0] === 'linear')).toEqual([])
-    expect(drawn.includes('BLO-1936 bank import')).toBe(true)
-    expect(drawn.includes('should not show')).toBe(false)
-    expect(drawn.includes('(raw bank import)')).toBe(false)
-    expect([...store.keys()].some(k => k.startsWith('goal:') || k.startsWith('gloss:'))).toBe(false)
-  })
+      const ui = await $.ui.mount({
+        plugin: 'hq',
+        surface: 'terminal',
+        component: 'Pane',
+        requestId: 'hq',
+        props: {
+          title: 'hq',
+          isFocused: false,
+          bodyColumns: 120,
+          placement: 'dock' as const,
+          scroll: { offset: 0, bodyRows: 60 },
+          view: {},
+        },
+      })
+      const drawn = JSON.stringify(await ui.drawn())
+      await ui.unmount()
+      expect(calls).toBe(0)
+      expect(fx.ran.filter(a => a[0] === 'linear')).toEqual([])
+      expect(drawn.includes('BLO-1936 bank import')).toBe(true)
+      expect(drawn.includes('should not show')).toBe(false)
+      expect(drawn.includes('(raw bank import)')).toBe(false)
+      expect([...store.keys()].some(k => k.startsWith('goal:') || k.startsWith('gloss:'))).toBe(false)
+    },
+  )
 }

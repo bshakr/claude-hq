@@ -22,11 +22,18 @@ export const ASKED_TEXT_MAX = 130
 // Stand-ins for sentence punctuation inside code, URLs and quotes, so a "?" there does not count.
 const MASK: Record<string, string> = { '?': '\uE000', '.': '\uE001', '!': '\uE002' }
 const mask = (t: string) => t.replace(/[?.!]/g, c => MASK[c]!)
-const unmask = (t: string) => t.replace(/\uE000/g, '?').replace(/\uE001/g, '.').replace(/\uE002/g, '!')
+const unmask = (t: string) =>
+  t
+    .replace(/\uE000/g, '?')
+    .replace(/\uE001/g, '.')
+    .replace(/\uE002/g, '!')
 
 /** The question a reply ends on: the last "?" sentence of its final paragraph, outside code, URLs, quotes and headers. */
 export function trailingQuestion(text: string): string | undefined {
-  const paras = text.replace(/(```|~~~)[\s\S]*?(\1|$)/g, '').trim().split(/\n[ \t]*\n/)
+  const paras = text
+    .replace(/(```|~~~)[\s\S]*?(\1|$)/g, '')
+    .trim()
+    .split(/\n[ \t]*\n/)
   const last = paras[paras.length - 1] ?? ''
   const body = last
     .split('\n')
@@ -135,7 +142,7 @@ function closeWaits(pred: (o: Open) => boolean): void {
 }
 
 export function onCallStart(id: string, tool: string, loop: string, input: unknown, now: number): void {
-  W.inflight.push({ id, tool, loop, ...((t => (t ? { target: t } : {}))(permissionTarget(tool, input))) })
+  W.inflight.push({ id, tool, loop, ...(t => (t ? { target: t } : {}))(permissionTarget(tool, input)) })
   if (tool === 'AskUserQuestion') {
     const wait = questionWait(input, now)
     if (wait) openWait({ wait, loop, tool, toolUseId: id })
@@ -169,7 +176,8 @@ export function ownWait(activity: { idle: boolean; since: number; prompt?: strin
   const real = [...W.open].sort((a, b) => a.wait.since - b.wait.since)[0]
   if (real) return real.wait
   if (activity.idle && W.asked) return W.asked
-  if (activity.idle && activity.prompt !== undefined && activity.since > 0) return { kind: 'turn', text: 'your turn', since: activity.since }
+  if (activity.idle && activity.prompt !== undefined && activity.since > 0)
+    return { kind: 'turn', text: 'your turn', since: activity.since }
   return undefined
 }
 

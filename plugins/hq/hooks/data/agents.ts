@@ -102,7 +102,7 @@ export function onSpawn(s: AgentsState, f: SpawnFacts, agentId: string, resolved
     files: prev?.files ?? [],
     toolUseId: f.toolUseId,
     ...(f.parentAgentId ? { parentId: f.parentAgentId } : {}),
-    ...(resolvedModel ?? f.model ? { model: resolvedModel ?? f.model } : {}),
+    ...((resolvedModel ?? f.model) ? { model: resolvedModel ?? f.model } : {}),
     ...(wt ? { worktree: wt.label, root: wt.root } : f.cwd ? { worktree: f.cwd, root: f.cwd } : {}),
   }
   s.byId[agentId] = rec
@@ -305,7 +305,13 @@ export function reconcile(s: AgentsState, listed: readonly ListedAgent[], now: n
       // A pruned id comes back only when it truly runs again (a message resumed it).
       if (!isLive({ status }) || (status !== 'running' && s.pruned?.includes(l.id))) continue
       s.byId[l.id] = {
-        id: l.id, title: l.description, status, background: true, startedAt: now, toolCount: 0, files: [],
+        id: l.id,
+        title: l.description,
+        status,
+        background: true,
+        startedAt: now,
+        toolCount: 0,
+        files: [],
         ...(l.parentId ? { parentId: l.parentId } : {}),
       }
       continue
@@ -364,9 +370,8 @@ export function agentList(s: AgentsState, sessionRoot?: string): AgentVM[] {
     .map(({ root, toolUseId: _t, missing: _m, lastToolAt: _l, notifiedAt: _n, todos, ...vm }) => {
       const place = placeOf(root, sessionRoot)
       const current = todos?.find(t => t.status === 'in_progress')
-      const todo = current && todos
-        ? { text: current.text, done: todos.filter(t => t.status === 'completed').length, total: todos.length }
-        : undefined
+      const todo =
+        current && todos ? { text: current.text, done: todos.filter(t => t.status === 'completed').length, total: todos.length } : undefined
       return { ...vm, ...(place ? { place } : {}), ...(todo ? { todo } : {}) }
     })
 }

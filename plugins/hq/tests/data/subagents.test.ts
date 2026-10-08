@@ -2,7 +2,18 @@ import { expect, test } from 'claude-code/testing'
 
 import { buildFleet, toSessionVM } from '../../hooks/data/fleet'
 import type { RegistryRow } from '../../hooks/data/fleet'
-import { AGENT_FRESH_MS, LONG_CALL_MS, OPEN_CALL_CAP_MS, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from '../../hooks/data/subagents'
+import {
+  AGENT_FRESH_MS,
+  LONG_CALL_MS,
+  OPEN_CALL_CAP_MS,
+  freshTranscripts,
+  isRunning,
+  longCall,
+  otherAgents,
+  parseMeta,
+  parseTail,
+  subagentsDir,
+} from '../../hooks/data/subagents'
 import { plainText, summaryLine } from '../../hooks/model/plain'
 import type { PublishedSession } from '../../hooks/model/types'
 import * as SUB from './subagent-fixtures'
@@ -55,15 +66,24 @@ test('subagents: only fresh transcripts are tailed; running ones listed newest f
 })
 
 const row = (extra: Partial<RegistryRow> = {}): RegistryRow => ({
-  pid: 7, sessionId: 'm1', cwd: '/Users/b/code/monolense', tmux: 'monolense:@2.%3', status: 'busy', ...extra,
+  pid: 7,
+  sessionId: 'm1',
+  cwd: '/Users/b/code/monolense',
+  tmux: 'monolense:@2.%3',
+  status: 'busy',
+  ...extra,
 })
 const agent = { id: 'x', title: 'Implement guard', model: 'opus', startedAt: 5 }
 
 test('fleet: a fresh publish with agents wins; otherwise the transcripts give the list and the count', () => {
   const now = 100_000
   const pub: PublishedSession = {
-    sessionId: 'm1', pid: 7, updatedAt: now - 1_000, agentsRunning: 5,
-    prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 }, agents: [{ ...agent, id: 'p' }],
+    sessionId: 'm1',
+    pid: 7,
+    updatedAt: now - 1_000,
+    agentsRunning: 5,
+    prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
+    agents: [{ ...agent, id: 'p' }],
   }
   expect(toSessionVM(row(), undefined, pub, now, {}, [agent])).toMatchObject({ agentsRunning: 5, agents: [{ id: 'p' }] })
   expect(toSessionVM(row(), undefined, undefined, now, {}, [agent])).toMatchObject({ agentsRunning: 1, agents: [agent] })
@@ -79,14 +99,23 @@ test('fleet: the dim line is dropped when it only repeats the tmux group, kept w
   expect(toSessionVM(row(), 'main', undefined, 0).detail).toBe(undefined)
   expect(toSessionVM(row(), 'BLO-1941-guard', undefined, 0).detail).toBe('monolense · BLO-1941-guard')
   expect(toSessionVM(row({ cwd: '/Users/b/code/monolense/.koh/BLO-7' }), undefined, undefined, 0).detail).toBe('BLO-7')
-  const pub: PublishedSession = { sessionId: 'm1', pid: 7, updatedAt: 0, agentsRunning: 0, prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 }, doing: '2/4 · Ship' }
+  const pub: PublishedSession = {
+    sessionId: 'm1',
+    pid: 7,
+    updatedAt: 0,
+    agentsRunning: 0,
+    prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
+    doing: '2/4 · Ship',
+  }
   expect(toSessionVM(row(), undefined, pub, 1).detail).toBe('monolense · 2/4 · Ship')
 })
 
 test('plain text: markdown is stripped and the first sentence kept', () => {
   expect(summaryLine('**Brief and all four add-ons are done.** HQ now shows todos.\n\nMore')).toBe('Brief and all four add-ons are done.')
   expect(summaryLine('**Brief and all four add-ons are done; HQ now/todos')).toBe('Brief and all four add-ons are done; HQ now/todos')
-  expect(summaryLine('## Report\n\n- Fixed `firstLine` in [agents.ts](hooks/data/agents.ts). Then tests.')).toBe('Fixed firstLine in agents.ts.')
+  expect(summaryLine('## Report\n\n- Fixed `firstLine` in [agents.ts](hooks/data/agents.ts). Then tests.')).toBe(
+    'Fixed firstLine in agents.ts.',
+  )
   expect(summaryLine('# Only a heading')).toBe('Only a heading')
   expect(summaryLine('1. *Scoped* the __PR__ ~~list~~ to snake_case_name')).toBe('Scoped the PR list to snake_case_name')
   expect(summaryLine('Fixed the refund rounding; 3 specs added.\nmore')).toBe('Fixed the refund rounding; 3 specs added.')
@@ -105,7 +134,11 @@ test('subagents: an open tool call keeps a stale transcript running; a result or
   expect(isRunning(parseTail(SUB.running, false), mtime, T0 + 10 * 60_000, false)).toBe(false)
   expect(isRunning(parseTail(SUB.running, false), mtime, T0 + 10_000, false)).toBe(true)
   // Its result lands: closed.
-  const closed = SUB.running + SUB.openCall(T0) + JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't9' }] } }) + '\n'
+  const closed =
+    SUB.running +
+    SUB.openCall(T0) +
+    JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't9' }] } }) +
+    '\n'
   expect(parseTail(closed, false).open).toBe(undefined)
   expect(parseTail(SUB.running + SUB.openCall(T0) + SUB.endTurn, false)).toMatchObject({ ended: true })
   expect(parseTail(SUB.running + SUB.openCall(T0) + SUB.endTurn, false).open).toBe(undefined)
@@ -124,14 +157,18 @@ test('subagents: a call open past LONG_CALL_MS is waiting, with its start; a sho
   const run = { id: 'w', meta: { description: 'Ship it' }, startedAt: 1, tail, mtimeMs: T0 }
   expect(otherAgents([run], T0 + LONG_CALL_MS - 1)[0]!.waiting).toBe(undefined)
   expect(otherAgents([run], T0 + 7 * 60_000)[0]).toEqual({
-    id: 'w', title: 'Ship it', startedAt: 1, doing: 'Wait for CI on #275', waiting: { text: 'Wait for CI on #275', since: T0 },
+    id: 'w',
+    title: 'Ship it',
+    startedAt: 1,
+    doing: 'Wait for CI on #275',
+    waiting: { text: 'Wait for CI on #275', since: T0 },
   })
   // No timestamp on the entry: the transcript mtime stands in.
   const bare = { ...run, tail: { ended: false, open: { text: 'x' } } }
   expect(otherAgents([bare], T0 + LONG_CALL_MS)[0]!.waiting).toEqual({ text: 'x', since: T0 })
 })
 
-test('subagents: this session\'s agent in one long call publishes as waiting; parked on a child does not', () => {
+test("subagents: this session's agent in one long call publishes as waiting; parked on a child does not", () => {
   expect(longCall({ status: 'running', callSince: T0, now: 'Run specs' }, T0 + LONG_CALL_MS)).toEqual({ text: 'Run specs', since: T0 })
   expect(longCall({ status: 'running', callSince: T0, now: 'Run specs' }, T0 + LONG_CALL_MS - 1)).toBe(undefined)
   expect(longCall({ status: 'waiting', callSince: T0 }, T0 + LONG_CALL_MS)).toBe(undefined)

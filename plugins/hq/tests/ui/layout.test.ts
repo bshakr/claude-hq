@@ -9,7 +9,14 @@ import { ACTIVE, BUSY, EMPTY, LONG, QUIET } from './fixtures'
 import * as SHEET from './sheet'
 
 const view = (over: Partial<View> = {}): View => ({
-  width: 80, rows: 64, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0, ...over,
+  width: 80,
+  rows: 64,
+  focused: false,
+  cursor: null,
+  expanded: [],
+  scroll: 0,
+  phase: 0,
+  ...over,
 })
 const lines = (m: HqModel, over: Partial<View> = {}) => layout(m, view(over)).rows.map(r => r.text())
 
@@ -20,13 +27,11 @@ function expectSheet(got: string[], want: string[]) {
 
 describe('the sheet, cell for cell', () => {
   test('(a) busy, unfocused, 80 cols', () => expectSheet(lines(BUSY), SHEET.a80))
-  test("(a') busy, focused, cursor on the flare", () =>
-    expectSheet(lines(BUSY, { focused: true, cursor: 'flare' }), SHEET.aFocusFlare))
+  test("(a') busy, focused, cursor on the flare", () => expectSheet(lines(BUSY, { focused: true, cursor: 'flare' }), SHEET.aFocusFlare))
   test('(b) quiet, unfocused', () => expectSheet(lines(QUIET), SHEET.b80))
   test("(b') quiet, focused, cursor on #433", () =>
     expectSheet(lines(QUIET, { focused: true, cursor: 'p:ritualpass/admin-web#433' }), SHEET.bFocus433))
-  test('(c) busy, focused, cursor on rp-admin', () =>
-    expectSheet(lines(BUSY, { focused: true, cursor: 's:s-rp-admin' }), SHEET.c80))
+  test('(c) busy, focused, cursor on rp-admin', () => expectSheet(lines(BUSY, { focused: true, cursor: 's:s-rp-admin' }), SHEET.c80))
   test('(e) 40 cols', () => expectSheet(lines(BUSY, { width: 40 }), SHEET.e40))
   test('(e) 88 cols', () => expectSheet(lines(BUSY, { width: 88 }), SHEET.e88))
   test('(f) long list', () => expectSheet(lines(LONG), SHEET.f80))
@@ -36,12 +41,20 @@ describe('the sheet, cell for cell', () => {
 })
 
 const MODELS = { BUSY, QUIET, LONG, EMPTY, ACTIVE }
-const DATA_TEXT = [...new Set(Object.values(MODELS).flatMap(m => [
-  ...m.current.agents.flatMap(a => [a.title, a.outcome ?? '', a.now ?? '']),
-  ...m.current.prs.map(p => p.title),
-  m.current.now?.prompt ?? '', m.current.now?.tool?.text ?? '',
-  ...(m.current.todos ?? []).map(t => t.text), ...(m.current.waiting ?? []).map(w => w.text),
-]))].filter(Boolean).sort((a, b) => b.length - a.length)
+const DATA_TEXT = [
+  ...new Set(
+    Object.values(MODELS).flatMap(m => [
+      ...m.current.agents.flatMap(a => [a.title, a.outcome ?? '', a.now ?? '']),
+      ...m.current.prs.map(p => p.title),
+      m.current.now?.prompt ?? '',
+      m.current.now?.tool?.text ?? '',
+      ...(m.current.todos ?? []).map(t => t.text),
+      ...(m.current.waiting ?? []).map(w => w.text),
+    ]),
+  ),
+]
+  .filter(Boolean)
+  .sort((a, b) => b.length - a.length)
 const GLYPHS = new Set([...'▌▶◆●◦○✓✗↑↓→·⏎⌃…─│╭╮╰╯▰▱◷━'])
 
 describe('every state, every width', () => {
@@ -95,7 +108,14 @@ describe('every state, every width', () => {
       const got = lines(BUSY, { width, rows: 90 })
       const tops = got.filter(l => l.startsWith(' ╭─ '))
       expect(tops.map(l => l.slice(4).split(' ')[0])).toEqual([
-        'this', 'ritualpass', 'bassemshaker', 'monolense', 'travel-map', 'rotamonster', 'finance', 'pull',
+        'this',
+        'ritualpass',
+        'bassemshaker',
+        'monolense',
+        'travel-map',
+        'rotamonster',
+        'finance',
+        'pull',
       ])
       for (const l of got.filter(t => /^ [╭│╰]/.test(t))) {
         expect(cellLen(l)).toBe(width - 1)
@@ -107,7 +127,8 @@ describe('every state, every width', () => {
 
 type Run = { col: number; t: string; tok: string }
 const runsOf = (r: Row): Run[] =>
-  r.segs()
+  r
+    .segs()
     .filter(s => s.t.trim() && s.t !== '│' && (s.s.c || s.s.bold || s.s.dim))
     .map(s => ({ col: s.col, t: s.t.trimEnd(), tok: [s.s.bold ? 'bold' : '', s.s.c ?? (s.s.dim ? 'dim' : '')].filter(Boolean).join('+') }))
 const BORDER = /^[╭╮╰╯│─]+$/
@@ -138,10 +159,14 @@ describe('colour', () => {
     const rows = layout(BUSY, view({ rows: 90 })).rows
     const row = (ref: string) => rows.find(r => r.text().includes(ref))!
     expect(runsOf(row('#212')).slice(-3)).toEqual([
-      { col: 62, t: '▰▰▰▰▰▰▰▰▰', tok: 'dim' }, { col: 71, t: '▰', tok: 'fail' }, { col: 73, t: '9/9', tok: 'fail' },
+      { col: 62, t: '▰▰▰▰▰▰▰▰▰', tok: 'dim' },
+      { col: 71, t: '▰', tok: 'fail' },
+      { col: 73, t: '9/9', tok: 'fail' },
     ])
     expect(runsOf(row('#214')).slice(-3)).toEqual([
-      { col: 62, t: '▰▰▰▰▰▰', tok: 'run' }, { col: 68, t: '▱▱▱▱', tok: 'dim' }, { col: 73, t: '5/9', tok: 'run' },
+      { col: 62, t: '▰▰▰▰▰▰', tok: 'run' },
+      { col: 68, t: '▱▱▱▱', tok: 'dim' },
+      { col: 73, t: '5/9', tok: 'run' },
     ])
     const facts = (ref: string) => rows[rows.indexOf(row(ref)) + 1]!
     expect(runsOf(facts('#212'))[0]).toEqual({ col: 10, t: '✗ rspec failed', tok: 'fail' })
@@ -170,10 +195,26 @@ describe('targets', () => {
   test('one Button per actionable row, each with its jump or expansion', () => {
     const l = layout(BUSY, view({ focused: true, rows: 120 }))
     expect(l.items).toEqual([
-      'flare', 'a:a5', 'a:a1', 'a:a2', 'a:a3', 'a:a4',
-      's:s-rp-api', 's:s-rp-admin', 's:s-rp-docs', 's:s-home', 's:s-mono-r', 's:s-travel', 's:s-rota', 's:s-rota-r', 's:s-fin',
-      'p:bshakr/monolense#212', 'p:bshakr/monolense#214',
-      'p:ritualpass/admin-web#431', 'p:ritualpass/admin-web#433', 'p:ritualpass/admin-web#429',
+      'flare',
+      'a:a5',
+      'a:a1',
+      'a:a2',
+      'a:a3',
+      'a:a4',
+      's:s-rp-api',
+      's:s-rp-admin',
+      's:s-rp-docs',
+      's:s-home',
+      's:s-mono-r',
+      's:s-travel',
+      's:s-rota',
+      's:s-rota-r',
+      's:s-fin',
+      'p:bshakr/monolense#212',
+      'p:bshakr/monolense#214',
+      'p:ritualpass/admin-web#431',
+      'p:ritualpass/admin-web#433',
+      'p:ritualpass/admin-web#429',
       'p:ritualpass/api#522',
     ])
     const buttons = l.rows.flatMap(r => r.buttons)
@@ -181,11 +222,19 @@ describe('targets', () => {
     for (const key of shown) expect(buttons.filter(b => b.key === key).length).toBe(1)
     expect(buttons.map(b => b.key).filter(k => !l.items.includes(k))).toEqual(['j', 'k'])
     expect(l.actions.flare).toEqual({ kind: 'jump', jump: { kind: 'tmux', target: 'ritualpass:@3.%6' } })
-    expect(l.actions['p:bshakr/monolense#212']).toEqual({ kind: 'jump', jump: { kind: 'url', url: 'https://github.com/bshakr/monolense/pull/212' } })
+    expect(l.actions['p:bshakr/monolense#212']).toEqual({
+      kind: 'jump',
+      jump: { kind: 'url', url: 'https://github.com/bshakr/monolense/pull/212' },
+    })
     expect(l.actions['s:s-rp-admin']).toEqual({ kind: 'jump', jump: { kind: 'tmux', target: 'ritualpass:@4.%13' } })
     expect(l.actions['a:a3']).toEqual({ kind: 'toggle', id: 'a3' })
     const all = layout(BUSY, view({ rows: 90 }))
-    const hrefs = all.rows.flatMap(r => r.segs().filter(s => s.s.href).map(s => `${s.t}=${s.s.href}`))
+    const hrefs = all.rows.flatMap(r =>
+      r
+        .segs()
+        .filter(s => s.s.href)
+        .map(s => `${s.t}=${s.s.href}`),
+    )
     expect(hrefs).toContain('#212=https://github.com/bshakr/monolense/pull/212')
     expect(hrefs.length).toBe(BUSY.current.prs.length)
   })
@@ -254,10 +303,12 @@ describe('scrolling and motion', () => {
       const a = layout(m, view({ phase: 0, rows: 90 })).rows
       const b = layout(m, view({ phase: 1, rows: 90 })).rows
       let n = 0
-      a.forEach((r, i) => r.cells.forEach((c, j) => {
-        const d = b[i]!.cells[j]!
-        if (c.ch !== d.ch || JSON.stringify(c.s) !== JSON.stringify(d.s)) n++
-      }))
+      a.forEach((r, i) =>
+        r.cells.forEach((c, j) => {
+          const d = b[i]!.cells[j]!
+          if (c.ch !== d.ch || JSON.stringify(c.s) !== JSON.stringify(d.s)) n++
+        }),
+      )
       return n
     }
     // a2's breath, #214's next check, rp-admin's breath.
@@ -302,7 +353,16 @@ describe('this session: one card for now, todos, waiting and agents', () => {
 
   test('idle after the turn: dim, reads idle, no tool line', () => {
     const quiet = ACTIVE.current.agents.filter(a => a.status !== 'running' && a.status !== 'waiting')
-    const m = { ...ACTIVE, current: { ...ACTIVE.current, agents: quiet, now: { prompt: 'Ship it', since: ACTIVE.now - 60_000, idle: true }, todos: undefined, waiting: undefined } }
+    const m = {
+      ...ACTIVE,
+      current: {
+        ...ACTIVE.current,
+        agents: quiet,
+        now: { prompt: 'Ship it', since: ACTIVE.now - 60_000, idle: true },
+        todos: undefined,
+        waiting: undefined,
+      },
+    }
     const rows = layout(m, view()).rows
     expect(rows[6]!.text()).toBe(' │  ○ idle · Ship it                                                      1m  │')
     expect(coloured([rows[6]!])).toEqual([])
@@ -314,10 +374,17 @@ describe('this session: one card for now, todos, waiting and agents', () => {
     expect(lines(EMPTY)[4]).toBe(' │  nothing running                                                           │')
   })
 
-  test('an agent inside one long call reads ◷ with what it waits on and the call\'s age', () => {
+  test("an agent inside one long call reads ◷ with what it waits on and the call's age", () => {
     const agent = (callAgo: number) => ({
-      id: 'lc', title: 'Watch CI', status: 'running' as const, background: true, startedAt: QUIET.now - 20 * 60_000,
-      toolCount: 4, files: [], now: 'Wait for CI on #275', callSince: QUIET.now - callAgo,
+      id: 'lc',
+      title: 'Watch CI',
+      status: 'running' as const,
+      background: true,
+      startedAt: QUIET.now - 20 * 60_000,
+      toolCount: 4,
+      files: [],
+      now: 'Wait for CI on #275',
+      callSince: QUIET.now - callAgo,
     })
     const draw = (callAgo: number) => lines({ ...QUIET, current: { ...QUIET.current, agents: [agent(callAgo)] } })
     const long = draw(7 * 60_000)
@@ -334,11 +401,19 @@ describe('this session: one card for now, todos, waiting and agents', () => {
       ...QUIET,
       current: {
         ...QUIET.current,
-        agents: [{
-          id: 'md', title: 'Scope PR ownership', status: 'completed', background: true, startedAt: QUIET.now - 60_000,
-          endedAt: QUIET.now - 30_000, toolCount: 3, files: [],
-          outcome: '**Brief and all four add-ons are done.** HQ now shows `todos`.',
-        }],
+        agents: [
+          {
+            id: 'md',
+            title: 'Scope PR ownership',
+            status: 'completed',
+            background: true,
+            startedAt: QUIET.now - 60_000,
+            endedAt: QUIET.now - 30_000,
+            toolCount: 3,
+            files: [],
+            outcome: '**Brief and all four add-ons are done.** HQ now shows `todos`.',
+          },
+        ],
       },
     }
     const row = lines(m).find(l => l.includes('Scope PR ownership'))!
@@ -371,11 +446,19 @@ describe('other sessions: one card per tmux group', () => {
     ])
   })
 
-  test('another session\'s agent inside a long call reads ◷ waiting', () => {
-    const other = lines({
-      ...ACTIVE,
-      others: ACTIVE.others.map(g => ({ ...g, sessions: g.sessions.map(x => x.agents ? { ...x, agents: [{ ...x.agents[0]!, waiting: { text: 'Run the spec suite', since: ACTIVE.now - 9 * 60_000 } }] } : x) })),
-    }, { rows: 90 })
+  test("another session's agent inside a long call reads ◷ waiting", () => {
+    const other = lines(
+      {
+        ...ACTIVE,
+        others: ACTIVE.others.map(g => ({
+          ...g,
+          sessions: g.sessions.map(x =>
+            x.agents ? { ...x, agents: [{ ...x.agents[0]!, waiting: { text: 'Run the spec suite', since: ACTIVE.now - 9 * 60_000 } }] } : x,
+          ),
+        })),
+      },
+      { rows: 90 },
+    )
     const at = other.findIndex(l => l.includes('◷ Implement BLO-1941'))
     expect(other[at + 1]!.startsWith(' │    waiting · Run the spec suite · 9m')).toBe(true)
   })
@@ -383,8 +466,15 @@ describe('other sessions: one card per tmux group', () => {
 
 describe('this session: finished agents, the waiting now line, the goal line', () => {
   const fin = (id: string, minsAgo: number): AgentVM => ({
-    id, title: `Finished ${id}`, status: 'completed', background: true, startedAt: BUSY.now - 20 * 60_000,
-    endedAt: BUSY.now - minsAgo * 60_000, toolCount: 3, files: [], outcome: `outcome ${id}`,
+    id,
+    title: `Finished ${id}`,
+    status: 'completed',
+    background: true,
+    startedAt: BUSY.now - 20 * 60_000,
+    endedAt: BUSY.now - minsAgo * 60_000,
+    toolCount: 3,
+    files: [],
+    outcome: `outcome ${id}`,
   })
   const FIN: HqModel = { ...BUSY, current: { ...BUSY.current, agents: [...BUSY.current.agents, fin('f1', 1), fin('f2', 7), fin('f3', 9)] } }
 
@@ -413,7 +503,14 @@ describe('this session: finished agents, the waiting now line, the goal line', (
     const got = lines(m)
     expect(got[6]).toBe(' │  ◷ waiting on 1 agent                                             14m 20s  │')
     expect(got.some(l => l.includes('idle ·'))).toBe(false)
-    const waitsOnly = { ...QUIET, current: { ...QUIET.current, now: { since: QUIET.now, idle: true }, waiting: [{ text: 'pr-ci-wait 276', since: QUIET.now - 3 * 60_000 }] } }
+    const waitsOnly = {
+      ...QUIET,
+      current: {
+        ...QUIET.current,
+        now: { since: QUIET.now, idle: true },
+        waiting: [{ text: 'pr-ci-wait 276', since: QUIET.now - 3 * 60_000 }],
+      },
+    }
     expect(lines(waitsOnly)[4]!.includes('◷ waiting on 1 background task')).toBe(true)
   })
 
@@ -429,7 +526,12 @@ describe('this session: finished agents, the waiting now line, the goal line', (
   test('with a goal the card takes the repo name, the goal line carries day, status and meter, the step sits under it', () => {
     const m: HqModel = {
       ...ACTIVE,
-      current: { ...ACTIVE.current, title: 'claude-hq', goal: { text: 'Ship the HQ layout fixes', day: 3, step: 'Rewriting the agent rows' }, context: { percent: 36, window: 1_000_000, source: 'live' } },
+      current: {
+        ...ACTIVE.current,
+        title: 'claude-hq',
+        goal: { text: 'Ship the HQ layout fixes', day: 3, step: 'Rewriting the agent rows' },
+        context: { percent: 36, window: 1_000_000, source: 'live' },
+      },
     }
     const got = lines(m)
     expect(got[4]!.startsWith(' ╭─ claude-hq ─')).toBe(true)
@@ -446,13 +548,15 @@ describe('this session: finished agents, the waiting now line, the goal line', (
       const a = layout(m, view({ phase: 0, rows: 90 })).rows
       const b = layout(m, view({ phase: 1, rows: 90 })).rows
       let stepped = 0
-      a.forEach((r, i) => r.cells.forEach((c, j) => {
-        const d = b[i]!.cells[j]!
-        if (c.ch === '●' || d.ch === '●') {
-          expect(d.ch).toBe(c.ch)
-          if (c.s.c === 'run' && !c.s.dim && d.s.c === 'run' && d.s.dim) stepped++
-        }
-      }))
+      a.forEach((r, i) =>
+        r.cells.forEach((c, j) => {
+          const d = b[i]!.cells[j]!
+          if (c.ch === '●' || d.ch === '●') {
+            expect(d.ch).toBe(c.ch)
+            if (c.s.c === 'run' && !c.s.dim && d.s.c === 'run' && d.s.dim) stepped++
+          }
+        }),
+      )
       expect(stepped).toBeGreaterThan(0)
       expect(b.some(r => r.text().includes('◦ Run') || r.text().includes('◦ busy'))).toBe(false)
     }

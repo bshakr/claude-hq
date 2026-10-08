@@ -8,20 +8,66 @@ import { emptyActivity, notificationsOf, onPrompt, onTurnEnd, todosOf, nowOf } f
 import type { ActivityState } from './activity'
 import { repoOfRemote } from './claims'
 import {
-  CHUNK_BYTES, GOAL_MODEL, HEAD_BYTES, PR_REFRESH_MS, TAIL_BYTES as DIGEST_TAIL_BYTES, dayOf, emptyDigest, goalDue, goalText, ingest, ingestLines,
-  parsePrStates, prKey as prStateKey, prStateQuery, prText, prsToLook, refreshGoal, todoProgress,
+  CHUNK_BYTES,
+  GOAL_MODEL,
+  HEAD_BYTES,
+  PR_REFRESH_MS,
+  TAIL_BYTES as DIGEST_TAIL_BYTES,
+  dayOf,
+  emptyDigest,
+  goalDue,
+  goalText,
+  ingest,
+  ingestLines,
+  parsePrStates,
+  prKey as prStateKey,
+  prStateQuery,
+  prText,
+  prsToLook,
+  refreshGoal,
+  todoProgress,
 } from './context'
 import type { Digest, GoalCache, PrState } from './context'
 import {
-  PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, pairsOf, parsePsPids, parsePublished, parseRegistryRow, selfTmux, splitTmux, transcriptPath,
+  PUBLISH_FRESH_MS,
+  buildFleet,
+  findSelf,
+  isOtherRow,
+  pairsOf,
+  parsePsPids,
+  parsePublished,
+  parseRegistryRow,
+  selfTmux,
+  splitTmux,
+  transcriptPath,
 } from './fleet'
 import type { RegistryRow, SessionContext, SessionTopic } from './fleet'
 import {
-  ADR_LOOKUPS_PER_TICK, GLOSS_MODEL, TICKET_LOOKUPS_PER_TICK, briefBatch, briefDue, findIds, glossOf, lookUpAdr, lookUpTicket, lookupDue as idLookupDue,
+  ADR_LOOKUPS_PER_TICK,
+  GLOSS_MODEL,
+  TICKET_LOOKUPS_PER_TICK,
+  briefBatch,
+  briefDue,
+  findIds,
+  glossOf,
+  lookUpAdr,
+  lookUpTicket,
+  lookupDue as idLookupDue,
 } from './ids'
 import type { GlossEntry, IdRef } from './ids'
 import { doingLine, prSummary } from './model'
-import { OPEN_CALL_CAP_MS, OTHER_AGENTS_MAX, TAIL_BYTES, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from './subagents'
+import {
+  OPEN_CALL_CAP_MS,
+  OTHER_AGENTS_MAX,
+  TAIL_BYTES,
+  freshTranscripts,
+  isRunning,
+  longCall,
+  otherAgents,
+  parseMeta,
+  parseTail,
+  subagentsDir,
+} from './subagents'
 import type { AgentMeta, AgentTail, ListedFile, RunningAgent } from './subagents'
 import { accountOf, live, preferred, settingsModel } from './usage'
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe'
@@ -46,7 +92,8 @@ export function lookupDue(b: Pick<BranchClaim, 'lookedAt' | 'misses'>, now: numb
 /** A branch claim that never got a PR is dropped after this. */
 export const BRANCH_KEEP_MS = 24 * 60 * 60_000
 /** Lines a sparse scan of a large transcript keeps: titles, PR links, compactions, task-list calls. */
-export const SPARSE_RE = '"type":"(ai-title|custom-title|pr-link)"|"isCompactSummary":true|"name":"(TaskCreate|TaskUpdate|TodoWrite)"|"toolUseResult":\\{"task"'
+export const SPARSE_RE =
+  '"type":"(ai-title|custom-title|pr-link)"|"isCompactSummary":true|"name":"(TaskCreate|TaskUpdate|TodoWrite)"|"toolUseResult":\\{"task"'
 const DEFAULT_BRANCHES = new Set(['main', 'master'])
 /** Ids per session looked up from its transcript (for the goal input) and from its shown lines. */
 export const DIGEST_IDS_MAX = 6
@@ -62,7 +109,6 @@ const activityAtom = atom({ plugin: 'hq', key: 'activity' } as const, emptyActiv
 export function currentModel(): HqModel {
   return S.model
 }
-
 
 export function installData(on: On, onChange: () => void): void {
   S.onChange = onChange
@@ -87,7 +133,9 @@ export function installData(on: On, onChange: () => void): void {
         onSpawn(
           S.agents,
           {
-            toolUseId: e.tool_use_id, description: e.description, background: e.background,
+            toolUseId: e.tool_use_id,
+            description: e.description,
+            background: e.background,
             ...(e.model ? { model: e.model } : {}),
             ...(e.parentAgentId ? { parentAgentId: e.parentAgentId } : {}),
             ...(e.cwd ? { cwd: e.cwd } : {}),
@@ -185,7 +233,8 @@ async function start($: EngineInterface): Promise<void> {
   const restore = (o: OwnedState | undefined) => {
     if (!o || !Array.isArray(o.claims) || !Array.isArray(o.branches)) return false
     for (const c of o.claims) if (c && typeof c.repo === 'string' && typeof c.number === 'number') S.claims[claimKey(c.repo, c.number)] = c
-    for (const b of o.branches) if (b && typeof b.repo === 'string' && typeof b.branch === 'string') S.branches[branchKey(b.repo, b.branch)] = b
+    for (const b of o.branches)
+      if (b && typeof b.repo === 'string' && typeof b.branch === 'string') S.branches[branchKey(b.repo, b.branch)] = b
     return o.claims.length + o.branches.length > 0
   }
   if (!restore(await read($, ownedAtom))) restore((await $.store.get(storeKey('owned'))) as OwnedState | undefined)
@@ -251,7 +300,7 @@ async function start($: EngineInterface): Promise<void> {
   const repoForDir = async (dir: string): Promise<string | undefined> => {
     if (!repoCache.has(dir)) {
       const r = await run(['git', 'remote', 'get-url', 'origin'], dir)
-      repoCache.set(dir, r && r.exitCode === 0 ? repoOfRemote(r.stdout) ?? null : null)
+      repoCache.set(dir, r && r.exitCode === 0 ? (repoOfRemote(r.stdout) ?? null) : null)
     }
     return repoCache.get(dir) ?? undefined
   }
@@ -336,7 +385,21 @@ async function start($: EngineInterface): Promise<void> {
       if (!lookupDue(b, S.now)) continue
       b.lookedAt = S.now
       S.dirty = true
-      const r = await run(['gh', 'pr', 'list', '-R', b.repo, '--head', b.branch, '--state', 'open', '--json', 'number,title,url,state', '--limit', '1'])
+      const r = await run([
+        'gh',
+        'pr',
+        'list',
+        '-R',
+        b.repo,
+        '--head',
+        b.branch,
+        '--state',
+        'open',
+        '--json',
+        'number,title,url,state',
+        '--limit',
+        '1',
+      ])
       if (!r || r.exitCode !== 0) continue
       try {
         const [hit] = JSON.parse(r.stdout) as { number?: number; title?: string; url?: string; state?: string }[]
@@ -432,7 +495,8 @@ async function start($: EngineInterface): Promise<void> {
       const sparse = await run(['grep', '-E', SPARSE_RE, path])
       if (sparse && sparse.exitCode === 0) ingestLines(d, sparse.stdout)
       const br = await run(['grep', '-o', '-E', '"gitBranch":"[^"]*"', path])
-      if (br && br.exitCode === 0) ingestLines(d, [...new Set(br.stdout.split('\n').filter(Boolean))].map(l => `{"type":"user","isMeta":true,${l}}`).join('\n'))
+      if (br && br.exitCode === 0)
+        ingestLines(d, [...new Set(br.stdout.split('\n').filter(Boolean))].map(l => `{"type":"user","isMeta":true,${l}}`).join('\n'))
       const tail = await run(['tail', '-c', String(DIGEST_TAIL_BYTES), path])
       // A question seen in the head may have its answer in the unread middle.
       delete d.ask
@@ -588,7 +652,14 @@ async function start($: EngineInterface): Promise<void> {
     if (due.size === 0) return
     briefInflight = true
     void briefBatch(due, S.now, req =>
-      $.model.complete({ model: GLOSS_MODEL, system: req.system, prompt: req.prompt, maxTokens: req.maxTokens, effort: 'low', timeoutMs: 30_000 }),
+      $.model.complete({
+        model: GLOSS_MODEL,
+        system: req.system,
+        prompt: req.prompt,
+        maxTokens: req.maxTokens,
+        effort: 'low',
+        timeoutMs: 30_000,
+      }),
     )
       .then(async got => {
         for (const [key, e] of got) {
@@ -606,14 +677,23 @@ async function start($: EngineInterface): Promise<void> {
   }
 
   /** The summary lines of one session's card. */
-  const contextOf = async (sid: string, cwd: string, busy: boolean, pub: PublishedSession | undefined): Promise<{ ctx: SessionContext; topic: SessionTopic }> => {
+  const contextOf = async (
+    sid: string,
+    cwd: string,
+    busy: boolean,
+    pub: PublishedSession | undefined,
+  ): Promise<{ ctx: SessionContext; topic: SessionTopic }> => {
     const d = await digestOf(sid, cwd)
     const fresh = pub && S.now - pub.updatedAt < PUBLISH_FRESH_MS ? pub : undefined
     if (!d) return { ctx: fresh?.context ? { context: fresh.context } : {}, topic: {} }
     await lookUpPrStates(d)
     const context = preferred(fresh, d.usage, await settingModelFor(cwd))
     const prTitles = d.prs.flatMap(p => prStates.get(prStateKey(p.repo, p.number))?.title ?? [])
-    const ids = await idsOf(cwd, [d.firstPrompt ?? '', ...d.titles, ...d.prompts.slice(-5).map(p => p.text), ...prTitles, ...d.branches], DIGEST_IDS_MAX)
+    const ids = await idsOf(
+      cwd,
+      [d.firstPrompt ?? '', ...d.titles, ...d.prompts.slice(-5).map(p => p.text), ...prTitles, ...d.branches],
+      DIGEST_IDS_MAX,
+    )
     const cache = summaries && fresh?.goal?.goal ? fresh.goal : await maybeGoal(sid, d, busy, ids)
     const day = dayOf(d.firstTs, S.now)
     const prs = prText(d.prs, statesOf(d))
@@ -745,12 +825,11 @@ async function start($: EngineInterface): Promise<void> {
       }
     }
     const previousPrs = S.prs
-    S.prs = Object.entries(S.claims).map(([key, claim]) =>
-      prFromSources(claim, files.get(key) ?? {}, pid => alive.has(pid)),
-    )
+    S.prs = Object.entries(S.claims).map(([key, claim]) => prFromSources(claim, files.get(key) ?? {}, pid => alive.has(pid)))
     const news = newsOf(previousPrs, S.prs)
     for (const text of news.toasts) $.ui.toast(text, { timeoutMs: 8000 })
-    if (news.prompt !== null && effective(await $.store.get(WAKE_KEY), config().wake)) $.prompt.submit({ text: news.prompt }).catch(() => undefined)
+    if (news.prompt !== null && effective(await $.store.get(WAKE_KEY), config().wake))
+      $.prompt.submit({ text: news.prompt }).catch(() => undefined)
 
     const branches = new Map<string, string | undefined>()
     const published = new Map<string, PublishedSession>()
@@ -771,10 +850,17 @@ async function start($: EngineInterface): Promise<void> {
       const c = await contextOf(row.sessionId, row.cwd, row.status === 'busy', pub)
       topicMap.set(row.sessionId, c.topic)
       const shownAgents = (pubFresh && Array.isArray(pub.agents) ? pub.agents : agentMap.get(row.sessionId)) ?? []
-      const seen = await idsOf(row.cwd, [
-        c.ctx.goal ?? c.topic.title ?? c.topic.firstPrompt ?? row.name ?? '', c.ctx.step ?? '', pub?.doing ?? '', c.ctx.todos?.active ?? '',
-        ...shownAgents.flatMap(a => [a.title, a.waiting?.text ?? a.doing ?? '']),
-      ], VISIBLE_IDS_MAX)
+      const seen = await idsOf(
+        row.cwd,
+        [
+          c.ctx.goal ?? c.topic.title ?? c.topic.firstPrompt ?? row.name ?? '',
+          c.ctx.step ?? '',
+          pub?.doing ?? '',
+          c.ctx.todos?.active ?? '',
+          ...shownAgents.flatMap(a => [a.title, a.waiting?.text ?? a.doing ?? '']),
+        ],
+        VISIBLE_IDS_MAX,
+      )
       ctxMap.set(row.sessionId, { ...c.ctx, glosses: seen.glosses })
       const wait = otherWait(pubFresh ? pub : undefined, digests.get(row.sessionId)?.d, row.status, row.statusUpdatedAt)
       if (wait) waits.set(row.sessionId, wait)
@@ -813,7 +899,11 @@ async function start($: EngineInterface): Promise<void> {
       S.dirty = true
     }
     const ownGoal = own.ctx.goal ?? own.topic.title ?? own.topic.firstPrompt
-    const ownIds = await idsOf(sessionCwd, [ownGoal ?? '', ...S.model.current.agents.flatMap(a => [a.title, a.todo?.text ?? a.now ?? ''])], VISIBLE_IDS_MAX)
+    const ownIds = await idsOf(
+      sessionCwd,
+      [ownGoal ?? '', ...S.model.current.agents.flatMap(a => [a.title, a.todo?.text ?? a.now ?? ''])],
+      VISIBLE_IDS_MAX,
+    )
     if (JSON.stringify(ownIds.glosses) !== JSON.stringify(S.glosses)) {
       S.glosses = ownIds.glosses
       S.dirty = true
@@ -862,15 +952,19 @@ async function start($: EngineInterface): Promise<void> {
             const doing = a.todo?.text ?? a.now
             const waiting = longCall(a, S.now)
             return {
-              id: a.id, title: a.title, startedAt: a.startedAt,
-              ...(a.model ? { model: a.model } : {}), ...(doing ? { doing } : {}), ...(waiting ? { waiting } : {}),
+              id: a.id,
+              title: a.title,
+              startedAt: a.startedAt,
+              ...(a.model ? { model: a.model } : {}),
+              ...(doing ? { doing } : {}),
+              ...(waiting ? { waiting } : {}),
             }
           }),
         owned: Object.values(S.claims).map(c => ({ repo: c.repo, number: c.number })),
         ...(doing ? { doing } : {}),
-        ...((t => (t ? { todos: t } : {}))(todoProgress(todosOf(S.activity).map((x, i) => ({ id: String(i), ...x }))))),
-        ...((g => (g?.goal ? { goal: { goal: g.goal, ...(g.step ? { step: g.step } : {}), at: g.at } } : {}))(goals.get(S.sessionId))),
-        ...((w => (w ? { waiting: w } : {}))(ownWait(S.activity))),
+        ...(t => (t ? { todos: t } : {}))(todoProgress(todosOf(S.activity).map((x, i) => ({ id: String(i), ...x })))),
+        ...(g => (g?.goal ? { goal: { goal: g.goal, ...(g.step ? { step: g.step } : {}), at: g.at } } : {}))(goals.get(S.sessionId)),
+        ...(w => (w ? { waiting: w } : {}))(ownWait(S.activity)),
         ...(S.context?.source === 'live' ? { context: S.context } : {}),
         // Only its own reading, so a relayed figure never outlives its source.
         ...(ownAccount ? { account: ownAccount } : {}),

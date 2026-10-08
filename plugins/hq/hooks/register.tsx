@@ -185,7 +185,8 @@ export const register: Register = (on, options) => {
       return { text: 'hq pane closed.' }
     }
     const notify = parseNotifyArg(args)
-    if (notify === 'show') return { text: `hq notifications are ${effective(await $.store.get(NOTIFY_STORE_KEY), config().notify) ? 'on' : 'off'}.` }
+    if (notify === 'show')
+      return { text: `hq notifications are ${effective(await $.store.get(NOTIFY_STORE_KEY), config().notify) ? 'on' : 'off'}.` }
     if (notify !== undefined) {
       await $.store.set(NOTIFY_STORE_KEY, notify)
       return { text: `hq notifications ${notify ? 'on' : 'off'}.` }
@@ -193,7 +194,8 @@ export const register: Register = (on, options) => {
     if (args === 'help') return { text: HELP }
     const summaries = /^summaries(?:\s+(on|off))?$/.exec(args)
     if (summaries) {
-      if (summaries[1] === undefined) return { text: `hq summaries are ${effective(await $.store.get(SUMMARIES_KEY), config().summaries) ? 'on' : 'off'}.` }
+      if (summaries[1] === undefined)
+        return { text: `hq summaries are ${effective(await $.store.get(SUMMARIES_KEY), config().summaries) ? 'on' : 'off'}.` }
       await $.store.set(SUMMARIES_KEY, summaries[1] === 'on')
       return { text: `hq summaries ${summaries[1]}.` }
     }

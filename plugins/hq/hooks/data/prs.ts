@@ -25,9 +25,7 @@ export interface PrFiles {
 const PASSED = new Set(['SUCCESS', 'NEUTRAL', 'PASS'])
 const SKIPPED = new Set(['SKIPPED', 'SKIPPING'])
 // ACTION_REQUIRED and STARTUP_FAILURE never turn green on their own either.
-const FAILED = new Set([
-  'FAILURE', 'FAIL', 'ERROR', 'CANCELLED', 'CANCEL', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE',
-])
+const FAILED = new Set(['FAILURE', 'FAIL', 'ERROR', 'CANCELLED', 'CANCEL', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE'])
 const DONE = new Set(['COMPLETED'])
 
 type Outcome = 'pending' | 'passed' | 'skipped' | 'failed'
@@ -106,11 +104,17 @@ export function prFromSources(claim: StoredClaim, files: PrFiles, isAlive: (pid:
   const url = latest?.url ?? claim.url ?? `https://github.com/${claim.repo}/pull/${claim.number}`
   const title = latest?.title ?? claim.title ?? ''
   if (!latest) {
-    const merge: MergeState =
-      claim.ghState === 'MERGED' ? 'merged' : claim.ghState === 'CLOSED' ? 'closed' : 'unknown'
+    const merge: MergeState = claim.ghState === 'MERGED' ? 'merged' : claim.ghState === 'CLOSED' ? 'closed' : 'unknown'
     return {
-      repo: claim.repo, number: claim.number, title, url, ci: { kind: 'none' }, merge,
-      gallery: 'unknown', watcher: 'none', claimedBy: claim.claimedBy,
+      repo: claim.repo,
+      number: claim.number,
+      title,
+      url,
+      ci: { kind: 'none' },
+      merge,
+      gallery: 'unknown',
+      watcher: 'none',
+      claimedBy: claim.claimedBy,
       ...(merge === 'merged' && claim.endedAt !== undefined ? { mergedAt: claim.endedAt } : {}),
     }
   }
@@ -124,14 +128,27 @@ export function prFromSources(claim: StoredClaim, files: PrFiles, isAlive: (pid:
   const live = (f: PrWatchState | undefined) => f !== undefined && !f.exited && isAlive(f.pid)
   const watcher: Watcher =
     live(files.ci) && live(files.merge)
-      ? SETTLED.has(ci.kind) ? 'merge-wait' : 'ci-wait'
-      : live(files.ci) ? 'ci-wait' : live(files.merge) ? 'merge-wait' : 'none'
+      ? SETTLED.has(ci.kind)
+        ? 'merge-wait'
+        : 'ci-wait'
+      : live(files.ci)
+        ? 'ci-wait'
+        : live(files.merge)
+          ? 'merge-wait'
+          : 'none'
   const polledAt = Math.max(...[files.ci, files.merge].map(f => (f ? Date.parse(f.updatedAt) : NaN)).filter(Number.isFinite))
   const body = latest.body ?? files.ci?.body ?? files.merge?.body
   const stale = files.ci?.stale === true || files.merge?.stale === true
   return {
-    repo: claim.repo, number: claim.number, title, url, ci, merge,
-    gallery: deriveGallery(body), watcher, claimedBy: claim.claimedBy,
+    repo: claim.repo,
+    number: claim.number,
+    title,
+    url,
+    ci,
+    merge,
+    gallery: deriveGallery(body),
+    watcher,
+    claimedBy: claim.claimedBy,
     ...(Number.isFinite(polledAt) ? { polledAt } : {}),
     ...(merge === 'merged' && claim.endedAt !== undefined ? { mergedAt: claim.endedAt } : {}),
     ...(stale ? { stale: true } : {}),

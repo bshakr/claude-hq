@@ -1,6 +1,18 @@
 import { summaryLine } from '../model/plain'
 import { LONG_CALL_MS } from '../model/types'
-import type { AgentVM, CiState, HqModel, NowVM, OtherAgentVM, OtherSessionVM, PrVM, TmuxGroupVM, TodoVM, WaitVM, WaitingVM } from '../model/types'
+import type {
+  AgentVM,
+  CiState,
+  HqModel,
+  NowVM,
+  OtherAgentVM,
+  OtherSessionVM,
+  PrVM,
+  TmuxGroupVM,
+  TodoVM,
+  WaitVM,
+  WaitingVM,
+} from '../model/types'
 import { resumeOnly } from './focus'
 import { Row } from './row'
 import type { Action, Sty, Tok } from './row'
@@ -149,11 +161,7 @@ type Node = { a: AgentVM; kids: Node[] }
 const rank = (a: AgentVM) => (a.status === 'failed' ? 0 : LIVE.has(a.status) ? 1 : 2)
 
 function sortNodes(nodes: Node[]) {
-  nodes.sort(
-    (x, y) =>
-      rank(x.a) - rank(y.a) ||
-      (rank(x.a) === 2 ? (y.a.endedAt ?? 0) - (x.a.endedAt ?? 0) : x.a.startedAt - y.a.startedAt),
-  )
+  nodes.sort((x, y) => rank(x.a) - rank(y.a) || (rank(x.a) === 2 ? (y.a.endedAt ?? 0) - (x.a.endedAt ?? 0) : x.a.startedAt - y.a.startedAt))
   for (const n of nodes) sortNodes(n.kids)
 }
 
@@ -335,11 +343,19 @@ function waitingOn(agents: readonly AgentVM[], waits: readonly WaitingVM[]): { t
   const live = agents.filter(a => LIVE.has(a.status) && !(a.parentId !== undefined && ids.has(a.parentId)))
   if (!live.length && !waits.length) return undefined
   const what = [live.length ? plural(live.length, 'agent') : '', waits.length ? plural(waits.length, 'background task') : '']
-  return { text: `waiting on ${what.filter(Boolean).join(' · ')}`, since: Math.min(...live.map(a => a.startedAt), ...waits.map(w => w.since)) }
+  return {
+    text: `waiting on ${what.filter(Boolean).join(' · ')}`,
+    since: Math.min(...live.map(a => a.startedAt), ...waits.map(w => w.since)),
+  }
 }
 
 /** The now line; `meter` rides on its right when the card has no goal line to carry it. */
-function nowRows(n: NowVM | undefined, x: Ctx, meter: { full: Part[]; pct: Part[] }, on: { text: string; since: number } | undefined): Row[] {
+function nowRows(
+  n: NowVM | undefined,
+  x: Ctx,
+  meter: { full: Part[]; pct: Part[] },
+  on: { text: string; since: number } | undefined,
+): Row[] {
   const { IW, now } = x
   const r = new Row(IW)
   const idle = !n || n.idle
@@ -415,8 +431,16 @@ function sessionCard(m: HqModel, x0: Ctx): Row[] {
     const day: Part[] = cur.goal.day ? [{ t: `day ${cur.goal.day} · `, s: DIM }] : []
     const busy = cur.now !== undefined && !cur.now.idle
     const status: Part[] = busy
-      ? [{ t: '●', s: runDot(x.phase) }, { t: ' busy', s: DIM }]
-      : on ? [{ t: '◷', s: tok('run') }, { t: ' waiting', s: DIM }] : [{ t: 'idle', s: DIM }]
+      ? [
+          { t: '●', s: runDot(x.phase) },
+          { t: ' busy', s: DIM },
+        ]
+      : on
+        ? [
+            { t: '◷', s: tok('run') },
+            { t: ' waiting', s: DIM },
+          ]
+        : [{ t: 'idle', s: DIM }]
     const room = fitRight(g, [[...day, ...status, ...meter.full], [...day, ...status, ...meter.pct], [...status, ...meter.pct], status])
     g.put(0, clip(expandIds(cur.goal.text, x.g), room), { bold: true })
     inner.push(g)
@@ -497,9 +521,15 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
   const since = s.statusSince !== undefined ? ` ${age(now - s.statusSince)}` : ''
   const status: Part[] =
     s.status === 'waiting'
-      ? [{ t: '◆', s: tok('wait') }, { t: ` waiting${since}`, s: tok('wait') }]
+      ? [
+          { t: '◆', s: tok('wait') },
+          { t: ` waiting${since}`, s: tok('wait') },
+        ]
       : s.status === 'busy'
-        ? [{ t: '●', s: runDot(x.phase) }, { t: ` busy${since}`, s: DIM }]
+        ? [
+            { t: '●', s: runDot(x.phase) },
+            { t: ` busy${since}`, s: DIM },
+          ]
         : [{ t: `${s.wait?.kind === 'turn' ? 'your turn' : 'idle'}${since}`, s: DIM }]
   if (s.day) status.unshift({ t: `day ${s.day} · `, s: DIM })
   const ps = s.prSummary
@@ -509,10 +539,12 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
   if (ps && ps.total > 0) {
     if (ps.broken) prs.push({ t: `✗ ${plural(ps.broken, 'PR')} red`, s: tok('fail') })
     else if (ps.waiting) {
-      const t = ps.waiting === ps.total ? `${plural(ps.total, 'PR')} need${ps.total === 1 ? 's' : ''} you` : `${ps.waiting} of ${ps.total} PRs need you`
+      const t =
+        ps.waiting === ps.total
+          ? `${plural(ps.total, 'PR')} need${ps.total === 1 ? 's' : ''} you`
+          : `${ps.waiting} of ${ps.total} PRs need you`
       prs.push({ t, s: tok('wait') })
-    }
-    else prs.push({ t: plural(ps.total, 'PR'), s: DIM })
+    } else prs.push({ t: plural(ps.total, 'PR'), s: DIM })
     prs.push({ t: ' · ', s: DIM })
   }
   const width = (ps2: Part[]) => ps2.reduce((n, p) => n + cellLen(p.t), 0)
@@ -520,8 +552,10 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
   const keep = Math.min(cellLen(name), 12)
   // Narrowing drops the meter's cells, then the PR facts, then its percent, then the status.
   const meter = meterParts(s.context)
-  const right = [[...prs, ...status, ...meter.full], [...prs, ...status, ...meter.pct], [...status, ...meter.pct], status]
-    .find(p => IW - width(p) - 2 >= keep) ?? []
+  const right =
+    [[...prs, ...status, ...meter.full], [...prs, ...status, ...meter.pct], [...status, ...meter.pct], status].find(
+      p => IW - width(p) - 2 >= keep,
+    ) ?? []
   let col = IW - width(right)
   for (const p of right) col = r.put(col, p.t, p.s)
   const room = right.length ? IW - width(right) - 2 : IW
@@ -603,7 +637,10 @@ export function groupPrs(prs: readonly PrVM[]): { repo: string; prs: PrVM[] }[] 
   return [...groups.entries()]
     .map(([repo, list], i) => ({
       repo,
-      prs: list.map((p, j) => ({ p, j })).sort((a, b) => SEV[prKind(a.p)] - SEV[prKind(b.p)] || a.j - b.j).map(o => o.p),
+      prs: list
+        .map((p, j) => ({ p, j }))
+        .sort((a, b) => SEV[prKind(a.p)] - SEV[prKind(b.p)] || a.j - b.j)
+        .map(o => o.p),
       i,
     }))
     .sort((a, b) => worstOf(a.prs) - worstOf(b.prs) || a.i - b.i)
@@ -694,7 +731,12 @@ function prRows(p: PrVM, tcol: number, x: Ctx): Row[] {
   const ref = `#${p.number}`
   if (k === 'gone') {
     r.put(0, ref, { dim: true, href: p.url })
-    const room = rightPart(r, tcol, p.merge === 'closed' ? 'closed' : p.mergedAt !== undefined ? `merged ${age(now - p.mergedAt)} ago` : 'merged', 8)
+    const room = rightPart(
+      r,
+      tcol,
+      p.merge === 'closed' ? 'closed' : p.mergedAt !== undefined ? `merged ${age(now - p.mergedAt)} ago` : 'merged',
+      8,
+    )
     r.button(tcol, clip(p.title, room), { key, action: x.actions[key]!, dim: true }, DIM)
     return [r]
   }

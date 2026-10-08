@@ -1,5 +1,6 @@
 // Terminal cell width: wide East Asian and emoji count 2 (an over-estimate is safe: lines only get shorter).
-const WIDE = /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\u8C48-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]|[\u{1F000}-\u{1FAFF}\u{20000}-\u{3FFFD}]/u
+const WIDE =
+  /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\u8C48-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]|[\u{1F000}-\u{1FAFF}\u{20000}-\u{3FFFD}]/u
 // eslint-disable-next-line no-misleading-character-class -- ranges of combining marks, matched one code point at a time
 const ZERO = /[\u200B-\u200F\u0300-\u036F\uFE00-\uFE0F]/u
 

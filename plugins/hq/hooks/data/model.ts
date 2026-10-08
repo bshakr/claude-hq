@@ -1,4 +1,17 @@
-import type { AccountUsage, AgentVM, ContextUsage, Counts, HqModel, NowVM, OtherSessionVM, PrVM, PublishedSession, TmuxGroupVM, TodoVM, WaitingVM } from '../model/types'
+import type {
+  AccountUsage,
+  AgentVM,
+  ContextUsage,
+  Counts,
+  HqModel,
+  NowVM,
+  OtherSessionVM,
+  PrVM,
+  PublishedSession,
+  TmuxGroupVM,
+  TodoVM,
+  WaitingVM,
+} from '../model/types'
 import { isLive } from './agents'
 import { pickFlare } from './fleet'
 import { prTone } from './prs'
@@ -54,9 +67,7 @@ export function countsOf(inputs: Pick<ModelInputs, 'agents' | 'prs' | 'others'>)
   return {
     waiting: others.filter(s => s.status === 'waiting').length + pr.waiting,
     broken:
-      inputs.agents.filter(a => a.status === 'failed').length +
-      pr.broken +
-      others.reduce((n, s) => n + (s.prSummary?.broken ?? 0), 0),
+      inputs.agents.filter(a => a.status === 'failed').length + pr.broken + others.reduce((n, s) => n + (s.prSummary?.broken ?? 0), 0),
     inProgress: inputs.agents.filter(isLive).length + pr.inProgress,
     sessions: others.length + 1,
   }
@@ -124,7 +135,14 @@ export function buildModel(inputs: ModelInputs): HqModel {
     },
     others: inputs.others,
     ...(inputs.account ? { account: inputs.account } : {}),
-    statusText: withPrStatus(statusTextOf(counts, sessions.filter(s => s.status === 'waiting'), inputs.now), inputs.prs),
+    statusText: withPrStatus(
+      statusTextOf(
+        counts,
+        sessions.filter(s => s.status === 'waiting'),
+        inputs.now,
+      ),
+      inputs.prs,
+    ),
   }
 }
 

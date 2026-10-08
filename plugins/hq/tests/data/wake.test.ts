@@ -7,8 +7,15 @@ import { detectTransitions, parseWake, prStatusPart, toastText, wakePrompt, with
 
 function pr(number: number, over: Partial<PrVM> = {}): PrVM {
   return {
-    repo: 'acme/app', number, title: `PR ${number}`, url: `https://github.com/acme/app/pull/${number}`,
-    ci: { kind: 'passed', total: 3 }, merge: 'mergeable', gallery: 'none', watcher: 'ci-wait', claimedBy: 'main',
+    repo: 'acme/app',
+    number,
+    title: `PR ${number}`,
+    url: `https://github.com/acme/app/pull/${number}`,
+    ci: { kind: 'passed', total: 3 },
+    merge: 'mergeable',
+    gallery: 'none',
+    watcher: 'ci-wait',
+    claimedBy: 'main',
     ...over,
   }
 }
@@ -92,7 +99,13 @@ describe('wake prompt and toasts', () => {
 
 describe('status line', () => {
   test('counts owned PRs, and adds nothing without any', () => {
-    const prs = [pr(1), pr(2, { ci: RUNNING }), pr(3, { ci: RED, merge: 'behind' }), pr(4, { merge: 'conflicting' }), pr(5, { merge: 'merged' })]
+    const prs = [
+      pr(1),
+      pr(2, { ci: RUNNING }),
+      pr(3, { ci: RED, merge: 'behind' }),
+      pr(4, { merge: 'conflicting' }),
+      pr(5, { merge: 'merged' }),
+    ]
     expect(prStatusPart(prs)).toBe('PRs 2 green · 1 running · 1 red · 1 conflict · 1 rebase · 1 merged')
     expect(prStatusPart([pr(1, { ci: { kind: 'none' } })])).toBe('PRs 1 open')
     expect(prStatusPart([])).toBeUndefined()
@@ -123,8 +136,19 @@ interface Host {
 
 function watchFile(h: Host, n: number, checks: Check[], state: 'OPEN' | 'MERGED' = 'OPEN', at = '2026-10-08T00:00:00Z') {
   h.files[`${WATCH}/acme__app__${n}.ci-wait.json`] = JSON.stringify({
-    version: 1, repo: 'acme/app', number: n, watcher: 'ci-wait', pid: 500, updatedAt: at, headSha: 'abc',
-    title: `PR ${n}`, url: `https://github.com/acme/app/pull/${n}`, state, mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', checks,
+    version: 1,
+    repo: 'acme/app',
+    number: n,
+    watcher: 'ci-wait',
+    pid: 500,
+    updatedAt: at,
+    headSha: 'abc',
+    title: `PR ${n}`,
+    url: `https://github.com/acme/app/pull/${n}`,
+    state,
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
+    checks,
   })
 }
 
@@ -198,7 +222,11 @@ for (const wake of [undefined, false] as const) {
     await clock.advance(2_000)
     expect(h.toasts).toEqual(['acme/app#40 CI went red: rspec'])
     expect(h.prompts).toEqual(
-      wake === false ? [] : ['[hq] acme/app#40 CI went red (failing check: rspec). Triage: read the failing log and report; do not merge or push without asking.'],
+      wake === false
+        ? []
+        : [
+            '[hq] acme/app#40 CI went red (failing check: rspec). Triage: read the failing log and report; do not merge or push without asking.',
+          ],
     )
     expect(h.statuses.at(-1)).toBe('hq: 1 broken · PRs 1 red')
 
@@ -208,16 +236,23 @@ for (const wake of [undefined, false] as const) {
   })
 }
 
-for (const [stored, wakes] of [[undefined, false], [true, true]] as const) {
-  test(`config wake off ${stored === undefined ? 'only toasts' : 'yields to a stored /hq wake on'}`, { options: { wake: false } }, async ($, on) => {
-    const h = host(on, [40], stored)
-    watchFile(h, 40, [ok('lint'), pending('rspec')])
-    const clock = await begin($, on)
-    watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z')
-    await clock.advance(2_000)
-    expect(h.toasts).toEqual(['acme/app#40 CI went red: rspec'])
-    expect(h.prompts).toHaveLength(wakes ? 1 : 0)
-  })
+for (const [stored, wakes] of [
+  [undefined, false],
+  [true, true],
+] as const) {
+  test(
+    `config wake off ${stored === undefined ? 'only toasts' : 'yields to a stored /hq wake on'}`,
+    { options: { wake: false } },
+    async ($, on) => {
+      const h = host(on, [40], stored)
+      watchFile(h, 40, [ok('lint'), pending('rspec')])
+      const clock = await begin($, on)
+      watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z')
+      await clock.advance(2_000)
+      expect(h.toasts).toEqual(['acme/app#40 CI went red: rspec'])
+      expect(h.prompts).toHaveLength(wakes ? 1 : 0)
+    },
+  )
 }
 
 test('a merge wakes with the other owned open PRs to rebase-check; alone it only toasts', async ($, on) => {
@@ -260,8 +295,22 @@ test('no owned PRs: the status line is cleared', async ($, on) => {
 test('/hq wake off and on persist in the store', async ($, on) => {
   const h = host(on, [])
   await begin($, on)
-  expect(await $.command.run({ command: 'hq', args: 'wake off', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })).toMatchObject({ text: 'hq waking is off.' })
+  expect(
+    await $.command.run({
+      command: 'hq',
+      args: 'wake off',
+      origin: { kind: 'composer' },
+      presentation: { isFullscreen: true, columns: 160 },
+    }),
+  ).toMatchObject({ text: 'hq waking is off.' })
   expect(h.store.get('wake')).toBe(false)
-  expect(await $.command.run({ command: 'hq', args: 'wake on', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })).toMatchObject({ text: 'hq waking is on.' })
+  expect(
+    await $.command.run({
+      command: 'hq',
+      args: 'wake on',
+      origin: { kind: 'composer' },
+      presentation: { isFullscreen: true, columns: 160 },
+    }),
+  ).toMatchObject({ text: 'hq waking is on.' })
   expect(h.store.get('wake')).toBe(true)
 })

@@ -4,9 +4,19 @@ import type { PrWatchState } from '../../hooks/model/types'
 import { claimKey, deriveCi, deriveGallery, deriveMerge, prFromSources, prTone, stateFileName } from '../../hooks/data/prs'
 
 const base: PrWatchState = {
-  version: 1, repo: 'acme/app', number: 12, watcher: 'ci-wait', pid: 4242, updatedAt: '2026-10-08T10:00:00Z',
-  headSha: 'abc', title: 'Ledger fix', url: 'https://github.com/acme/app/pull/12', state: 'OPEN',
-  mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', checks: [],
+  version: 1,
+  repo: 'acme/app',
+  number: 12,
+  watcher: 'ci-wait',
+  pid: 4242,
+  updatedAt: '2026-10-08T10:00:00Z',
+  headSha: 'abc',
+  title: 'Ledger fix',
+  url: 'https://github.com/acme/app/pull/12',
+  state: 'OPEN',
+  mergeable: 'MERGEABLE',
+  mergeStateStatus: 'CLEAN',
+  checks: [],
 }
 const yes = () => true
 const no = () => false
@@ -25,24 +35,35 @@ test('state file: running counts done over total', () => {
 
 test('state file: failed names the first failing check', () => {
   expect(deriveCi([ok('lint'), bad('rspec'), run('build'), bad('e2e')])).toEqual({
-    kind: 'failed', done: 3, total: 4, failed: 2, firstFailing: 'rspec',
+    kind: 'failed',
+    done: 3,
+    total: 4,
+    failed: 2,
+    firstFailing: 'rspec',
   })
 })
 
 test('state file: gh-pr-checks style states are read too', () => {
-  expect(deriveCi([{ name: 'a', status: 'pass', conclusion: null }, { name: 'b', status: 'fail', conclusion: null }]))
-    .toEqual({ kind: 'failed', done: 2, total: 2, failed: 1, firstFailing: 'b' })
+  expect(
+    deriveCi([
+      { name: 'a', status: 'pass', conclusion: null },
+      { name: 'b', status: 'fail', conclusion: null },
+    ]),
+  ).toEqual({ kind: 'failed', done: 2, total: 2, failed: 1, firstFailing: 'b' })
 })
 
 test('state file: passed', () => {
   expect(deriveCi([ok('lint'), ok('rspec'), { name: 'opt', status: 'COMPLETED', conclusion: 'SKIPPED' }])).toEqual({
-    kind: 'passed', total: 3,
+    kind: 'passed',
+    total: 3,
   })
 })
 
 test('state file: a skipped required check', () => {
-  expect(deriveCi([ok('lint'), { name: 'deploy-gate', status: 'COMPLETED', conclusion: 'SKIPPED', required: true }]))
-    .toEqual({ kind: 'skippedRequired', name: 'deploy-gate' })
+  expect(deriveCi([ok('lint'), { name: 'deploy-gate', status: 'COMPLETED', conclusion: 'SKIPPED', required: true }])).toEqual({
+    kind: 'skippedRequired',
+    name: 'deploy-gate',
+  })
 })
 
 test('state file: merge states', () => {
@@ -65,8 +86,9 @@ test('state file: gallery from the body, unknown without one', () => {
 test('state file: watcher is none once the pid is dead or the watcher exited', () => {
   expect(prFromSources(claim, { ci: base }, yes).watcher).toBe('ci-wait')
   expect(prFromSources(claim, { ci: base }, no).watcher).toBe('none')
-  expect(prFromSources(claim, { ci: { ...base, exited: { code: 0, at: '2026-10-08T10:05:00Z', reason: 'green' } } }, yes).watcher)
-    .toBe('none')
+  expect(prFromSources(claim, { ci: { ...base, exited: { code: 0, at: '2026-10-08T10:05:00Z', reason: 'green' } } }, yes).watcher).toBe(
+    'none',
+  )
 })
 
 test('state file: merged PR row carries mergedAt from when it was first seen merged', () => {
@@ -79,8 +101,15 @@ test('state file: merged PR row carries mergedAt from when it was first seen mer
 test('no state file: title and url from the claim, ci none, watcher none, waiting on him', () => {
   const pr = prFromSources({ ...claim, title: 'From gh', url: 'https://github.com/acme/app/pull/12' }, {}, yes)
   expect(pr).toEqual({
-    repo: 'acme/app', number: 12, title: 'From gh', url: 'https://github.com/acme/app/pull/12', ci: { kind: 'none' },
-    merge: 'unknown', gallery: 'unknown', watcher: 'none', claimedBy: 'main',
+    repo: 'acme/app',
+    number: 12,
+    title: 'From gh',
+    url: 'https://github.com/acme/app/pull/12',
+    ci: { kind: 'none' },
+    merge: 'unknown',
+    gallery: 'unknown',
+    watcher: 'none',
+    claimedBy: 'main',
   })
   expect(prTone(pr)).toBe('waiting')
 })
@@ -99,18 +128,35 @@ test('state file name', () => {
 })
 
 const ciFile: PrWatchState = {
-  ...base, watcher: 'ci-wait', pid: 1, updatedAt: '2026-10-08T10:00:00Z', mergeable: undefined, mergeStateStatus: undefined,
-  checks: [ok('lint'), ok('rspec')], title: 'Old title',
+  ...base,
+  watcher: 'ci-wait',
+  pid: 1,
+  updatedAt: '2026-10-08T10:00:00Z',
+  mergeable: undefined,
+  mergeStateStatus: undefined,
+  checks: [ok('lint'), ok('rspec')],
+  title: 'Old title',
 }
 const mergeFile: PrWatchState = {
-  ...base, watcher: 'merge-wait', pid: 2, updatedAt: '2026-10-08T10:01:00Z', checks: [], title: 'New title',
-  mergeable: 'MERGEABLE', mergeStateStatus: 'BEHIND', body: 'https://claude.ai/artifact/x',
+  ...base,
+  watcher: 'merge-wait',
+  pid: 2,
+  updatedAt: '2026-10-08T10:01:00Z',
+  checks: [],
+  title: 'New title',
+  mergeable: 'MERGEABLE',
+  mergeStateStatus: 'BEHIND',
+  body: 'https://claude.ai/artifact/x',
 }
 
 test('two files: checks from ci-wait, merge from merge-wait, title from the newer, settled CI prefers merge-wait', () => {
   const pr = prFromSources(claim, { ci: ciFile, merge: mergeFile }, yes)
   expect(pr).toMatchObject({
-    ci: { kind: 'passed', total: 2 }, merge: 'behind', title: 'New title', gallery: 'linked', watcher: 'merge-wait',
+    ci: { kind: 'passed', total: 2 },
+    merge: 'behind',
+    title: 'New title',
+    gallery: 'linked',
+    watcher: 'merge-wait',
     polledAt: Date.parse('2026-10-08T10:01:00Z'),
   })
   expect(pr.stale).toBe(undefined)
@@ -120,7 +166,11 @@ test('two files: checks from ci-wait, merge from merge-wait, title from the newe
 })
 
 test('one stale file: last values kept, row flagged and never healthy', () => {
-  const pr = prFromSources(claim, { ci: { ...ciFile, stale: true, lastOkAt: '2026-10-08T09:58:00Z' }, merge: { ...mergeFile, mergeStateStatus: 'CLEAN' } }, yes)
+  const pr = prFromSources(
+    claim,
+    { ci: { ...ciFile, stale: true, lastOkAt: '2026-10-08T09:58:00Z' }, merge: { ...mergeFile, mergeStateStatus: 'CLEAN' } },
+    yes,
+  )
   expect(pr).toMatchObject({ ci: { kind: 'passed', total: 2 }, merge: 'mergeable', stale: true })
   expect(prTone(pr)).toBe('waiting')
   expect(prTone({ ...pr, stale: undefined })).toBe('quiet')

@@ -1,8 +1,25 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import {
-  BUSY_REFRESH_MS, FAIL_BACKOFF_MS, GOAL_INPUT_MAX, dayOf, emptyDigest, goalDue, goalInput, goalText, ingest, ingestLines,
-  parseGoalReply, parsePrStates, prKey, prStateQuery, prText, prsToLook, refreshGoal, todoProgress, utf8Bytes,
+  BUSY_REFRESH_MS,
+  FAIL_BACKOFF_MS,
+  GOAL_INPUT_MAX,
+  dayOf,
+  emptyDigest,
+  goalDue,
+  goalInput,
+  goalText,
+  ingest,
+  ingestLines,
+  parseGoalReply,
+  parsePrStates,
+  prKey,
+  prStateQuery,
+  prText,
+  prsToLook,
+  refreshGoal,
+  todoProgress,
+  utf8Bytes,
 } from '../../hooks/data/context'
 import type { Complete, Digest, GoalCache, PrState } from '../../hooks/data/context'
 import { buildFleet, parseRegistryRow, selfTmux, toSessionVM } from '../../hooks/data/fleet'
@@ -14,10 +31,36 @@ const MIN = 60_000
 
 // The registry as it stood on 2026-10-08: a terminal front-end, the bg session it parked, a spare, and monolense.
 const REGISTRY = [
-  { pid: 29637, sessionId: '21e093a4-f5f3', cwd: '/Users/me', kind: 'interactive', tmux: 'bassemshaker:@0.%1', name: 'bassemshaker-6c', status: 'idle', parkedJobId: '990b185e' },
+  {
+    pid: 29637,
+    sessionId: '21e093a4-f5f3',
+    cwd: '/Users/me',
+    kind: 'interactive',
+    tmux: 'bassemshaker:@0.%1',
+    name: 'bassemshaker-6c',
+    status: 'idle',
+    parkedJobId: '990b185e',
+  },
   { pid: 32938, sessionId: '990b185e-a2a7', cwd: '/Users/me', kind: 'bg', name: 'HQ background color', jobId: '990b185e', status: 'busy' },
-  { pid: 33267, sessionId: '79a80429-9416', cwd: '/Users/me', kind: 'bg', name: '79a80429', jobId: '79a80429', spare: true, status: 'idle' },
-  { pid: 45327, sessionId: '1b6016a8-e12d', cwd: '/Users/me/code/monolense', kind: 'interactive', tmux: 'monolense:@3.%7', name: 'monolense-bb', status: 'busy' },
+  {
+    pid: 33267,
+    sessionId: '79a80429-9416',
+    cwd: '/Users/me',
+    kind: 'bg',
+    name: '79a80429',
+    jobId: '79a80429',
+    spare: true,
+    status: 'idle',
+  },
+  {
+    pid: 45327,
+    sessionId: '1b6016a8-e12d',
+    cwd: '/Users/me/code/monolense',
+    kind: 'interactive',
+    tmux: 'monolense:@3.%7',
+    name: 'monolense-bb',
+    status: 'busy',
+  },
 ].map(r => parseRegistryRow(JSON.stringify(r))!)
 const ALIVE = new Set([29637, 32938, 33267, 45327])
 const names = (f: ReturnType<typeof buildFleet>) => f.others.flatMap(g => g.sessions.map(s => s.sessionId))
@@ -38,9 +81,28 @@ describe('self pairing and spares', () => {
   test('another pair stays listed; a genuine bg session without tmux is named by title, never by id', () => {
     const other = [
       ...REGISTRY,
-      parseRegistryRow(JSON.stringify({ pid: 50001, sessionId: 'aaaa1111-0000', cwd: '/Users/me/code/x', kind: 'bg', name: 'aaaa1111', jobId: 'aaaa1111', status: 'busy' }))!,
+      parseRegistryRow(
+        JSON.stringify({
+          pid: 50001,
+          sessionId: 'aaaa1111-0000',
+          cwd: '/Users/me/code/x',
+          kind: 'bg',
+          name: 'aaaa1111',
+          jobId: 'aaaa1111',
+          status: 'busy',
+        }),
+      )!,
     ]
-    const f = buildFleet(other, new Set([...ALIVE, 50001]), '990b185e-a2a7', new Map(), new Map(), NOW, 32938, new Map([['aaaa1111-0000', { title: 'Port the importer' }]]))
+    const f = buildFleet(
+      other,
+      new Set([...ALIVE, 50001]),
+      '990b185e-a2a7',
+      new Map(),
+      new Map(),
+      NOW,
+      32938,
+      new Map([['aaaa1111-0000', { title: 'Port the importer' }]]),
+    )
     const s = f.others.flatMap(g => g.sessions).find(x => x.sessionId === 'aaaa1111-0000')!
     expect(s.name).toBe('Port the importer')
     const bare = toSessionVM(other[other.length - 1]!, undefined, undefined, NOW)
@@ -52,27 +114,61 @@ describe('self pairing and spares', () => {
 
 const line = (v: Record<string, unknown>) => `${JSON.stringify(v)}\n`
 const at = (min: number) => new Date(NOW - 3 * 86_400_000 + min * MIN).toISOString()
-const prompt = (text: string, min: number) => line({ type: 'user', message: { role: 'user', content: text }, timestamp: at(min), gitBranch: 'main' })
-const reply = (text: string, min: number) => line({ type: 'assistant', message: { role: 'assistant', stop_reason: 'end_turn', content: [{ type: 'text', text }] }, timestamp: at(min) })
+const prompt = (text: string, min: number) =>
+  line({ type: 'user', message: { role: 'user', content: text }, timestamp: at(min), gitBranch: 'main' })
+const reply = (text: string, min: number) =>
+  line({
+    type: 'assistant',
+    message: { role: 'assistant', stop_reason: 'end_turn', content: [{ type: 'text', text }] },
+    timestamp: at(min),
+  })
 const title = (t: string) => line({ type: 'ai-title', aiTitle: t })
-const prLink = (n: number, min: number) => line({ type: 'pr-link', prNumber: n, prUrl: `https://github.com/bshakr/monolense/pull/${n}`, prRepository: 'bshakr/monolense', timestamp: at(min) })
+const prLink = (n: number, min: number) =>
+  line({
+    type: 'pr-link',
+    prNumber: n,
+    prUrl: `https://github.com/bshakr/monolense/pull/${n}`,
+    prRepository: 'bshakr/monolense',
+    timestamp: at(min),
+  })
 
 function neverCompacted(): Digest {
   const d = emptyDigest()
-  ingest(d, [
-    line({ type: 'user', isMeta: true, message: { content: 'Stop hook feedback: CI pending' }, timestamp: at(0) }),
-    prompt('Rebuild the classification pipeline as v2 with a kind stage', 1),
-    title('Pipeline v2 kickoff'),
-    line({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] }, timestamp: at(2), gitBranch: 'BLO-1941-kind-stage' }),
-    line({ type: 'user', origin: { kind: 'task-notification' }, message: { content: '<task-notification>done</task-notification>' }, timestamp: at(3) }),
-    reply('Opened the foundation PR.', 4),
-    line({ type: 'attachment', attachment: { type: 'queued_command', prompt: 'ok merged', origin: { kind: 'human' } }, timestamp: at(4) }),
-    line({ type: 'attachment', attachment: { type: 'queued_command', prompt: '<agent-message>report</agent-message>', origin: { kind: 'agent' } }, timestamp: at(4) }),
-    prLink(270, 5),
-    prLink(270, 6),
-    prLink(271, 7),
-    title('269 merged whats next'),
-  ].join(''))
+  ingest(
+    d,
+    [
+      line({ type: 'user', isMeta: true, message: { content: 'Stop hook feedback: CI pending' }, timestamp: at(0) }),
+      prompt('Rebuild the classification pipeline as v2 with a kind stage', 1),
+      title('Pipeline v2 kickoff'),
+      line({
+        type: 'user',
+        message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] },
+        timestamp: at(2),
+        gitBranch: 'BLO-1941-kind-stage',
+      }),
+      line({
+        type: 'user',
+        origin: { kind: 'task-notification' },
+        message: { content: '<task-notification>done</task-notification>' },
+        timestamp: at(3),
+      }),
+      reply('Opened the foundation PR.', 4),
+      line({
+        type: 'attachment',
+        attachment: { type: 'queued_command', prompt: 'ok merged', origin: { kind: 'human' } },
+        timestamp: at(4),
+      }),
+      line({
+        type: 'attachment',
+        attachment: { type: 'queued_command', prompt: '<agent-message>report</agent-message>', origin: { kind: 'agent' } },
+        timestamp: at(4),
+      }),
+      prLink(270, 5),
+      prLink(270, 6),
+      prLink(271, 7),
+      title('269 merged whats next'),
+    ].join(''),
+  )
   return d
 }
 
@@ -102,10 +198,18 @@ describe('transcript digest', () => {
 
   test('the compaction summary keeps its Primary Request and Intent part', () => {
     const d = neverCompacted()
-    ingest(d, line({
-      type: 'user', isCompactSummary: true, timestamp: at(50),
-      message: { content: 'This session is being continued.\n\nSummary:\n1. Primary Request and Intent:\n   Finish epic BLO-1936: v2 pipeline.\n\n2. Key Technical Concepts:\n   - rails' },
-    }))
+    ingest(
+      d,
+      line({
+        type: 'user',
+        isCompactSummary: true,
+        timestamp: at(50),
+        message: {
+          content:
+            'This session is being continued.\n\nSummary:\n1. Primary Request and Intent:\n   Finish epic BLO-1936: v2 pipeline.\n\n2. Key Technical Concepts:\n   - rails',
+        },
+      }),
+    )
     expect(d.compact?.text).toBe('Finish epic BLO-1936: v2 pipeline.')
     expect(d.prompts.length).toBe(2)
   })
@@ -125,23 +229,45 @@ describe('todos from the transcript', () => {
       line({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name, input }] } })
     const result = (id: string, task: Record<string, unknown>) =>
       line({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] }, toolUseResult: { task } })
-    ingest(d, [
-      use('u1', 'TaskCreate', { subject: 'Implement BLO-1947 withhold file', description: '' }),
-      result('u1', { id: '1', subject: 'Implement BLO-1947 withhold file' }),
-      use('u2', 'TaskCreate', { subject: 'Write the ADR', description: '' }),
-      result('u2', { id: '2' }),
-      use('u3', 'TaskUpdate', { taskId: '1', status: 'in_progress', activeForm: 'Implementing BLO-1947 withhold file' }),
-      use('u4', 'TaskUpdate', { taskId: '2', status: 'completed' }),
-    ].join(''))
+    ingest(
+      d,
+      [
+        use('u1', 'TaskCreate', { subject: 'Implement BLO-1947 withhold file', description: '' }),
+        result('u1', { id: '1', subject: 'Implement BLO-1947 withhold file' }),
+        use('u2', 'TaskCreate', { subject: 'Write the ADR', description: '' }),
+        result('u2', { id: '2' }),
+        use('u3', 'TaskUpdate', { taskId: '1', status: 'in_progress', activeForm: 'Implementing BLO-1947 withhold file' }),
+        use('u4', 'TaskUpdate', { taskId: '2', status: 'completed' }),
+      ].join(''),
+    )
     expect(todoProgress(d.tasks)).toEqual({ done: 1, total: 2, active: 'Implementing BLO-1947 withhold file' })
   })
 
   test('TodoWrite replaces the list; no list, no line', () => {
     const d = emptyDigest()
     expect(todoProgress(d.tasks)).toBe(undefined)
-    ingest(d, line({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 'x', name: 'TodoWrite', input: { todos: [
-      { content: 'a', status: 'completed', activeForm: 'A' }, { content: 'b', status: 'in_progress', activeForm: 'Doing b' }, { content: 'c', status: 'pending', activeForm: 'C' },
-    ] } }] } }))
+    ingest(
+      d,
+      line({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'x',
+              name: 'TodoWrite',
+              input: {
+                todos: [
+                  { content: 'a', status: 'completed', activeForm: 'A' },
+                  { content: 'b', status: 'in_progress', activeForm: 'Doing b' },
+                  { content: 'c', status: 'pending', activeForm: 'C' },
+                ],
+              },
+            },
+          ],
+        },
+      }),
+    )
     expect(todoProgress(d.tasks)).toEqual({ done: 1, total: 3, active: 'Doing b' })
   })
 })
@@ -160,10 +286,13 @@ describe('pr-link counting', () => {
   test('at most 20 looked up, newest first; one GraphQL query per repo', () => {
     const prs = Array.from({ length: 30 }, (_, i) => ({ url: `u${i}`, repo: 'a/b', number: i, ts: i }))
     expect(prsToLook({ prs }).map(p => p.number)).toEqual(Array.from({ length: 20 }, (_, i) => 29 - i))
-    expect(prStateQuery('a/b', [1, 2])).toBe('query { repository(owner: "a", name: "b") { p1: pullRequest(number: 1) { state title headRefName } p2: pullRequest(number: 2) { state title headRefName } } }')
+    expect(prStateQuery('a/b', [1, 2])).toBe(
+      'query { repository(owner: "a", name: "b") { p1: pullRequest(number: 1) { state title headRefName } p2: pullRequest(number: 2) { state title headRefName } } }',
+    )
     expect(prStateQuery('a/b"x', [1])).toBe(undefined)
-    expect([...parsePrStates('{"data":{"repository":{"p1":{"state":"MERGED","title":"T","headRefName":"BLO-1-x"},"p2":null}}}')])
-      .toEqual([[1, { state: 'MERGED', title: 'T', branch: 'BLO-1-x' }]])
+    expect([...parsePrStates('{"data":{"repository":{"p1":{"state":"MERGED","title":"T","headRefName":"BLO-1-x"},"p2":null}}}')]).toEqual([
+      [1, { state: 'MERGED', title: 'T', branch: 'BLO-1-x' }],
+    ])
   })
 })
 
@@ -181,7 +310,15 @@ describe('goal summary', () => {
   test('never compacted: the input carries the first request, title history, PRs, tickets, prompts and replies', () => {
     const d = neverCompacted()
     const input = goalInput(d, { prTitles: ['BLO-1940 evaluation report'] })
-    const order = ['## First request', '## Title history', 'Pipeline v2 kickoff → 269 merged whats next', '## Pull requests', 'tickets: BLO-1940, BLO-1941', '## Recent requests', '## Latest replies']
+    const order = [
+      '## First request',
+      '## Title history',
+      'Pipeline v2 kickoff → 269 merged whats next',
+      '## Pull requests',
+      'tickets: BLO-1940, BLO-1941',
+      '## Recent requests',
+      '## Latest replies',
+    ]
     let last = -1
     for (const part of order) {
       const i = input.indexOf(part)
@@ -254,7 +391,9 @@ describe('goal summary', () => {
     d.lastTs = NOW + MIN
     expect(goalDue(none, d, false, NOW + FAIL_BACKOFF_MS)).toBe(true)
 
-    const kept = await refreshGoal(d, { goal: 'Old goal', at: 1 }, {}, NOW, async () => { throw new Error('down') })
+    const kept = await refreshGoal(d, { goal: 'Old goal', at: 1 }, {}, NOW, async () => {
+      throw new Error('down')
+    })
     expect(kept.goal).toBe('Old goal')
     expect(kept.failedAt).toBe(NOW)
     expect(goalText(undefined, emptyDigest())).toBe(undefined)
@@ -264,16 +403,34 @@ describe('goal summary', () => {
 describe('the card', () => {
   test('goal, day and status; step and PR counts; todos; then agents', () => {
     const s: OtherSessionVM = {
-      sessionId: 'm', name: 'Pipeline v2 rearchitecture', windowLabel: '', status: 'busy', statusSince: NOW - MIN,
-      tmuxTarget: 'monolense:@3.%7', jump: { kind: 'tmux', target: 'monolense:@3.%7' }, detail: 'monolense',
-      day: 3, step: 'stage 4 of 7: kind stage', prText: '12 PRs merged, 1 open',
+      sessionId: 'm',
+      name: 'Pipeline v2 rearchitecture',
+      windowLabel: '',
+      status: 'busy',
+      statusSince: NOW - MIN,
+      tmuxTarget: 'monolense:@3.%7',
+      jump: { kind: 'tmux', target: 'monolense:@3.%7' },
+      detail: 'monolense',
+      day: 3,
+      step: 'stage 4 of 7: kind stage',
+      prText: '12 PRs merged, 1 open',
       todos: { done: 5, total: 9, active: 'Implement BLO-1947 withhold file' },
-      agents: [{ id: 'a', title: 'Implement BLO-1947 withhold file', model: 'opus', startedAt: NOW - 26_000, doing: 'Read rake spec patterns and report leaky spec' }],
+      agents: [
+        {
+          id: 'a',
+          title: 'Implement BLO-1947 withhold file',
+          model: 'opus',
+          startedAt: NOW - 26_000,
+          doing: 'Read rake spec patterns and report leaky spec',
+        },
+      ],
     }
     const m: HqModel = {
-      now: NOW, counts: { waiting: 0, broken: 0, inProgress: 0, sessions: 1 },
+      now: NOW,
+      counts: { waiting: 0, broken: 0, inProgress: 0, sessions: 1 },
       current: { label: '', goal: { text: 'HQ broader context', day: 1 }, agents: [], prs: [] },
-      others: [{ tmuxSession: 'monolense', sessions: [s] }], statusText: '',
+      others: [{ tmuxSession: 'monolense', sessions: [s] }],
+      statusText: '',
     }
     const rows = layout(m, { width: 58, rows: 40, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0 }).rows.map(r => r.text())
     const top = rows.findIndex(l => l.includes('╭─ monolense'))

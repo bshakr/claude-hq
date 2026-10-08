@@ -1,7 +1,17 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
-  agentList, emptyAgents, onAgentResult, onHandback, onSpawn, onSubagentTool, onTaskNotification, onTurnComplete, prune, reconcile, settleQuiet,
+  agentList,
+  emptyAgents,
+  onAgentResult,
+  onHandback,
+  onSpawn,
+  onSubagentTool,
+  onTaskNotification,
+  onTurnComplete,
+  prune,
+  reconcile,
+  settleQuiet,
 } from '../../hooks/data/agents'
 import { S, afterTool, agentsState, beforeTool, pendingClaims } from '../../hooks/data/observe'
 
@@ -24,13 +34,30 @@ test('agents: spawn, tool calls, foreground completion', () => {
   expect(a.files).toEqual(['app/ledger.rb', 'spec/ledger_spec.rb'])
   expect(a.now).toBe('running tests')
 
-  onAgentResult(s, 'tu1', {
-    status: 'completed', agentId: 'a1', resolvedModel: 'claude-opus-5-5', totalToolUseCount: 7, totalDurationMs: 9_000,
-    totalTokens: 52_000, content: [{ type: 'text', text: '\nFixed the refund rounding; 3 specs added.\nmore' }], usage: {},
-    prompt: 'x',
-  }, false, undefined, 10_000)
+  onAgentResult(
+    s,
+    'tu1',
+    {
+      status: 'completed',
+      agentId: 'a1',
+      resolvedModel: 'claude-opus-5-5',
+      totalToolUseCount: 7,
+      totalDurationMs: 9_000,
+      totalTokens: 52_000,
+      content: [{ type: 'text', text: '\nFixed the refund rounding; 3 specs added.\nmore' }],
+      usage: {},
+      prompt: 'x',
+    },
+    false,
+    undefined,
+    10_000,
+  )
   expect(s.byId.a1).toMatchObject({
-    status: 'completed', endedAt: 10_000, toolCount: 7, tokens: 52_000, outcome: 'Fixed the refund rounding; 3 specs added.',
+    status: 'completed',
+    endedAt: 10_000,
+    toolCount: 7,
+    tokens: 52_000,
+    outcome: 'Fixed the refund rounding; 3 specs added.',
   })
 })
 
@@ -46,7 +73,14 @@ test('agents: nested child parks the parent, completion wakes it', () => {
   expect(s.byId.p!.toolCount).toBe(1)
   expect(s.byId.c!.toolCount).toBe(1)
 
-  onAgentResult(s, 'tu2', { status: 'completed', agentId: 'c', totalToolUseCount: 1, totalTokens: 10, content: [{ type: 'text', text: 'green' }] }, false, undefined, 3)
+  onAgentResult(
+    s,
+    'tu2',
+    { status: 'completed', agentId: 'c', totalToolUseCount: 1, totalTokens: 10, content: [{ type: 'text', text: 'green' }] },
+    false,
+    undefined,
+    3,
+  )
   expect(s.byId.p!.status).toBe('running')
   expect(s.byId.c!.outcome).toBe('green')
 })
@@ -113,15 +147,20 @@ test('agents: the doing line is plain words, and a todo list wins with its progr
   expect(s.byId.d1!.now).toBe('reading claims.ts')
   onSubagentTool(s, 'd1', { tool: 'Edit', file_path: `${KOH}/hooks/ui/layout.ts` }, HOME)
   expect(s.byId.d1!.now).toBe('editing layout.ts')
-  onSubagentTool(s, 'd1', {
-    tool: 'TodoWrite',
-    todos: [
-      { content: 'a', status: 'completed', activeForm: 'A-ing' },
-      { content: 'b', status: 'completed', activeForm: 'B-ing' },
-      { content: 'c', status: 'in_progress', activeForm: 'Rewriting claims' },
-      { content: 'd', status: 'pending', activeForm: 'D-ing' },
-    ],
-  }, HOME)
+  onSubagentTool(
+    s,
+    'd1',
+    {
+      tool: 'TodoWrite',
+      todos: [
+        { content: 'a', status: 'completed', activeForm: 'A-ing' },
+        { content: 'b', status: 'completed', activeForm: 'B-ing' },
+        { content: 'c', status: 'in_progress', activeForm: 'Rewriting claims' },
+        { content: 'd', status: 'pending', activeForm: 'D-ing' },
+      ],
+    },
+    HOME,
+  )
   const [vm] = agentList(s, `${HOME}/code/app`)
   expect(vm!.todo).toEqual({ text: 'Rewriting claims', done: 2, total: 4 })
   expect(vm!.place).toBe('ledger-fix')
@@ -138,7 +177,7 @@ test('agents: a live agent the engine stops listing is closed after two reads', 
   expect('missing' in agentList(s)[0]!).toBe(false)
 })
 
-test('agents: a subagent\'s open call carries its start until the result lands; a foreground child does not', () => {
+test("agents: a subagent's open call carries its start until the result lands; a foreground child does not", () => {
   const s = agentsState()
   onSpawn(s, { toolUseId: 'tuw', description: 'Wait for CI', background: true }, 'w1', 'opus', 1)
   S.now = 5_000
@@ -153,12 +192,15 @@ test('agents: a subagent\'s open call carries its start until the result lands; 
   expect(s.byId.w1!.callSince).toBe(undefined)
 })
 
-test('agents: a directory a subagent cds into is attributed to that agent, the main loop\'s to main', () => {
+test("agents: a directory a subagent cds into is attributed to that agent, the main loop's to main", () => {
   const s = agentsState()
   onSpawn(s, { toolUseId: 'tud', description: 'Dirs', background: true }, 'd1', 'opus', 1)
   afterTool({ tool: 'Bash', agentId: 'd1', tool_use_id: 'x1', command: `cd ${KOH} && git status` }, { result: { stdout: '' } })
   afterTool({ tool: 'Bash', tool_use_id: 'x2', command: `cd ${HOME}/code/other && ls` }, { result: { stdout: '' } })
-  expect(S.dirs.slice(0, 2)).toEqual([{ dir: `${HOME}/code/other`, by: 'main' }, { dir: KOH, by: 'd1' }])
+  expect(S.dirs.slice(0, 2)).toEqual([
+    { dir: `${HOME}/code/other`, by: 'main' },
+    { dir: KOH, by: 'd1' },
+  ])
 })
 
 test('agents: a handed-back agent pruned after 30 min is not re-adopted as live from the engine list', () => {
@@ -181,10 +223,14 @@ test('agents: a live subagent the engine lists as idle has ended; a teammate wai
   const s = emptyAgents()
   onSpawn(s, { toolUseId: 'tu1', description: 'Handed back', background: true }, 'h', 'opus', 1)
   onSpawn(s, { toolUseId: 'tu2', description: 'Teammate', background: true }, 't', 'opus', 1)
-  reconcile(s, [
-    { id: 'h', description: 'Handed back', type: 'general-purpose', status: 'idle' },
-    { id: 't', description: 'Teammate', type: 'teammate', status: 'idle' },
-  ], 50)
+  reconcile(
+    s,
+    [
+      { id: 'h', description: 'Handed back', type: 'general-purpose', status: 'idle' },
+      { id: 't', description: 'Teammate', type: 'teammate', status: 'idle' },
+    ],
+    50,
+  )
   expect(s.byId.h).toMatchObject({ status: 'completed', endedAt: 50 })
   expect(s.byId.t!.status).toBe('waiting')
   reconcile(s, [{ id: 'new', description: 'Ended unseen', type: 'general-purpose', status: 'idle' }], 60)

@@ -85,7 +85,7 @@ function drawRow(row: Row, o: DrawOpts, hovered: boolean): RenderElement {
 export function drawPane(rows: readonly Row[], o: DrawOpts): RenderElement {
   const { Box } = o.el
   const out: RenderElement[] = []
-  for (let i = 0; i < rows.length; ) {
+  for (let i = 0; i < rows.length;) {
     const item = rows[i]!.item
     if (item === undefined) {
       out.push(drawRow(rows[i]!, o, false))

@@ -11,7 +11,14 @@ import * as SHEET from './sheet'
 import { METERED, ctx } from './usage-fixtures'
 
 const view = (over: Partial<View> = {}): View => ({
-  width: 80, rows: 20, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0, ...over,
+  width: 80,
+  rows: 20,
+  focused: false,
+  cursor: null,
+  expanded: [],
+  scroll: 0,
+  phase: 0,
+  ...over,
 })
 const rowsOf = (m: HqModel, width: number) => layout(m, view({ width })).rows
 const lines = (m: HqModel, width: number) => rowsOf(m, width).map(r => r.text())
@@ -78,7 +85,8 @@ describe('sheet', () => {
     expect(layout(BUSY, view({ rows: 64 })).rows.map(r => r.text())).toEqual(SHEET.a80)
   })
   test('rows never pass the width', () => {
-    for (const width of [12, 20, 30, 40, 48, 60, 80, 120]) for (const r of rowsOf(METERED, width)) expect(cellLen(r.text()) <= width).toBe(true)
+    for (const width of [12, 20, 30, 40, 48, 60, 80, 120])
+      for (const r of rowsOf(METERED, width)) expect(cellLen(r.text()) <= width).toBe(true)
   })
 })
 
@@ -138,6 +146,10 @@ describe('colour thresholds', () => {
   })
 
   test('header: a figure keeps the precision the engine sent', () => {
-    expect(rowsOf({ ...METERED, account: { fiveHour: 23.5 } }, 80)[0]!.text().endsWith('5h ▰▰▱▱▱▱ 23.5%')).toBe(true)
+    expect(
+      rowsOf({ ...METERED, account: { fiveHour: 23.5 } }, 80)[0]!
+        .text()
+        .endsWith('5h ▰▰▱▱▱▱ 23.5%'),
+    ).toBe(true)
   })
 })

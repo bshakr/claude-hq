@@ -1,5 +1,16 @@
 // Other Claude sessions on this machine, from ~/.claude/sessions/<pid>.json.
-import type { ContextUsage, Flare, Jump, OtherAgentVM, OtherSessionVM, PublishedSession, TermEnv, TmuxGroupVM, TodoProgress, WaitVM } from '../model/types'
+import type {
+  ContextUsage,
+  Flare,
+  Jump,
+  OtherAgentVM,
+  OtherSessionVM,
+  PublishedSession,
+  TermEnv,
+  TmuxGroupVM,
+  TodoProgress,
+  WaitVM,
+} from '../model/types'
 import { isRealWait } from './waiting'
 
 export const PUBLISH_FRESH_MS = 30_000
@@ -124,14 +135,14 @@ export function toSessionVM(
     windowLabel: window ? `${window} ${label}` : label,
     status,
     ...(row.tmux ? { tmuxTarget: row.tmux } : {}),
-    ...((j => (j ? { jump: j } : {}))(jumpOf(row, term))),
+    ...(j => (j ? { jump: j } : {}))(jumpOf(row, term)),
     ...(real ? { waitingFor: wait.text, wait } : status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
     ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
     ...(real ? { statusSince: wait.since } : typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
     ...(fresh ? { agentsRunning: fresh.agentsRunning, prSummary: fresh.prSummary } : {}),
     ...(!fresh && agents?.length ? { agentsRunning: agents.length } : {}),
     ...(agents?.length ? { agents: [...agents] } : {}),
-    ...((d => (d ? { detail: d } : {}))(detailOf(row, branch, fresh?.doing))),
+    ...(d => (d ? { detail: d } : {}))(detailOf(row, branch, fresh?.doing)),
     ...(ctx.day ? { day: ctx.day } : {}),
     ...(ctx.step ? { step: ctx.step } : {}),
     ...(ctx.prText ? { prText: ctx.prText } : {}),
@@ -145,7 +156,11 @@ export function toSessionVM(
 export function jumpOf(row: RegistryRow, term: TermEnv | undefined): Jump | undefined {
   if (!term) return row.tmux ? { kind: 'tmux', target: row.tmux } : undefined
   return {
-    kind: 'session', sessionId: row.sessionId, cwd: row.cwd, pid: row.pid, term,
+    kind: 'session',
+    sessionId: row.sessionId,
+    cwd: row.cwd,
+    pid: row.pid,
+    term,
     ...(row.tmux ? { tmux: row.tmux } : {}),
     ...(row.kind === 'bg' ? { bg: true as const } : {}),
     ...(row.jobId ? { jobId: row.jobId } : {}),
@@ -179,8 +194,20 @@ export function parseFirstPrompt(line: string): string | undefined {
   try {
     const v = JSON.parse(line) as { message?: { content?: unknown } }
     const c = v.message?.content
-    const text = typeof c === 'string' ? c : Array.isArray(c) ? c.map(b => (b && typeof b === 'object' && typeof (b as { text?: unknown }).text === 'string' ? (b as { text: string }).text : '')).join('\n') : ''
-    const first = text.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('<'))
+    const text =
+      typeof c === 'string'
+        ? c
+        : Array.isArray(c)
+          ? c
+              .map(b =>
+                b && typeof b === 'object' && typeof (b as { text?: unknown }).text === 'string' ? (b as { text: string }).text : '',
+              )
+              .join('\n')
+          : ''
+    const first = text
+      .split('\n')
+      .map(l => l.trim())
+      .find(l => l && !l.startsWith('<'))
     return first ? (first.length > 80 ? `${first.slice(0, 79)}…` : first) : undefined
   } catch {
     return undefined
@@ -223,9 +250,7 @@ export function groupByTmux(sessions: readonly OtherSessionVM[]): TmuxGroupVM[] 
 
 /** The other session that has waited for input longest. */
 export function pickFlare(sessions: readonly OtherSessionVM[]): Flare | undefined {
-  const waiting = sessions
-    .filter(s => s.status === 'waiting' && s.tmuxTarget)
-    .sort((a, b) => (a.statusSince ?? 0) - (b.statusSince ?? 0))
+  const waiting = sessions.filter(s => s.status === 'waiting' && s.tmuxTarget).sort((a, b) => (a.statusSince ?? 0) - (b.statusSince ?? 0))
   const top = waiting[0]
   if (!top || !top.tmuxTarget) return undefined
   return {
@@ -286,7 +311,7 @@ export function mergePair(front: OtherSessionVM, worker: OtherSessionVM): OtherS
     ...(lead.statusSince !== undefined ? { statusSince: lead.statusSince } : {}),
     ...(lead.waitingFor !== undefined ? { waitingFor: lead.waitingFor } : {}),
     ...(lead.wait ? { wait: lead.wait } : {}),
-    ...((j => (j ? { jump: j } : {}))(front.jump ?? worker.jump)),
+    ...(j => (j ? { jump: j } : {}))(front.jump ?? worker.jump),
   }
 }
 
@@ -306,7 +331,17 @@ export function buildFleet(
 ): { self?: RegistryRow; others: TmuxGroupVM[] } {
   const self = findSelf(rows, selfId, selfPid)
   const vm = (r: RegistryRow) =>
-    toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId), terms.get(r.pid))
+    toSessionVM(
+      r,
+      branches.get(r.cwd),
+      published.get(r.sessionId),
+      now,
+      topics.get(r.sessionId),
+      agents.get(r.sessionId),
+      contexts.get(r.sessionId),
+      waits.get(r.sessionId),
+      terms.get(r.pid),
+    )
   const pairs = pairsOf(rows, r => isOtherRow(r, self, selfId, alive))
   const workers = new Set(pairs.values())
   const others = rows
