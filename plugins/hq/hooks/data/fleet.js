@@ -209,10 +209,43 @@ export function selfTmux(rows, self) {
         return undefined;
     return self.tmux ?? rows.find(r => r !== self && isPaired(r, self) && r.tmux)?.tmux;
 }
+/** Shown front-ends whose background worker is shown too, mapped to that worker: each pair draws as one card. */
+export function pairsOf(rows, shown) {
+    const out = new Map();
+    const live = rows.filter(shown);
+    for (const front of live) {
+        if (!front.parkedJobId)
+            continue;
+        const worker = live.find(r => r !== front && r.jobId === front.parkedJobId);
+        if (worker)
+            out.set(front, worker);
+    }
+    return out;
+}
+const STATUS_RANK = { waiting: 0, busy: 1, idle: 2 };
+/** One card for a pair: the worker's content (its transcript and publish carry the work), the front-end's tmux and jump, the busier half's status and wait. */
+export function mergePair(front, worker) {
+    const lead = STATUS_RANK[front.status] < STATUS_RANK[worker.status] ? front : worker;
+    const { status: _s, statusSince: _ss, waitingFor: _wf, wait: _w, jump: _j, ...content } = { ...front, ...worker };
+    return {
+        ...content,
+        status: lead.status,
+        ...(lead.statusSince !== undefined ? { statusSince: lead.statusSince } : {}),
+        ...(lead.waitingFor !== undefined ? { waitingFor: lead.waitingFor } : {}),
+        ...(lead.wait ? { wait: lead.wait } : {}),
+        ...((j => (j ? { jump: j } : {}))(front.jump ?? worker.jump)),
+    };
+}
 export function buildFleet(rows, alive, selfId, branches, published, now, selfPid, topics = new Map(), agents = new Map(), contexts = new Map(), waits = new Map(), terms = new Map()) {
     const self = findSelf(rows, selfId, selfPid);
+    const vm = (r) => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId), terms.get(r.pid));
+    const pairs = pairsOf(rows, r => isOtherRow(r, self, selfId, alive));
+    const workers = new Set(pairs.values());
     const others = rows
-        .filter(r => isOtherRow(r, self, selfId, alive))
-        .map(r => toSessionVM(r, branches.get(r.cwd), published.get(r.sessionId), now, topics.get(r.sessionId), agents.get(r.sessionId), contexts.get(r.sessionId), waits.get(r.sessionId), terms.get(r.pid)));
+        .filter(r => isOtherRow(r, self, selfId, alive) && !workers.has(r))
+        .map(r => {
+        const worker = pairs.get(r);
+        return worker ? mergePair(vm(r), vm({ ...worker, tmux: r.tmux })) : vm(r);
+    });
     return { ...(self ? { self } : {}), others: groupByTmux(others) };
 }

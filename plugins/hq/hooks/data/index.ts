@@ -13,7 +13,7 @@ import {
 } from './context'
 import type { Digest, GoalCache, PrState } from './context'
 import {
-  PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, parsePsPids, parsePublished, parseRegistryRow, selfTmux, splitTmux, transcriptPath,
+  PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, pairsOf, parsePsPids, parsePublished, parseRegistryRow, selfTmux, splitTmux, transcriptPath,
 } from './fleet'
 import type { RegistryRow, SessionContext, SessionTopic } from './fleet'
 import {
@@ -28,7 +28,7 @@ import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, 
 import { parsePsTerm } from './term'
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs'
 import type { BranchClaim, OwnedState, PrFiles, StoredClaim } from './prs'
-import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting'
+import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onMainAnswer, onPromptOrigin, otherWait, ownWait } from './waiting'
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify'
 import { WAKE_KEY, newsOf } from './wake'
 import { SUMMARIES_KEY, config, effective } from '../config'
@@ -151,6 +151,7 @@ export function installData(on: On, onChange: () => void): void {
       try {
         S.now = await $.clock.now()
         onTurnEnd(S.activity, S.now)
+        onMainAnswer(e.answer, e.reason, S.now)
         S.dirty = true
         rebuild()
       } catch {
@@ -758,8 +759,10 @@ async function start($: EngineInterface): Promise<void> {
     const agentMap = new Map<string, OtherAgentVM[]>()
     const waits = new Map<string, WaitVM>()
     const seenFiles = new Set<string>()
+    // A paired front-end's card shows its worker's content, so its own transcript is not read.
+    const fronts = pairsOf(rows, r => isOtherRow(r, self0, S.sessionId, alive))
     for (const row of rows) {
-      if (!isOtherRow(row, self0, S.sessionId, alive)) continue
+      if (!isOtherRow(row, self0, S.sessionId, alive) || fronts.has(row)) continue
       if (row.cwd) branches.set(row.cwd, await branchOf(row.cwd))
       const pub = parsePublished((await readText(`${S.home}/.claude/hq/sessions/${row.sessionId}.json`)) ?? '')
       if (pub) published.set(row.sessionId, pub)

@@ -3,7 +3,7 @@ import { isLive, onSpawn, onTaskNotification, onTurnComplete, prune, reconcile, 
 import { emptyActivity, notificationsOf, onPrompt, onTurnEnd, todosOf, nowOf } from './activity';
 import { repoOfRemote } from './claims';
 import { CHUNK_BYTES, GOAL_MODEL, HEAD_BYTES, PR_REFRESH_MS, TAIL_BYTES as DIGEST_TAIL_BYTES, dayOf, emptyDigest, goalDue, goalText, ingest, ingestLines, parsePrStates, prKey as prStateKey, prStateQuery, prText, prsToLook, refreshGoal, todoProgress, } from './context';
-import { PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, parsePsPids, parsePublished, parseRegistryRow, selfTmux, splitTmux, transcriptPath, } from './fleet';
+import { PUBLISH_FRESH_MS, buildFleet, findSelf, isOtherRow, pairsOf, parsePsPids, parsePublished, parseRegistryRow, selfTmux, splitTmux, transcriptPath, } from './fleet';
 import { ADR_LOOKUPS_PER_TICK, GLOSS_MODEL, TICKET_LOOKUPS_PER_TICK, briefBatch, briefDue, findIds, glossOf, lookUpAdr, lookUpTicket, lookupDue as idLookupDue, } from './ids';
 import { doingLine, prSummary } from './model';
 import { OPEN_CALL_CAP_MS, OTHER_AGENTS_MAX, TAIL_BYTES, freshTranscripts, isRunning, longCall, otherAgents, parseMeta, parseTail, subagentsDir } from './subagents';
@@ -11,7 +11,7 @@ import { accountOf, live, preferred, settingsModel } from './usage';
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe';
 import { parsePsTerm } from './term';
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs';
-import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onPromptOrigin, otherWait, ownWait } from './waiting';
+import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onMainAnswer, onPromptOrigin, otherWait, ownWait } from './waiting';
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify';
 import { WAKE_KEY, newsOf } from './wake';
 import { SUMMARIES_KEY, config, effective } from '../config';
@@ -124,6 +124,7 @@ export function installData(on, onChange) {
             try {
                 S.now = await $.clock.now();
                 onTurnEnd(S.activity, S.now);
+                onMainAnswer(e.answer, e.reason, S.now);
                 S.dirty = true;
                 rebuild();
             }
@@ -789,8 +790,10 @@ async function start($) {
         const agentMap = new Map();
         const waits = new Map();
         const seenFiles = new Set();
+        // A paired front-end's card shows its worker's content, so its own transcript is not read.
+        const fronts = pairsOf(rows, r => isOtherRow(r, self0, S.sessionId, alive));
         for (const row of rows) {
-            if (!isOtherRow(row, self0, S.sessionId, alive))
+            if (!isOtherRow(row, self0, S.sessionId, alive) || fronts.has(row))
                 continue;
             if (row.cwd)
                 branches.set(row.cwd, await branchOf(row.cwd));

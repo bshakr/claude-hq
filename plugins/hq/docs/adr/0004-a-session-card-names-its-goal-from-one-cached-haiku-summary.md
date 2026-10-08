@@ -37,3 +37,7 @@ Ticket ids (`[A-Z]{2,5}-\d+`) and ADR numbers (`ADR 0019`, `ADR-19`) on goal, st
 - **Summarise on every poll or on every new prompt:** cost grows with activity for no visible change.
 - **`gh pr view` per PR:** up to 20 calls per session where one GraphQL call per repo does.
 - **Read the whole transcript each poll:** multi-MB files, and `$.fs.read` refuses over 4 MiB.
+
+## As built
+
+- 2026-10-08: pairing applies to every session, not only this one. A live front-end and its live worker draw as one card: the worker's goal, agents and context (its transcript and publish file carry the work), the front-end's tmux group, target and jump, the busier half's status. A pair with one dead pid shows the live half alone.
