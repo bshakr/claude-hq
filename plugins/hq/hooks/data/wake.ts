@@ -81,21 +81,28 @@ export function parseWake(args: string): 'on' | 'off' | null {
   return match ? (match[1] as 'on' | 'off') : null
 }
 
+const BUCKETS = ['green', 'running', 'red', 'conflict', 'rebase', 'open', 'merged'] as const
+type Bucket = (typeof BUCKETS)[number]
+
+/** One bucket per PR, the most urgent first, so a red PR that is also behind counts once. */
+function bucketOf(pr: PrVM): Bucket | undefined {
+  if (pr.merge === 'merged') return 'merged'
+  if (isEnded(pr.merge)) return undefined
+  if (pr.ci.kind === 'failed') return 'red'
+  if (pr.merge === 'conflicting') return 'conflict'
+  if (pr.merge === 'behind') return 'rebase'
+  if (pr.ci.kind === 'running' || pr.ci.kind === 'registering') return 'running'
+  if (pr.ci.kind === 'passed') return 'green'
+  return 'open'
+}
+
 /** The owned-PR part of the status line, e.g. "PRs 1 red · 2 green"; undefined with no owned PRs. */
 export function prStatusPart(prs: readonly PrVM[]): string | undefined {
-  if (prs.length === 0) return undefined
-  const open = prs.filter(pr => !isEnded(pr.merge))
-  const counts: [number, string][] = [
-    [open.filter(pr => pr.ci.kind === 'passed').length, 'green'],
-    [open.filter(pr => pr.ci.kind === 'running' || pr.ci.kind === 'registering').length, 'running'],
-    [open.filter(pr => pr.ci.kind === 'failed').length, 'red'],
-    [open.filter(pr => pr.merge === 'conflicting').length, 'conflict'],
-    [open.filter(pr => pr.merge === 'behind').length, 'rebase'],
-    [prs.filter(pr => pr.merge === 'merged').length, 'merged'],
-  ]
-  const shown = counts.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`)
-  if (shown.length > 0) return `PRs ${shown.join(' · ')}`
-  return open.length > 0 ? `PRs ${open.length} open` : undefined
+  const buckets = prs.map(bucketOf)
+  const shown = BUCKETS.map(b => [buckets.filter(x => x === b).length, b] as const)
+    .filter(([n]) => n > 0)
+    .map(([n, b]) => `${n} ${b}`)
+  return shown.length > 0 ? `PRs ${shown.join(' · ')}` : undefined
 }
 
 /** HQ's one status entry: its own parts, then the owned PRs'; '' clears it. */

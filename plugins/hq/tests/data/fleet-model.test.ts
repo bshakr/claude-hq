@@ -149,14 +149,36 @@ test('model: counts reproduce the sheet (3 waiting, 2 broken, 3 in progress, 10 
   expect(countsOf(sheetA())).toEqual({ waiting: 3, broken: 2, inProgress: 3, sessions: 10 })
 })
 
-test('model: status line names the one waiting session, counts otherwise, empty when quiet', () => {
+test("model: status line names the one waiting session, then this session's PRs, each counted once", () => {
   const m = buildModel({ now: NOW, label: 'monolense:@1 · BLO-1940-promote', ...sheetA() })
-  expect(m.statusText).toBe('hq: rp-api waiting 2m · 2 broken · 3 in progress · PRs 3 green · 1 running · 1 red · 1 rebase · 1 merged')
+  expect(m.statusText).toBe('hq: rp-api waiting 2m · PRs 2 green · 1 running · 1 red · 1 rebase · 1 merged')
   expect(m.flare?.text).toBe('rp-api is waiting for your input')
   expect(m.current.prs.map(p => p.number)).toEqual([212, 214, 431, 433, 429, 522])
   const two = [session('a', 'x:@1.%1', 'waiting', NOW - 1), session('b', 'x:@2.%2', 'waiting', NOW - 2)]
-  expect(statusTextOf({ waiting: 2, broken: 0, inProgress: 4, sessions: 3 }, two, NOW)).toBe('hq: 2 waiting · 4 in progress')
-  expect(statusTextOf({ waiting: 0, broken: 0, inProgress: 0, sessions: 1 }, [], NOW)).toBe('')
+  expect(statusTextOf(two, NOW)).toBe('hq: 2 waiting, b first <1m')
+  expect(statusTextOf([], NOW)).toBe('')
+})
+
+test("model: status line leaves out other sessions' PRs and this session's agents", () => {
+  const red = { kind: 'failed', done: 1, total: 1, failed: 1, firstFailing: 'ci' } as const
+  const others = groupByTmux([
+    session('web', 'x:@1.%1', 'busy', NOW - 1, { prSummary: { total: 1, broken: 1, waiting: 0, inProgress: 0 } }),
+  ])
+  const failed: AgentVM = { id: 'a', title: 'a', status: 'failed', background: true, startedAt: 0, toolCount: 0, files: [] }
+  const own: PrVM = {
+    repo: 'acme/app',
+    number: 1,
+    title: '',
+    url: '',
+    ci: red,
+    merge: 'behind',
+    gallery: 'none',
+    watcher: 'ci-wait',
+    claimedBy: 'main',
+  }
+  const m = buildModel({ now: NOW, label: 'x', agents: [failed], prs: [own], others })
+  expect(m.statusText).toBe('hq: PRs 1 red')
+  expect(buildModel({ now: NOW, label: 'x', agents: [failed], prs: [], others }).statusText).toBe('')
 })
 
 test('model: fingerprint ignores the clock and key order', () => {

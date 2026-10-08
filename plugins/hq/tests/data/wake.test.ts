@@ -98,21 +98,25 @@ describe('wake prompt and toasts', () => {
 })
 
 describe('status line', () => {
-  test('counts owned PRs, and adds nothing without any', () => {
+  test('counts each owned PR once, in its most urgent bucket, and adds nothing without any', () => {
     const prs = [
       pr(1),
       pr(2, { ci: RUNNING }),
       pr(3, { ci: RED, merge: 'behind' }),
       pr(4, { merge: 'conflicting' }),
       pr(5, { merge: 'merged' }),
+      pr(6, { merge: 'behind' }),
+      pr(7, { ci: { kind: 'none' } }),
+      pr(8, { merge: 'closed' }),
     ]
-    expect(prStatusPart(prs)).toBe('PRs 2 green · 1 running · 1 red · 1 conflict · 1 rebase · 1 merged')
+    expect(prStatusPart(prs)).toBe('PRs 1 green · 1 running · 1 red · 1 conflict · 1 rebase · 1 open · 1 merged')
     expect(prStatusPart([pr(1, { ci: { kind: 'none' } })])).toBe('PRs 1 open')
+    expect(prStatusPart([pr(1, { merge: 'closed' })])).toBeUndefined()
     expect(prStatusPart([])).toBeUndefined()
     expect(withPrStatus('', [])).toBe('')
-    expect(withPrStatus('hq: 1 broken', [])).toBe('hq: 1 broken')
+    expect(withPrStatus('hq: api waiting 2m', [])).toBe('hq: api waiting 2m')
     expect(withPrStatus('', [pr(1)])).toBe('hq: PRs 1 green')
-    expect(withPrStatus('hq: 1 broken', [pr(1, { ci: RED })])).toBe('hq: 1 broken · PRs 1 red')
+    expect(withPrStatus('hq: api waiting 2m', [pr(1, { ci: RED })])).toBe('hq: api waiting 2m · PRs 1 red')
   })
 })
 
@@ -216,7 +220,7 @@ for (const wake of [undefined, false] as const) {
     watchFile(h, 40, [ok('lint'), pending('rspec')])
     const clock = await begin($, on)
     expect(h.toasts).toEqual([])
-    expect(h.statuses.at(-1)).toBe('hq: 1 in progress · PRs 1 running')
+    expect(h.statuses.at(-1)).toBe('hq: PRs 1 running')
 
     watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z')
     await clock.advance(2_000)
@@ -228,7 +232,7 @@ for (const wake of [undefined, false] as const) {
             '[hq] acme/app#40 CI went red (failing check: rspec). Triage: read the failing log and report; do not merge or push without asking.',
           ],
     )
-    expect(h.statuses.at(-1)).toBe('hq: 1 broken · PRs 1 red')
+    expect(h.statuses.at(-1)).toBe('hq: PRs 1 red')
 
     await clock.advance(10_000)
     expect(h.toasts).toHaveLength(1)

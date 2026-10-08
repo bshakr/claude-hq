@@ -194,7 +194,7 @@ export const BUSY: HqModel = {
   },
   current: { label: LABEL, agents: AGENTS, prs: PRS },
   others: OTHERS_BUSY,
-  statusText: 'hq: rp-api waiting 2m · 2 broken · 3 in progress',
+  statusText: 'hq: rp-api waiting 2m · PRs 1 red',
 }
 
 const quietOthers = OTHERS_BUSY.map(g => ({
@@ -272,7 +272,7 @@ export const LONG: HqModel = {
     ]),
     ...OTHERS_BUSY.slice(1, 5),
   ],
-  statusText: 'hq: 2 waiting · 3 broken · 4 in progress',
+  statusText: 'hq: 2 waiting, rp-api first 2m',
 }
 
 /** Nothing at all: a fresh session before the first poll. */

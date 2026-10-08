@@ -83,19 +83,13 @@ export function ageText(ms: number): string {
   return `${Math.floor(h / 24)}d`
 }
 
-export function statusTextOf(counts: Counts, waitingOthers: readonly OtherSessionVM[], now: number): string {
-  const parts: string[] = []
+/** What needs you: the one waiting session by name, or the count and the longest-waiting first. */
+export function statusTextOf(waitingOthers: readonly OtherSessionVM[], now: number): string {
   const longest = [...waitingOthers].sort((a, b) => (a.statusSince ?? 0) - (b.statusSince ?? 0))[0]
-  if (waitingOthers.length === 1 && longest) {
-    parts.push(
-      longest.statusSince !== undefined ? `${longest.name} waiting ${ageText(now - longest.statusSince)}` : `${longest.name} waiting`,
-    )
-  } else if (waitingOthers.length > 1) {
-    parts.push(`${waitingOthers.length} waiting`)
-  }
-  if (counts.broken > 0) parts.push(`${counts.broken} broken`)
-  if (counts.inProgress > 0) parts.push(`${counts.inProgress} in progress`)
-  return parts.length === 0 ? '' : `hq: ${parts.join(' · ')}`
+  if (!longest) return ''
+  const since = longest.statusSince !== undefined ? ` ${ageText(now - longest.statusSince)}` : ''
+  const lead = waitingOthers.length === 1 ? `${longest.name} waiting` : `${waitingOthers.length} waiting, ${longest.name} first`
+  return `hq: ${lead}${since}`
 }
 
 const TONE_RANK: Record<PrTone, number> = { broken: 0, waiting: 1, progress: 2, quiet: 3, done: 4 }
@@ -137,7 +131,6 @@ export function buildModel(inputs: ModelInputs): HqModel {
     ...(inputs.account ? { account: inputs.account } : {}),
     statusText: withPrStatus(
       statusTextOf(
-        counts,
         sessions.filter(s => s.status === 'waiting'),
         inputs.now,
       ),
