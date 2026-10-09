@@ -1,6 +1,7 @@
 import type { ElementTable, RenderElement, RenderNode } from 'claude-code'
 
 import { DEFAULT_TOKENS } from '../config'
+import { caretItem } from './caret'
 import type { Action, Row, Seg, Sty, Tok } from './row'
 
 /** ansi256 slots of the sheet's tokens (the validator refuses `ansi:<name>`). */
@@ -9,14 +10,14 @@ export const TOKENS = DEFAULT_TOKENS
 export type DrawOpts = {
   el: ElementTable
   onAction: (key: string, action: Action) => void
-  /** The Button the focus ring starts on when the pane takes the keys. */
+  /** The Button the focus ring starts on when the pane takes the keys: a caret. */
   autoFocusKey?: string
   /** The resolved palette; the defaults when left out. */
   tokens?: Readonly<Record<Tok, string>>
 }
 
 function textProps(s: Sty, hovered: boolean, tokens: Readonly<Record<Tok, string>>) {
-  const props: { color?: string; dimColor?: boolean; bold?: boolean; hover?: { dimColor?: boolean } } = {}
+  const props: { color?: string; dimColor?: boolean; bold?: boolean; underline?: boolean; hover?: { dimColor?: boolean } } = {}
   if (s.c !== undefined) {
     props.color = tokens[s.c]
     // A colour may be dimmed too: the running dot's motion phase.
@@ -27,6 +28,7 @@ function textProps(s: Sty, hovered: boolean, tokens: Readonly<Record<Tok, string
     if (hovered) props.hover = { dimColor: false }
   }
   if (s.bold) props.bold = true
+  if (s.underline) props.underline = true
   return props
 }
 
@@ -67,12 +69,17 @@ function drawRow(row: Row, o: DrawOpts, hovered: boolean): RenderElement {
       plain: true,
       onPress: () => o.onAction(spec.key, spec.action),
     }
+    const caret = caretItem(spec.key) !== undefined
     if (spec.hotkey !== undefined) props.hotkey = spec.hotkey
     if (spec.dim) props.dimColor = true
-    if (hovered) props.hover = { underline: true }
+    if (hovered && !caret) props.hover = { underline: true }
     if (o.autoFocusKey === spec.key) props.autoFocus = true
-    // A Button's own props carry no weight: bold rides in a Text child, the label still names it.
-    parts.push(s.s.bold ? <Button {...props}>{<Text bold>{spec.label}</Text>}</Button> : <Button {...props} />)
+    // A Button's own props carry no weight: bold, underline and the caret's colour ride in a Text child.
+    const look: { color?: string; bold?: boolean; underline?: boolean } = {}
+    if (caret && s.s.c !== undefined) look.color = (o.tokens ?? TOKENS)[s.s.c]
+    if (s.s.bold) look.bold = true
+    if (s.s.underline) look.underline = true
+    parts.push(Object.keys(look).length ? <Button {...props}>{<Text {...look}>{spec.label}</Text>}</Button> : <Button {...props} />)
   }
   flush()
   return (

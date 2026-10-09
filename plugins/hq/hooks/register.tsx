@@ -6,6 +6,7 @@ import { currentModel, installData } from './data/index'
 import { NOTIFY_STORE_KEY, parseNotifyArg } from './data/notify'
 import { WAKE_KEY, parseWake } from './data/wake'
 import type { HqModel } from './model/types'
+import { caretItem, caretKey, pressedItem, ringMove } from './ui/caret'
 import { pressJump } from './ui/jump'
 import { layout, scrollFor } from './ui/layout'
 import type { Layout } from './ui/layout'
@@ -109,6 +110,13 @@ async function startPane($: EngineInterface, isInteractive: boolean): Promise<vo
   }
 }
 
+/** The cursor goes to a pressed item and the ring to its caret: a click on a title may have sent the ring past it. */
+async function follow($: EngineInterface, key: string, last: Layout | undefined): Promise<void> {
+  const item = pressedItem(last, key)
+  await update($, cursor, () => item)
+  if (last?.items.includes(item)) await $.ui.focus({ requestId: PANE, key: caretKey(item) })
+}
+
 /** What a press does. Jumps run host commands; everything else only moves /hq's own view. */
 export async function act($: EngineInterface, key: string, action: Action, last: Layout | undefined): Promise<void> {
   switch (action.kind) {
@@ -119,12 +127,12 @@ export async function act($: EngineInterface, key: string, action: Action, last:
         toast: text => $.ui.toast(text),
       })
       if (!pressed) return
-      await update($, cursor, () => key)
+      await follow($, key, last)
       return
     }
     case 'toggle': {
       await update($, expanded, list => (list.includes(action.id) ? list.filter(id => id !== action.id) : [...list, action.id]))
-      await update($, cursor, () => key)
+      await follow($, key, last)
       return
     }
     case 'move': {
@@ -139,8 +147,8 @@ export async function act($: EngineInterface, key: string, action: Action, last:
       if (target === undefined) return
       const s = scrollFor(last, target, last.scroll)
       if (s !== last.scroll) await update($, scroll, () => s)
-      // The target's Button may arrive with the next drawing; focus waits for it.
-      await $.ui.focus({ requestId: PANE, key: target })
+      // The target's caret may arrive with the next drawing; focus waits for it.
+      await $.ui.focus({ requestId: PANE, key: caretKey(target) })
       return
     }
     case 'scroll': {
@@ -225,13 +233,23 @@ export const register: Register = (on, options) => {
     return closed
   }).catch(($, e, next) => next(e))
 
-  // Tab and clicks move the ring: the cursor row follows it.
+  // Tab, arrows and clicks move the ring. It rests only on carets; the cursor row follows it.
   on('ui.focus', async ($, e, next) => {
-    const moved = await next(e)
-    if (e.requestId === PANE && moved.deny === undefined && e.element !== undefined && last?.items.includes(e.element)) {
-      const key = e.element
-      await update($, cursor, () => key)
+    if (e.requestId !== PANE || e.element === undefined || !last) return next(e)
+    const move = ringMove(last, await read($, cursor), e)
+    if (move && 'scrollTo' in move) {
+      // The ring stays put until the item is scrolled in and its caret drawn.
+      const target = move.scrollTo
+      await update($, cursor, () => target)
+      const s = scrollFor(last, target, last.scroll)
+      if (s !== last.scroll) await update($, scroll, () => s)
+      void $.ui.focus({ requestId: PANE, key: caretKey(target) })
+      return {}
     }
+    const to = move ? { ...e, element: move.caret } : e
+    const moved = await next(to)
+    const item = to.element === undefined ? undefined : caretItem(to.element)
+    if (moved.deny === undefined && item !== undefined && last.items.includes(item)) await update($, cursor, () => item)
     return moved
   }).catch(($, e, next) => next(e))
 
@@ -254,11 +272,11 @@ export const register: Register = (on, options) => {
     const l = layout(currentModel(), view)
     last = l
     const shown = (key: string) => l.rows.some(r => r.head && r.item === key)
-    const autoFocusKey = view.cursor !== null && shown(view.cursor) ? view.cursor : l.items.find(shown)
+    const start = view.cursor !== null && shown(view.cursor) ? view.cursor : l.items.find(shown)
     return drawPane(l.rows, {
       el: $.ui.resolve(e),
       tokens: config().tokens,
-      autoFocusKey,
+      ...(start !== undefined ? { autoFocusKey: caretKey(start) } : {}),
       onAction: (key, action) => press($, key, action),
     })
   })

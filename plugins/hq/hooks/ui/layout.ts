@@ -13,6 +13,7 @@ import type {
   WaitVM,
   WaitingVM,
 } from '../model/types'
+import { caretKey } from './caret'
 import { resumeOnly } from './focus'
 import { Row } from './row'
 import type { Action, Sty, Tok } from './row'
@@ -44,6 +45,8 @@ export type Layout = {
   items: string[]
   /** Body index of each item's first line (the flare is -1). */
   itemLine: Record<string, number>
+  /** The item each item-row Button belongs to, by key. */
+  owner: Record<string, string>
   actions: Record<string, Action>
   region: number
   bodyLen: number
@@ -152,6 +155,8 @@ function card(x: Ctx, title: string, tone: Tok, inner: Row[], current = false): 
 
 /** The cursor row's style: bold at full strength. */
 const FOCUS: Sty = { bold: true }
+/** A link's cursor row: underlined too. */
+const LINK_FOCUS: Sty = { bold: true, underline: true }
 /** Lines the cursor row may grow to. */
 const FOCUS_LINES = 3
 
@@ -866,11 +871,11 @@ function prRows(p: PrVM, tcol: number, x: Ctx, key = prKey(p), compact = false):
       return
     }
     const [head = '', ...rest] = wrapCapped(p.title, room, IW - tcol, FOCUS_LINES)
-    r.button(tcol, head, { key, action: x.actions[key]! }, FOCUS)
+    r.button(tcol, head, { key, action: x.actions[key]! }, LINK_FOCUS)
     for (const line of rest) {
       const c = new Row(IW)
       c.item = key
-      c.put(tcol, line, FOCUS)
+      c.put(tcol, line, LINK_FOCUS)
       out.push(c)
     }
   }
@@ -1079,11 +1084,19 @@ export function layout(m: HqModel, view: View): Layout {
   hint(hr, view.focused, actions)
   place(R - 1, hr)
 
-  if (view.focused && view.cursor !== null) {
-    const r = out.find(row => row.item === view.cursor && row.head)
-    if (r) r.put(r.mark ?? 2, '▶', tok('accent'))
+  const owner: Record<string, string> = {}
+  for (const r of m.flare ? [flare, ...content] : content) {
+    if (r.item !== undefined) for (const b of r.buttons) owner[b.key] ??= r.item
   }
-  return { rows: out, items, itemLine, actions, region, bodyLen: content.length, scroll }
+  // Each drawn item's caret; the cursor's shows the marker.
+  const capped = new Set<string>()
+  for (const r of out) {
+    if (!r.head || r.item === undefined || !actions[r.item] || capped.has(r.item)) continue
+    capped.add(r.item)
+    const isCursor = view.focused && view.cursor === r.item
+    r.button(r.mark ?? 2, isCursor ? '▶' : ' ', { key: caretKey(r.item), action: actions[r.item]! }, isCursor ? tok('accent') : {})
+  }
+  return { rows: out, items, itemLine, owner, actions, region, bodyLen: content.length, scroll }
 }
 
 /** The scroll that keeps `key`'s first line in the window. */
