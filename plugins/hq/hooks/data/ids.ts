@@ -32,7 +32,7 @@ export function findIds(text: string): IdRef[] {
   return hits.flatMap(h => (seen.has(h.ref.id) ? [] : (seen.add(h.ref.id), [h.ref])))
 }
 
-/** "ENG-1947 (withhold file from labels)": the first occurrence of each glossed id in the line. */
+/** "ENG-4821 (webhook retry for refunds)": the first occurrence of each glossed id in the line. */
 export function expandIds(text: string, glosses: Readonly<Record<string, string>> | undefined): string {
   if (!glosses || !text) return text
   const done = new Set<string>()
@@ -82,7 +82,7 @@ export function briefDue(e: GlossEntry | undefined, now: number): boolean {
   return e.briefFailedAt === undefined || now - e.briefFailedAt >= LOOKUP_RETRY_MS
 }
 
-/** `linear issue show <id>` opens with "# ENG-1947: <title>". */
+/** `linear issue show <id>` opens with "# ENG-4821: <title>". */
 export function parseLinearShow(stdout: string, id: string): string | undefined {
   const m = /^#\s+([A-Z]{2,5}-\d+):\s*(.+?)\s*$/m.exec(stdout)
   return m && m[1] === id ? m[2] : undefined

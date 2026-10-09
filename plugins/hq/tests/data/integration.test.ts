@@ -602,18 +602,18 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
   const fx = newFake()
   registry(fx)
   fakeHost(on, fx)
-  fx.linear = { 'ENG-1936': 'Raw bank import: keep every statement line', 'ENG-1947': 'hang' }
-  fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-bank-data.md`] = '# Raw bank data is append-only\n'
+  fx.linear = { 'ENG-4810': 'Raw cart import: keep every statement line', 'ENG-4821': 'hang' }
+  fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-cart-data.md`] = '# Raw cart data is append-only\n'
   const asked: { system: string; prompt: string }[] = []
   on('model.complete', ($, e) => {
     asked.push({ system: e.system ?? '', prompt: e.prompt })
     const text = (e.system ?? '').includes('shorten titles')
       ? JSON.stringify(
           Object.fromEntries(
-            e.prompt.split('\n').map(l => [l.split(':')[0], l.includes('Raw bank import') ? 'raw bank import' : 'append-only bank data']),
+            e.prompt.split('\n').map(l => [l.split(':')[0], l.includes('Raw cart import') ? 'raw cart import' : 'append-only cart data']),
           ),
         )
-      : '{"goal":"Finish ADR 0019 epic ENG-1936 work","step":"Fix batch ENG-1947 in review"}'
+      : '{"goal":"Finish ADR 0019 epic ENG-4810 work","step":"Fix batch ENG-4821 in review"}'
     return {
       value: {
         isAnswered: true,
@@ -624,10 +624,10 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
   })
   const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
   fx.files[path] =
-    `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic ENG-1936 work, then ENG-1947' }, timestamp: '2026-10-08T09:00:00Z' })}\n`
+    `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic ENG-4810 work, then ENG-4821' }, timestamp: '2026-10-08T09:00:00Z' })}\n`
   await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
   await clock.settle()
-  // ENG-1947 never answers: the goal waits ID_WAIT_MS for it, then goes ahead with what resolved.
+  // ENG-4821 never answers: the goal waits ID_WAIT_MS for it, then goes ahead with what resolved.
   for (let i = 0; i < 4; i++) await clock.advance(2_000)
   expect(asked.filter(a => !a.system.includes('shorten titles')).length).toBe(0)
   for (let i = 0; i < 10; i++) await clock.advance(2_000)
@@ -645,18 +645,18 @@ test("integration: ids on a card are glossed from linear and the repo's ADRs; a 
     return text
   }
   const drawn = await pane()
-  expect(drawn.includes('Finish ADR 0019 (append-only bank data) epic ENG-1936 (raw bank import) work')).toBe(true)
-  // ENG-1947 still hangs: bare, and asked once only.
-  expect(drawn.includes('Fix batch ENG-1947 in review')).toBe(true)
-  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'ENG-1947').length).toBe(1)
-  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'ENG-1936').length).toBe(1)
+  expect(drawn.includes('Finish ADR 0019 (append-only cart data) epic ENG-4810 (raw cart import) work')).toBe(true)
+  // ENG-4821 still hangs: bare, and asked once only.
+  expect(drawn.includes('Fix batch ENG-4821 in review')).toBe(true)
+  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'ENG-4821').length).toBe(1)
+  expect(fx.ran.filter(a => a[0] === 'linear' && a[3] === 'ENG-4810').length).toBe(1)
   // The goal waited for the titles it could get, then saw them; one brief call covered both.
   const goals = asked.filter(a => !a.system.includes('shorten titles'))
   expect(goals.length).toBe(1)
-  expect(goals[0]!.prompt.includes('ENG-1936: Raw bank import: keep every statement line')).toBe(true)
+  expect(goals[0]!.prompt.includes('ENG-4810: Raw cart import: keep every statement line')).toBe(true)
   expect(asked.filter(a => a.system.includes('shorten titles')).length).toBe(1)
-  expect((store.get('gloss:ENG-1936') as { brief: string }).brief).toBe('raw bank import')
-  expect((store.get(`gloss:adr:${HOME}/code/x:0019`) as { title: string }).title).toBe('Raw bank data is append-only')
+  expect((store.get('gloss:ENG-4810') as { brief: string }).brief).toBe('raw cart import')
+  expect((store.get(`gloss:adr:${HOME}/code/x:0019`) as { title: string }).title).toBe('Raw cart data is append-only')
 })
 
 for (const how of ['config', 'store'] as const) {
@@ -671,8 +671,8 @@ for (const how of ['config', 'store'] as const) {
       const fx = newFake()
       registry(fx)
       fakeHost(on, fx)
-      fx.linear = { 'ENG-1936': 'Raw bank import: keep every statement line' }
-      fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-bank-data.md`] = '# Raw bank data is append-only\n'
+      fx.linear = { 'ENG-4810': 'Raw cart import: keep every statement line' }
+      fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-cart-data.md`] = '# Raw cart data is append-only\n'
       let calls = 0
       on('model.complete', () => {
         calls++
@@ -686,8 +686,8 @@ for (const how of ['config', 'store'] as const) {
       })
       const path = `${HOME}/.claude/projects/-home-u-code-x/w1.jsonl`
       fx.files[path] = [
-        `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic ENG-1936 work' }, timestamp: '2026-10-08T09:00:00Z' })}\n`,
-        `${JSON.stringify({ type: 'ai-title', aiTitle: 'ENG-1936 bank import' })}\n`,
+        `${JSON.stringify({ type: 'user', message: { content: 'Finish ADR 0019 epic ENG-4810 work' }, timestamp: '2026-10-08T09:00:00Z' })}\n`,
+        `${JSON.stringify({ type: 'ai-title', aiTitle: 'ENG-4810 cart import' })}\n`,
       ].join('')
       await $.session.start({ cwd: `${HOME}/code/app`, surface: 'terminal', isInteractive: true })
       await clock.settle()
@@ -712,9 +712,9 @@ for (const how of ['config', 'store'] as const) {
       await ui.unmount()
       expect(calls).toBe(0)
       expect(fx.ran.filter(a => a[0] === 'linear')).toEqual([])
-      expect(drawn.includes('ENG-1936 bank import')).toBe(true)
+      expect(drawn.includes('ENG-4810 cart import')).toBe(true)
       expect(drawn.includes('should not show')).toBe(false)
-      expect(drawn.includes('(raw bank import)')).toBe(false)
+      expect(drawn.includes('(raw cart import)')).toBe(false)
       expect([...store.keys()].some(k => k.startsWith('goal:') || k.startsWith('gloss:'))).toBe(false)
     },
   )

@@ -136,7 +136,7 @@ export interface OtherSessionVM {
   /** "12 PRs merged, 1 open" over the PRs its transcript links. */
   prText?: string
   todos?: TodoProgress
-  /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-1947", "ADR 0019"). */
+  /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-4821", "ADR 0019"). */
   glosses?: Record<string, string>
   /** What it waits on the user for; a real wait (not `turn`) also makes `status` waiting. */
   wait?: WaitVM
@@ -225,7 +225,7 @@ export interface HqModel {
     waiting?: WaitingVM[]
     agents: AgentVM[]
     prs: PrVM[]
-    /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-1947", "ADR 0019"). */
+    /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-4821", "ADR 0019"). */
     glosses?: Record<string, string>
     context?: ContextUsage
   }
