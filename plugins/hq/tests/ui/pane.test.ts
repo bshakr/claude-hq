@@ -166,3 +166,27 @@ test('the +N finished toggle is a Button the engine accepts, open or closed', as
     await ui.unmount()
   }
 })
+
+test('the cursor row: a heavy card and a bold, wrapped title the engine accepts, its Button keyed as before', async ($, on) => {
+  const p: Probe = { model: BUSY, cursor: null, expanded: [] }
+  probe(on, p)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    for (const [model, cursor] of [
+      [BUSY, 'a:a1'],
+      [QUIET, 'p:acme-store/admin-web#433'],
+      [BUSY, 's:s-st-admin'],
+    ] as const) {
+      p.model = model
+      p.cursor = cursor
+      const ui = await $.ui.mount({ plugin: 'hq', surface, component: 'Pane', requestId: PROBE, props: props(48, 80, true) })
+      const json = JSON.stringify(await ui.drawn())
+      expect(json.includes('backgroundColor')).toBe(false)
+      expect(json.includes('┏━')).toBe(true)
+      const buttons = await ui.findAll({ type: 'Button' })
+      const target = buttons.filter(b => b.props.key === cursor || b.key === cursor)
+      expect(target.length).toBe(1)
+      expect(JSON.stringify(target[0]).includes('"bold":true')).toBe(true)
+      await ui.unmount()
+    }
+  }
+})

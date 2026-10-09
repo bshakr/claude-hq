@@ -269,7 +269,7 @@ describe('layout: glossed ids', () => {
 
   test('narrow: the expanded line is clipped with …; without glosses the ids stay bare', () => {
     const got = draw(model(G), 40)
-    const goal = got[4]!
+    const goal = got[3]!
     expect(goal.includes('Finish ADR 0…  day 2 · ◷ waiting')).toBe(true)
     expect(goal.length).toBeLessThanOrEqual(40)
     const bare = draw(model(undefined), 120)

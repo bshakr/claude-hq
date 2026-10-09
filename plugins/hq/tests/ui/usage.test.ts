@@ -26,12 +26,12 @@ const lines = (m: HqModel, width: number) => rowsOf(m, width).map(r => r.text())
 const M80 = [
   '                                                    5h ▰▱▱▱▱▱ 5% · wk ▰▰▱▱▱▱ 18%',
   '',
-  ' ╭─ claude-hq ────────────────────────────────────────────────────────────────╮',
-  ' │                                                                            │',
+  ' ╭─ claude-hq · this session ─────────────────────────────────────────────────╮',
   ' │  Session usage meters                             day 2 · idle  ▰▰▱▱▱ 28%  │',
   ' │  Wiring the header bars                                                    │',
-  ' │                                                                            │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
+  '',
+  ' ── other sessions ────────────────────────────────────────────────────────────',
   '',
   ' ╭─ work ─────────────────────────────────────────────────────────────────────╮',
   ' │  rp-api                                      2 PRs · ● busy 6m  ▰▰▰▱▱ 55%  │',
@@ -46,12 +46,12 @@ const M80 = [
 const M40 = [
   '            5h ▰▱▱▱▱▱ 5% · wk ▰▰▱▱▱▱ 18%',
   '',
-  ' ╭─ claude-hq ────────────────────────╮',
-  ' │                                    │',
+  ' ╭─ claude-hq · this session ─────────╮',
   ' │  Session usag…  day 2 · idle  28%  │',
   ' │  Wiring the header bars            │',
-  ' │                                    │',
   ' ╰────────────────────────────────────╯',
+  '',
+  ' ── other sessions ────────────────────',
   '',
   ' ╭─ work ─────────────────────────────╮',
   ' │  rp-api    2 PRs · ● busy 6m  55%  │',
@@ -75,7 +75,7 @@ describe('sheet', () => {
   test('30 cols: PR facts drop next; the percent stays', () => {
     const l = lines(METERED, 30)
     expect(l[10]).toBe(' │  rp-api  ● busy 6m  55%  │')
-    expect(l[4]).toBe(' │  Session us…  idle  28%  │')
+    expect(l[3]).toBe(' │  Session us…  idle  28%  │')
   })
   test('narrower still: the percent goes before the status', () => {
     const docs = lines(METERED, 26)[12]!
@@ -115,7 +115,7 @@ describe('colour thresholds', () => {
   for (const width of [40, 80]) {
     test(`${width} cols: each meter and header figure is coloured by its threshold`, () => {
       const r = rowsOf(METERED, width)
-      expect(styleAt(r[4]!, '28%')).toEqual({ dim: true })
+      expect(styleAt(r[3]!, '28%')).toEqual({ dim: true })
       expect(styleAt(r[10]!, '55%')).toEqual({ c: 'wait' })
       expect(styleAt(r[12]!, '85%')).toEqual({ c: 'fail' })
       expect(styleAt(r[12]!, '▰')).toEqual({ c: 'fail' })

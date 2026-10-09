@@ -17,7 +17,7 @@ import { resumeOnly } from './focus'
 import { Row } from './row'
 import type { Action, Sty, Tok } from './row'
 import { expandIds } from '../data/ids'
-import { age, cellLen, clip, elapsed, plural, wrap } from './text'
+import { age, cellLen, clip, elapsed, plural, wrap, wrapCapped } from './text'
 import { accountParts, meterParts, partsWidth, putRight } from './meter'
 import type { Part } from './meter'
 
@@ -73,6 +73,8 @@ type Ctx = {
   phase: number
   expanded: ReadonlySet<string>
   actions: Record<string, Action>
+  /** The cursor's item while the pane is focused, else null. */
+  cursor: string | null
   /** Glosses of the ids in the card being drawn. */
   g?: Readonly<Record<string, string>>
 }
@@ -80,34 +82,51 @@ type Ctx = {
 /** Below this width a card drops its border and keeps its title. */
 const FRAME_MIN = 20
 
-/** Inner rows inside a rounded border, the title in the top edge, two cells of padding each side. */
-function card(x: Ctx, title: string, tone: Tok, inner: Row[], padY: boolean): Row[] {
+/** Rounded at rest; heavy on the card holding the cursor. */
+const ROUND = { tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│' }
+const HEAVY = { tl: '┏', tr: '┓', bl: '┗', br: '┛', h: '━', v: '┃' }
+
+const THIS_SESSION = 'this session'
+
+/** Inner rows inside a border, the title in the top edge, two cells of padding each side. */
+function card(x: Ctx, title: string, tone: Tok, inner: Row[], current = false): Row[] {
   const { W } = x
+  const label: Sty = current ? tok('accent', { bold: true }) : { bold: true }
   if (W < FRAME_MIN) {
     const h = new Row(W)
-    h.put(0, clip(title, W), { bold: true })
+    h.put(0, clip(title, W), label)
     return [h, ...inner.map(r => Object.assign(new Row(W).inset(2, r), { mark: 0 }))]
   }
+  const g = x.cursor !== null && inner.some(r => r.item === x.cursor) ? HEAVY : ROUND
   const edge = tok(tone)
   const top = new Row(W)
-  top.put(1, '╭─', edge)
-  const end = top.put(4, clip(title, W - 8), { bold: true })
-  top.fill(end + 1, W - 2, '─', edge)
-  top.put(W - 2, '╮', edge)
-  const side = (r?: Row) => {
+  top.put(1, `${g.tl}${g.h}`, edge)
+  const room = W - 8
+  // The suffix goes before the name is cut.
+  const suffix = current && title !== THIS_SESSION ? ` · ${THIS_SESSION}` : ''
+  let end = top.put(4, clip(title, room), label)
+  if (suffix && cellLen(title) + cellLen(suffix) <= room) end = top.put(end, suffix, DIM)
+  top.fill(end + 1, W - 2, g.h, edge)
+  top.put(W - 2, g.tr, edge)
+  const side = (r: Row) => {
     const s = new Row(W)
-    if (r) s.inset(4, r)
-    s.put(1, '│', edge)
-    s.put(W - 2, '│', edge)
+    s.inset(4, r)
+    s.put(1, g.v, edge)
+    s.put(W - 2, g.v, edge)
     s.mark = 2
     return s
   }
   const bottom = new Row(W)
-  bottom.put(1, '╰', edge)
-  bottom.fill(2, W - 2, '─', edge)
-  bottom.put(W - 2, '╯', edge)
-  return [top, ...(padY ? [side()] : []), ...inner.map(side), ...(padY ? [side()] : []), bottom]
+  bottom.put(1, g.bl, edge)
+  bottom.fill(2, W - 2, g.h, edge)
+  bottom.put(W - 2, g.br, edge)
+  return [top, ...inner.map(side), bottom]
 }
+
+/** The cursor row's style: bold at full strength. */
+const FOCUS: Sty = { bold: true }
+/** Lines the cursor row may grow to. */
+const FOCUS_LINES = 3
 
 const worst = (tones: readonly Tok[]): Tok => (tones.includes('fail') ? 'fail' : tones.includes('wait') ? 'wait' : 'rule')
 
@@ -231,6 +250,15 @@ function agentRows(node: Node, depth: number, x: Ctx): Row[] {
   const r = mk(true)
   const out: Row[] = [r]
   r.gutter = failed ? 'fail' : live ? 'run' : undefined
+  const focused = x.cursor === key
+  /** One line clipped to `first`, or on the cursor row up to FOCUS_LINES, the rest `IW - tc` wide. */
+  const lines = (text: string, first: number) => (focused ? wrapCapped(text, first, IW - tc, FOCUS_LINES) : [clip(text, first)])
+  const extra = (rest: string[], sty: Sty) =>
+    rest.map(line => {
+      const c = mk(false)
+      c.put(tc, line, sty)
+      return c
+    })
 
   if (!failed && !live) {
     const killed = a.status === 'killed'
@@ -238,11 +266,17 @@ function agentRows(node: Node, depth: number, x: Ctx): Row[] {
     const avail = rightPart(r, tc, a.endedAt !== undefined ? `${age(now - a.endedAt)} ago` : '')
     const outcome = summaryLine(a.outcome) ?? (killed ? 'stopped' : '')
     const full = gl(a.title)
-    const title = outcome && cellLen(full) + 3 + 12 > avail ? clip(full, Math.max(8, avail - 3 - 12)) : clip(full, avail)
-    let c = r.button(tc, title, { key, action: x.actions[key]!, dim: true }, DIM)
-    if (outcome && avail - cellLen(title) - 3 >= 4) {
-      c = r.put(c, ' → ', DIM)
-      r.put(c, clip(outcome, avail - cellLen(title) - 3), DIM)
+    if (focused) {
+      const [head = '', ...rest] = lines(outcome ? `${full} → ${outcome}` : full, avail)
+      r.button(tc, head, { key, action: x.actions[key]! }, FOCUS)
+      out.push(...extra(rest, FOCUS))
+    } else {
+      const title = outcome && cellLen(full) + 3 + 12 > avail ? clip(full, Math.max(8, avail - 3 - 12)) : clip(full, avail)
+      let c = r.button(tc, title, { key, action: x.actions[key]!, dim: true }, DIM)
+      if (outcome && avail - cellLen(title) - 3 >= 4) {
+        c = r.put(c, ' → ', DIM)
+        r.put(c, clip(outcome, avail - cellLen(title) - 3), DIM)
+      }
     }
   } else {
     const longCall = a.status === 'running' && a.callSince !== undefined && now - a.callSince >= LONG_CALL_MS
@@ -257,13 +291,19 @@ function agentRows(node: Node, depth: number, x: Ctx): Row[] {
     }
     if (IW - tc - cellLen(right) - 2 < 12) right = parts.slice(-1).join('')
     const room = rightPart(r, tc, right)
-    r.button(tc, clip(gl(a.title), room), { key, action: x.actions[key]! }, failed ? { bold: true } : {})
+    const sty = failed || focused ? FOCUS : {}
+    const [head = '', ...rest] = lines(gl(a.title), room)
+    r.button(tc, head, { key, action: x.actions[key]! }, sty)
+    out.push(...extra(rest, sty))
 
     const d = mk(false)
+    let more: Row[] = []
     if (failed) {
       const tail = a.endedAt !== undefined ? ` · failed ${age(now - a.endedAt)} ago` : ''
-      const c = d.put(tc, clip(gl(a.now ?? a.outcome ?? 'failed'), IW - tc - cellLen(tail)))
+      const [first = '', ...rest2] = lines(gl(a.now ?? a.outcome ?? 'failed'), IW - tc - cellLen(tail))
+      const c = d.put(tc, first)
       if (tail) d.put(c, tail, DIM)
+      more = extra(rest2, {})
     } else if (longCall) {
       d.put(tc, waitingLine(gl(a.now ?? 'working'), now - a.callSince!, IW - tc), DIM)
     } else {
@@ -273,10 +313,12 @@ function agentRows(node: Node, depth: number, x: Ctx): Row[] {
         a.status === 'waiting' && child
           ? `waiting on ${gl(child.a.title)}`
           : gl(a.todo?.text ?? a.now ?? (a.status === 'pending' ? 'starting' : 'working'))
-      d.put(tc, clip(text, IW - tc - (progress ? cellLen(progress) + 2 : 0)), DIM)
+      const [first = '', ...rest2] = lines(text, IW - tc - (progress ? cellLen(progress) + 2 : 0))
+      d.put(tc, first, DIM)
       if (progress) d.right(progress, DIM)
+      more = extra(rest2, DIM)
     }
-    out.push(d)
+    out.push(d, ...more)
   }
 
   if (x.expanded.has(a.id)) {
@@ -320,7 +362,10 @@ function agentBlock(agents: readonly AgentVM[], x: Ctx): Row[] {
     r.item = FINISHED_KEY
     r.head = true
     const n = finished.length - 1
-    r.button(2, open ? `− ${n} finished` : `+${n} finished`, { key: FINISHED_KEY, action: x.actions[FINISHED_KEY], dim: true }, DIM)
+    const label = open ? `− ${n} finished` : `+${n} finished`
+    const action = x.actions[FINISHED_KEY]
+    if (x.cursor === FINISHED_KEY) r.button(2, label, { key: FINISHED_KEY, action }, FOCUS)
+    else r.button(2, label, { key: FINISHED_KEY, action, dim: true }, DIM)
     out.push(r)
     if (open) finished.slice(1).forEach(f => walk(f, 0))
   }
@@ -461,7 +506,7 @@ function sessionCard(m: HqModel, x0: Ctx): Row[] {
     inner.push(r)
   }
   const tone = worst(cur.agents.filter(a => a.status === 'failed').map(() => 'fail' as const))
-  return card(x, cur.goal && cur.title ? cur.title : 'this session', tone, inner, true)
+  return card(x, cur.goal && cur.title ? cur.title : THIS_SESSION, tone, inner, true)
 }
 
 // ---------- other sessions ----------
@@ -559,19 +604,29 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
   let col = IW - width(right)
   for (const p of right) col = r.put(col, p.t, p.s)
   const room = right.length ? IW - width(right) - 2 : IW
-  const sty: Sty = s.status === 'waiting' ? { bold: true } : {}
+  const focused = s.jump !== undefined && x.cursor === key
+  const sty: Sty = s.status === 'waiting' || focused ? FOCUS : {}
+  const lines = (text: string, first: number) => (focused ? wrapCapped(text, first, IW, FOCUS_LINES) : [clip(text, first)])
+  const extra = (rest: string[], st: Sty) =>
+    rest.map(line => {
+      const c = under()
+      c.put(0, line, st)
+      return c
+    })
+  const [head = '', ...rest] = lines(name, room)
   if (s.jump) {
     x.actions[key] = { kind: 'jump', jump: s.jump }
-    r.button(0, clip(name, room), { key, action: x.actions[key] }, sty)
-  } else r.put(0, clip(name, room), sty)
-  const out = [r]
+    r.button(0, head, { key, action: x.actions[key] }, sty)
+  } else r.put(0, head, sty)
+  const out = [r, ...extra(rest, sty)]
   const second = expandIds([s.step, s.prText].filter(Boolean).join(' · ') || s.detail || '', s.glosses)
   const hint = s.jump && resumeOnly(s.jump) && IW >= 32 ? RESUME_HINT : ''
   if (second || hint) {
     const d = under()
-    d.put(0, clip(second, hint ? IW - cellLen(hint) - 2 : IW), DIM)
+    const [first = '', ...more] = lines(second, hint ? IW - cellLen(hint) - 2 : IW)
+    d.put(0, first, DIM)
     if (hint) d.right(hint, DIM)
-    out.push(d)
+    out.push(d, ...extra(more, DIM))
   }
   if (s.todos && s.todos.total > 0) {
     const t = under()
@@ -610,7 +665,7 @@ function groupCard(group: TmuxGroupVM, x: Ctx): Row[] {
     if (i > 0) inner.push(new Row(x.IW))
     inner.push(...otherRows(s, x))
   })
-  return card(x, group.tmuxSession || 'no tmux', worst(group.sessions.map(sessionTone)), inner, false)
+  return card(x, group.tmuxSession || 'no tmux', worst(group.sessions.map(sessionTone)), inner)
 }
 
 // ---------- pull requests ----------
@@ -729,6 +784,22 @@ function prRows(p: PrVM, tcol: number, x: Ctx): Row[] {
   r.head = true
   r.gutter = k === 'fail' ? 'fail' : k === 'wait' ? 'wait' : k === 'run' ? 'run' : undefined
   const ref = `#${p.number}`
+  const out = [r]
+  /** The title as its Button; on the cursor row the whole title, wrapped under itself. */
+  const title = (room: number, dim: boolean) => {
+    if (x.cursor !== key) {
+      r.button(tcol, clip(p.title, room), { key, action: x.actions[key]!, ...(dim ? { dim: true as const } : {}) }, dim ? DIM : {})
+      return
+    }
+    const [head = '', ...rest] = wrapCapped(p.title, room, IW - tcol, FOCUS_LINES)
+    r.button(tcol, head, { key, action: x.actions[key]! }, FOCUS)
+    for (const line of rest) {
+      const c = new Row(IW)
+      c.item = key
+      c.put(tcol, line, FOCUS)
+      out.push(c)
+    }
+  }
   if (k === 'gone') {
     r.put(0, ref, { dim: true, href: p.url })
     const room = rightPart(
@@ -737,15 +808,15 @@ function prRows(p: PrVM, tcol: number, x: Ctx): Row[] {
       p.merge === 'closed' ? 'closed' : p.mergedAt !== undefined ? `merged ${age(now - p.mergedAt)} ago` : 'merged',
       8,
     )
-    r.button(tcol, clip(p.title, room), { key, action: x.actions[key]!, dim: true }, DIM)
-    return [r]
+    title(room, true)
+    return out
   }
   const needs = k === 'fail' || k === 'wait'
   r.put(0, ref, needs ? { bold: true, href: p.url } : { href: p.url })
   const bar = IW >= 56 ? 10 : 6
   const barW = bar + 1 + 5
   const took = IW - tcol - barW - 2 >= 10 ? checkBar(r, bar, p.ci, x.phase) : 0
-  r.button(tcol, clip(p.title, IW - tcol - (took ? took + 2 : 0)), { key, action: x.actions[key]! })
+  title(IW - tcol - (took ? took + 2 : 0), false)
 
   const d = new Row(IW)
   d.item = key
@@ -766,7 +837,8 @@ function prRows(p: PrVM, tcol: number, x: Ctx): Row[] {
     if (sep) c = d.put(c, ' · ', DIM)
     c = d.put(c, t, s)
   }
-  return [r, d]
+  out.push(d)
+  return out
 }
 
 function prCard(prs: readonly PrVM[], x: Ctx): Row[] {
@@ -784,7 +856,7 @@ function prCard(prs: readonly PrVM[], x: Ctx): Row[] {
   })
   const kinds = prs.map(prKind)
   const tone = worst(kinds.map(k => (k === 'fail' ? 'fail' : k === 'wait' ? 'wait' : 'rule')))
-  return card(x, 'pull requests', tone, inner, false)
+  return card(x, 'pull requests', tone, inner)
 }
 
 // ---------- hint and indicators ----------
@@ -831,8 +903,21 @@ function litCount(rows: readonly Row[]) {
 
 // ---------- the pane ----------
 
+/** Separates this session's card from the others: a dim rule across the card width. */
+function divider(W: number): Row {
+  const r = new Row(W)
+  if (W < FRAME_MIN) {
+    r.put(0, clip('── other sessions', W), DIM)
+    return r
+  }
+  const end = r.put(1, '── other sessions ', DIM)
+  r.fill(end, W - 1, '─', DIM)
+  return r
+}
+
 export function body(m: HqModel, x: Ctx): Row[] {
   const out: Row[] = [...sessionCard(m, x)]
+  if (m.others.length) out.push(new Row(x.W), divider(x.W))
   for (const g of m.others) out.push(new Row(x.W), ...groupCard(g, x))
   if (m.current.prs.length) out.push(new Row(x.W), ...prCard(m.current.prs, x))
   return out
@@ -844,7 +929,15 @@ export function layout(m: HqModel, view: View): Layout {
   const R = Math.max(1, view.rows)
   const actions: Record<string, Action> = {}
   const IW = Math.max(1, W >= FRAME_MIN ? W - 8 : W - 2)
-  const x: Ctx = { W, IW, now: m.now, phase: view.phase, expanded: new Set(view.expanded), actions }
+  const x: Ctx = {
+    W,
+    IW,
+    now: m.now,
+    phase: view.phase,
+    expanded: new Set(view.expanded),
+    actions,
+    cursor: view.focused ? view.cursor : null,
+  }
 
   const top0 = new Row(W)
   header(top0, m, view.focused)

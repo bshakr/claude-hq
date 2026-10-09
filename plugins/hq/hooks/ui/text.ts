@@ -65,3 +65,25 @@ export function wrap(text: string, w: number): string[] {
   if (line) out.push(line)
   return out
 }
+
+/**
+ * Word wrap for the cursor row: the first line in `first` cells, the rest in `rest`,
+ * at most `max` lines, the last one clipped with `…` when text remains.
+ */
+export function wrapCapped(text: string, first: number, rest: number, max: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  const out: string[] = []
+  let i = 0
+  while (i < words.length && out.length < max) {
+    const w = out.length === 0 ? first : rest
+    if (w <= 0) break
+    if (out.length === max - 1) {
+      out.push(clip(words.slice(i).join(' '), w))
+      break
+    }
+    let line = clip(words[i++]!, w)
+    while (i < words.length && cellLen(`${line} ${words[i]}`) <= w) line = `${line} ${words[i++]}`
+    out.push(line)
+  }
+  return out
+}
