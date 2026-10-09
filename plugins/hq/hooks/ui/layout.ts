@@ -160,6 +160,9 @@ function card(x: Ctx, title: string, tone: Tok, inner: Row[], current = false): 
 const FOCUS: Sty = { bold: true }
 /** A link's cursor row: underlined too. */
 const LINK_FOCUS: Sty = { bold: true, underline: true }
+/** The cursor item's caret label; a blank one marks every other item. */
+export const CURSOR_CARET = '▐'
+
 /** Lines the cursor row may grow to. */
 const FOCUS_LINES = 3
 
@@ -1114,7 +1117,7 @@ export function layout(m: HqModel, view: View): Layout {
     if (!r.head || r.item === undefined || !actions[r.item] || capped.has(r.item)) continue
     capped.add(r.item)
     const isCursor = view.focused && view.cursor === r.item
-    r.button(r.mark ?? 2, isCursor ? '▐' : ' ', { key: caretKey(r.item), action: actions[r.item]! }, isCursor ? tok('accent') : {})
+    r.button(r.mark ?? 2, isCursor ? CURSOR_CARET : ' ', { key: caretKey(r.item), action: actions[r.item]! }, isCursor ? tok('accent') : {})
   }
   return { rows: out, items, itemLine, owner, actions, region, bodyLen: content.length, scroll }
 }

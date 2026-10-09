@@ -2,6 +2,10 @@
 
 Each release has a section headed `## X.Y.Z`; the release workflow publishes that section as the GitHub release notes.
 
+## 0.1.1
+
+- Hovering a row reads like the keyboard cursor: its title turns bold, a PR title underlined too, instead of the light inverted block. Other Buttons in the pane no longer invert under the pointer either.
+
 ## 0.1.0
 
 First release.
