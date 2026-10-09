@@ -130,6 +130,8 @@ export function toSessionVM(
   const status = real ? 'waiting' : mapStatus(row.status)
   const fresh = published && now - published.updatedAt < PUBLISH_FRESH_MS ? published : undefined
   const agents = fresh?.agents ?? transcriptAgents
+  const turnSince = wait?.kind === 'turn' && status === 'idle' && wait.since > 0 ? wait.since : undefined
+  const since = real ? wait.since : (turnSince ?? (typeof row.statusUpdatedAt === 'number' ? row.statusUpdatedAt : undefined))
   return {
     sessionId: row.sessionId,
     name,
@@ -140,7 +142,7 @@ export function toSessionVM(
     ...(row.kind === 'bg' && !row.tmux ? { background: true as const } : {}),
     ...(real ? { waitingFor: wait.text, wait } : status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
     ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
-    ...(real ? { statusSince: wait.since } : typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
+    ...(since !== undefined ? { statusSince: since } : {}),
     ...(fresh ? { agentsRunning: fresh.agentsRunning, prSummary: fresh.prSummary } : {}),
     ...(fresh?.prs?.length ? { prs: fresh.prs } : {}),
     ...(!fresh && agents?.length ? { agentsRunning: agents.length } : {}),

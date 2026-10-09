@@ -213,6 +213,8 @@ export function installWaits(on: On): void {
 export interface TranscriptWait {
   ask?: { id: string; wait: WaitVM }
   turnEnded?: boolean
+  /** When the reply that ended the turn was written. */
+  endedAt?: number
   /** The question the last reply ended on, when it ended the turn. */
   asked?: WaitVM
 }
@@ -231,6 +233,8 @@ export function noteWaitLine(d: TranscriptWait, v: Obj, ts: number | undefined):
     }
     d.turnEnded = msg?.stop_reason === 'end_turn'
     delete d.asked
+    delete d.endedAt
+    if (d.turnEnded && ts !== undefined) d.endedAt = ts
     if (d.turnEnded) {
       const texts = content.flatMap(b => (obj(b)?.type === 'text' ? (str(obj(b)?.text) ?? []) : []))
       const asked = askedWait(texts[texts.length - 1] ?? '', ts ?? 0)
@@ -245,6 +249,7 @@ export function noteWaitLine(d: TranscriptWait, v: Obj, ts: number | undefined):
   }
   d.turnEnded = false
   delete d.asked
+  delete d.endedAt
 }
 
 /** Another session's wait: its HQ's own word when it publishes, else its transcript's open question, else the question its last reply ended on, else "your turn" when idle after a reply. */
@@ -257,6 +262,8 @@ export function otherWait(
   if (pub) return pub.waiting
   if (t?.ask) return t.ask.wait
   if (status !== 'busy' && status !== 'waiting' && t?.turnEnded && t.asked) return t.asked
-  if (status !== 'busy' && status !== 'waiting' && t?.turnEnded) return { kind: 'turn', text: 'your turn', since: statusSince ?? 0 }
+  // The registry's statusUpdatedAt moves on heartbeats (a bg worker's), so the reply's own time wins.
+  if (status !== 'busy' && status !== 'waiting' && t?.turnEnded)
+    return { kind: 'turn', text: 'your turn', since: t.endedAt ?? statusSince ?? 0 }
   return undefined
 }
