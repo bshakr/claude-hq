@@ -13,7 +13,6 @@ function pr(number: number, over: Partial<PrVM> = {}): PrVM {
     url: `https://github.com/acme/app/pull/${number}`,
     ci: { kind: 'passed', total: 3 },
     merge: 'mergeable',
-    gallery: 'none',
     watcher: 'ci-wait',
     claimedBy: 'main',
     ...over,

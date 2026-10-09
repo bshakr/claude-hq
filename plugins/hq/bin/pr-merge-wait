@@ -199,9 +199,9 @@ FIELDS='state,mergeable,mergeStateStatus,mergeCommit,headRefName'
 # collapse the empty mergeCommit of an unmerged PR and shift every later field.
 QUERY='[.state, .mergeable, .mergeStateStatus, (.mergeCommit.oid // ""), .headRefName] | join("|")'
 if [ "$STATE_ON" = 1 ]; then
-	# Second output line for the state file; tojson keeps a multi-line body on one line.
-	FIELDS="$FIELDS,headRefOid,title,body"
-	QUERY="($QUERY), ({headRefOid, title, body} | tojson)"
+	# Second output line for the state file.
+	FIELDS="$FIELDS,headRefOid,title"
+	QUERY="($QUERY), ({headRefOid, title} | tojson)"
 fi
 
 # --- state files and child processes ----------------------------------------
@@ -260,7 +260,6 @@ write_state() {
 				 stale: $stale, lastOkAt: ($lastok | tonumber | todate),
 				 mergeable: $mergeable, mergeStateStatus: $mss, checks: []}
 				+ (if .title then {title} else {} end)
-				+ (if .body then {body} else {} end)
 				| if $code != "" then .exited = {code: ($code | tonumber), at: $now, reason: $reason} else . end
 				' >"$STATE_TMP" &&
 			mv -f "$STATE_TMP" "$f"

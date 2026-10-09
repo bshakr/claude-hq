@@ -190,7 +190,6 @@ write_state() {
 				     status: (if .bucket == "pending" then (.state // "PENDING") else "COMPLETED" end),
 				     conclusion: (if .bucket == "pending" then null else .state end),
 				     required: (.name as $n | $req | index($n) != null)}]}
-				+ (if .body then {body} else {} end)
 				| if $code != "" then .exited = {code: ($code | tonumber), at: $now, reason: $reason} else . end
 				' >"$STATE_TMP" &&
 			mv -f "$STATE_TMP" "$STATE_FILE"
@@ -225,7 +224,7 @@ fi
 
 # --- confirm the PR exists and is open ------------------------------------
 gh_rc=0
-xrun gh pr view "$PR" --repo "$REPO" --json number,state,url,headRefOid,title,body || gh_rc=$?
+xrun gh pr view "$PR" --repo "$REPO" --json number,state,url,headRefOid,title || gh_rc=$?
 pr_json=$(cat "$XDIR/out" "$XDIR/err")
 if [ "$gh_rc" -ne 0 ]; then
 	printf '%s: PR %s not found in %s\n%s\n' "$PROG" "$PR" "$REPO" "$pr_json" >&2

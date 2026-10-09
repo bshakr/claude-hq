@@ -80,7 +80,6 @@ export type CiState =
 
 export type MergeState = 'mergeable' | 'conflicting' | 'behind' | 'blocked' | 'unknown' | 'merged' | 'closed'
 export type Watcher = 'ci-wait' | 'merge-wait' | 'none'
-export type Gallery = 'linked' | 'no-visual-change' | 'none' | 'unknown'
 
 export interface PrVM {
   repo: string // "owner/name"
@@ -89,7 +88,6 @@ export interface PrVM {
   url: string
   ci: CiState
   merge: MergeState
-  gallery: Gallery
   watcher: Watcher
   /** epoch ms of the watcher's last poll, from its state file */
   polledAt?: number
@@ -278,7 +276,6 @@ export interface PrWatchState {
   mergeable?: string // GitHub's mergeable
   mergeStateStatus?: string // GitHub's mergeStateStatus
   checks: { name: string; status: string; conclusion: string | null; required?: boolean }[]
-  body?: string // for gallery detection; may be omitted
   exited?: { code: number; at: string; reason: string }
   /** true when the latest poll failed; the other fields are from the last good read */
   stale?: boolean

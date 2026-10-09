@@ -75,7 +75,6 @@ const pr = (p: Partial<PrVM> & Pick<PrVM, 'repo' | 'number' | 'title'>): PrVM =>
   url: `https://github.com/${p.repo}/pull/${p.number}`,
   ci: { kind: 'passed', total: 7 },
   merge: 'mergeable',
-  gallery: 'none',
   watcher: 'ci-wait',
   claimedBy: 'main',
   ...p,
@@ -92,7 +91,6 @@ export const PRS: PrVM[] = [
     title: 'Sidebar: collapse state persists',
     merge: 'merged',
     mergedAt: NOW - 4 * M,
-    gallery: 'linked',
     watcher: 'merge-wait',
   }),
   pr({
@@ -107,13 +105,12 @@ export const PRS: PrVM[] = [
     title: 'Pipeline: retry classification on timeout',
     ci: { kind: 'running', done: 5, total: 9, failed: 0 },
   }),
-  pr({ repo: ADMIN, number: 433, title: 'Stat cards: one-decimal trend deltas', gallery: 'linked', watcher: 'merge-wait' }),
+  pr({ repo: ADMIN, number: 433, title: 'Stat cards: one-decimal trend deltas', watcher: 'merge-wait' }),
   pr({
     repo: ADMIN,
     number: 431,
     title: 'Members table: sticky header on scroll',
     merge: 'behind',
-    gallery: 'linked',
     watcher: 'merge-wait',
   }),
   pr({
@@ -121,7 +118,6 @@ export const PRS: PrVM[] = [
     number: 522,
     title: 'Bookings: idempotent webhook replay',
     ci: { kind: 'passed', total: 6 },
-    gallery: 'no-visual-change',
     watcher: 'none',
   }),
 ]
@@ -218,13 +214,12 @@ export const QUIET: HqModel = {
     label: LABEL,
     agents: [],
     prs: [
-      pr({ repo: ADMIN, number: 433, title: 'Stat cards: one-decimal trend deltas', gallery: 'linked', watcher: 'merge-wait' }),
+      pr({ repo: ADMIN, number: 433, title: 'Stat cards: one-decimal trend deltas', watcher: 'merge-wait' }),
       pr({
         repo: API,
         number: 522,
         title: 'Bookings: idempotent webhook replay',
         ci: { kind: 'passed', total: 6 },
-        gallery: 'no-visual-change',
         watcher: 'merge-wait',
       }),
     ],
@@ -324,7 +319,7 @@ export const ACTIVE: HqModel = {
                   doing: 'Run ledger specs',
                 },
                 { id: 'o2', title: 'Review the members table PR', model: 'claude-sonnet-4-6', startedAt: NOW - 20 * M },
-                { id: 'o3', title: 'Capture screenshot pairs', startedAt: NOW - 25 * M, doing: 'editing gallery.html' },
+                { id: 'o3', title: 'Capture screenshot pairs', startedAt: NOW - 25 * M, doing: 'editing compare.html' },
               ],
             }
           : s,
@@ -382,7 +377,7 @@ export const WITH_PRS: HqModel = {
           statusSince: NOW - 6 * M,
           prSummary: { total: 2, broken: 0, waiting: 0, inProgress: 1 },
           prs: [
-            pr({ repo: ADMIN, number: 433, title: 'Stat cards: one-decimal trend deltas', gallery: 'linked' }),
+            pr({ repo: ADMIN, number: 433, title: 'Stat cards: one-decimal trend deltas' }),
             pr({ repo: ADMIN, number: 434, title: 'Members table: sticky header', ci: { kind: 'running', done: 2, total: 7, failed: 0 } }),
           ],
         },

@@ -185,7 +185,7 @@ describe('colour', () => {
     const facts = (ref: string) => rows[rows.indexOf(row(ref)) + 1]!
     expect(runsOf(facts('#212'))[0]).toEqual({ col: 10, t: '✗ rspec failed', tok: 'fail' })
     expect(runsOf(facts('#431'))).toContainEqual({ col: 22, t: '↑ behind main', tok: 'wait' })
-    expect(runsOf(facts('#522'))).toContainEqual({ col: 41, t: 'no watcher', tok: 'wait' })
+    expect(runsOf(facts('#522'))).toContainEqual({ col: 22, t: 'no watcher', tok: 'wait' })
   })
 
   test("quiet has no coloured cell but the borders and this session's title; focus adds only ▌ and ▐", () => {
@@ -459,7 +459,7 @@ describe('other sessions: one card per tmux group', () => {
       ' │    Run ledger specs                                                        │',
       ' │  ● Review the members table PR                               sonnet · 20m  │',
       ' │  ● Capture screenshot pairs                                           25m  │',
-      ' │    editing gallery.html                                                    │',
+      ' │    editing compare.html                                                    │',
       ' │    +1 more                                                                 │',
       ' ├────────────────────────────────────────────────────────────────────────────┤',
       ' │  st-docs                                                          idle 1h  │',

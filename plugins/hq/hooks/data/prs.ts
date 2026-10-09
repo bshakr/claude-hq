@@ -1,4 +1,4 @@
-import type { CiState, Gallery, MergeState, PrVM, PrWatchState, Watcher } from '../model/types'
+import type { CiState, MergeState, PrVM, PrWatchState, Watcher } from '../model/types'
 
 export const MERGED_KEEP_MS = 30 * 60_000
 
@@ -71,13 +71,6 @@ export function deriveMerge(state: Pick<PrWatchState, 'state' | 'mergeable' | 'm
   return 'unknown'
 }
 
-export function deriveGallery(body: string | undefined): Gallery {
-  if (body === undefined) return 'unknown'
-  if (/claude\.ai\/(code\/)?artifact\//.test(body)) return 'linked'
-  if (/^\s*No visual change:/m.test(body)) return 'no-visual-change'
-  return 'none'
-}
-
 export function parseStateFile(text: string): PrWatchState | undefined {
   try {
     const v = JSON.parse(text) as PrWatchState
@@ -97,7 +90,7 @@ const SETTLED = new Set<CiState['kind']>(['passed', 'failed', 'skippedRequired']
 
 /**
  * Builds a PR row from its claim and watcher files: checks from ci-wait, merge state from
- * merge-wait (ci-wait carries no `mergeable`), title/url/body/state from the newer file.
+ * merge-wait (ci-wait carries no `mergeable`), title/url/state from the newer file.
  */
 export function prFromSources(claim: StoredClaim, files: PrFiles, isAlive: (pid: number) => boolean): PrVM {
   const latest = newer(files.ci, files.merge)
@@ -112,7 +105,6 @@ export function prFromSources(claim: StoredClaim, files: PrFiles, isAlive: (pid:
       url,
       ci: { kind: 'none' },
       merge,
-      gallery: 'unknown',
       watcher: 'none',
       claimedBy: claim.claimedBy,
       ...(merge === 'merged' && claim.endedAt !== undefined ? { mergedAt: claim.endedAt } : {}),
@@ -137,7 +129,6 @@ export function prFromSources(claim: StoredClaim, files: PrFiles, isAlive: (pid:
           ? 'merge-wait'
           : 'none'
   const polledAt = Math.max(...[files.ci, files.merge].map(f => (f ? Date.parse(f.updatedAt) : NaN)).filter(Number.isFinite))
-  const body = latest.body ?? files.ci?.body ?? files.merge?.body
   const stale = files.ci?.stale === true || files.merge?.stale === true
   return {
     repo: claim.repo,
@@ -146,7 +137,6 @@ export function prFromSources(claim: StoredClaim, files: PrFiles, isAlive: (pid:
     url,
     ci,
     merge,
-    gallery: deriveGallery(body),
     watcher,
     claimedBy: claim.claimedBy,
     ...(Number.isFinite(polledAt) ? { polledAt } : {}),

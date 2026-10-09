@@ -75,7 +75,6 @@ test('fleet: registry row → session VM; shell reads as idle; stale publish ign
     url: 'https://github.com/acme/app/pull/7',
     ci: { kind: 'failed' as const, done: 2, total: 2, failed: 1, firstFailing: 'api' },
     merge: 'mergeable' as const,
-    gallery: 'none' as const,
     watcher: 'ci-wait' as const,
     claimedBy: 'main',
   }
@@ -130,7 +129,6 @@ function sheetA() {
     url: '',
     ci: { kind: 'passed', total: 7 },
     merge: 'mergeable',
-    gallery: 'none',
     watcher: 'ci-wait',
     claimedBy: 'main',
     ...p,
@@ -187,7 +185,6 @@ test("model: status line leaves out other sessions' PRs and this session's agent
     url: '',
     ci: red,
     merge: 'behind',
-    gallery: 'none',
     watcher: 'ci-wait',
     claimedBy: 'main',
   }

@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { PrWatchState } from '../../hooks/model/types'
-import { claimKey, deriveCi, deriveGallery, deriveMerge, prFromSources, prTone, stateFileName } from '../../hooks/data/prs'
+import { claimKey, deriveCi, deriveMerge, prFromSources, prTone, stateFileName } from '../../hooks/data/prs'
 
 const base: PrWatchState = {
   version: 1,
@@ -76,13 +76,6 @@ test('state file: merge states', () => {
   expect(deriveMerge({ ...base, state: 'CLOSED' })).toBe('closed')
 })
 
-test('state file: gallery from the body, unknown without one', () => {
-  expect(deriveGallery(undefined)).toBe('unknown')
-  expect(deriveGallery('Gallery: https://claude.ai/artifact/abc')).toBe('linked')
-  expect(deriveGallery('## Screenshots\nNo visual change: CSS diff empty')).toBe('no-visual-change')
-  expect(deriveGallery('nothing')).toBe('none')
-})
-
 test('state file: watcher is none once the pid is dead or the watcher exited', () => {
   expect(prFromSources(claim, { ci: base }, yes).watcher).toBe('ci-wait')
   expect(prFromSources(claim, { ci: base }, no).watcher).toBe('none')
@@ -107,7 +100,6 @@ test('no state file: title and url from the claim, ci none, watcher none, waitin
     url: 'https://github.com/acme/app/pull/12',
     ci: { kind: 'none' },
     merge: 'unknown',
-    gallery: 'unknown',
     watcher: 'none',
     claimedBy: 'main',
   })
@@ -146,7 +138,6 @@ const mergeFile: PrWatchState = {
   title: 'New title',
   mergeable: 'MERGEABLE',
   mergeStateStatus: 'BEHIND',
-  body: 'https://claude.ai/artifact/x',
 }
 
 test('two files: checks from ci-wait, merge from merge-wait, title from the newer, settled CI prefers merge-wait', () => {
@@ -155,7 +146,6 @@ test('two files: checks from ci-wait, merge from merge-wait, title from the newe
     ci: { kind: 'passed', total: 2 },
     merge: 'behind',
     title: 'New title',
-    gallery: 'linked',
     watcher: 'merge-wait',
     polledAt: Date.parse('2026-10-08T10:01:00Z'),
   })
