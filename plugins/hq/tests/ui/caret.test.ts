@@ -138,7 +138,7 @@ describe('the cursor row is drawn bold; a PR, a link, underlined too', () => {
         const auto = buttons.filter(b => b.props.autoFocus === true).map(b => b.key ?? b.props.key)
         expect(auto).toEqual([caretKey(cursor)])
         const caret = JSON.stringify(buttons.find(b => (b.key ?? b.props.key) === caretKey(cursor)))
-        expect(caret.includes('▶')).toBe(true)
+        expect(caret.includes('▐')).toBe(true)
         // No other row is underlined at rest (hover underlines are the surface's, under the pointer).
         const others = buttons.filter(b => (b.key ?? b.props.key) !== cursor)
         expect(others.some(b => JSON.stringify(b.children).includes('"underline":true'))).toBe(false)

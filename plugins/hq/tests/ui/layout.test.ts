@@ -69,7 +69,7 @@ const DATA_TEXT = [
 ]
   .filter(Boolean)
   .sort((a, b) => b.length - a.length)
-const GLYPHS = new Set([...'▌▶◆●◦○✓✗↑↓→·⏎⌃…─│╭╮╰╯┏┓┗┛┃├┤┣┫▰▱◷━−'])
+const GLYPHS = new Set([...'▌▐◆●◦○✓✗↑↓→·⏎⌃…─│╭╮╰╯┏┓┗┛┃├┤┣┫▰▱◷━−'])
 
 describe('every state, every width', () => {
   test('rows fill the body exactly and never pass its width', () => {
@@ -188,15 +188,15 @@ describe('colour', () => {
     expect(runsOf(facts('#522'))).toContainEqual({ col: 41, t: 'no watcher', tok: 'wait' })
   })
 
-  test("quiet has no coloured cell but the borders and this session's title; focus adds only ▌ and ▶", () => {
+  test("quiet has no coloured cell but the borders and this session's title; focus adds only ▌ and ▐", () => {
     expect(coloured(layout(QUIET, view()).rows).map(s => `${s.t}=${s.s.c}`)).toEqual(['this session=accent'])
     const focused = layout(QUIET, view({ focused: true, cursor: 'p:acme-store/admin-web#433' }))
-    expect(coloured(focused.rows).map(s => `${s.t}=${s.s.c}`)).toEqual(['▌=accent', 'this session=accent', '▶=accent'])
+    expect(coloured(focused.rows).map(s => `${s.t}=${s.s.c}`)).toEqual(['▌=accent', 'this session=accent', '▐=accent'])
   })
 
   test('unfocused draws no cursor even with one remembered', () => {
     const text = lines(BUSY, { cursor: 'flare' }).join('\n')
-    expect(text.includes('▶')).toBe(false)
+    expect(text.includes('▐')).toBe(false)
     expect(text.includes('▌')).toBe(false)
   })
 
@@ -604,9 +604,9 @@ describe('focus: the cursor card is heavy, the cursor row bold and whole', () =>
 
   test('the cursor row alone takes the caret and bold; its card-mates keep their style', () => {
     const rows = layout(BUSY, view({ rows: 120, focused: true, cursor: 'a:a1' })).rows
-    const marked = rows.filter(r => r.text().includes('▶'))
+    const marked = rows.filter(r => r.text().includes('▐'))
     expect(marked.length).toBe(1)
-    expect(marked[0]!.text().includes('▶ ◷ Implement ledger refund reconcile')).toBe(true)
+    expect(marked[0]!.text().includes('▐ ◷ Implement ledger refund reconcile')).toBe(true)
     // Every glyph on these rows is one cell, so a string index is a cell index.
     const titleOf = (r: Row, t: string) => r.cells[r.text().indexOf(t)]!.s
     expect(titleOf(marked[0]!, 'Implement')).toEqual({ bold: true, btn: 'a:a1' })
@@ -627,12 +627,12 @@ describe('focus: the cursor card is heavy, the cursor row bold and whole', () =>
       const got = lines(BUSY, { rows: 120, focused: true, cursor })
       expect(got.filter(l => l.startsWith(' ┏━')).length).toBe(1)
       expect(got.find(l => l.startsWith(' ┏━'))!.includes('this session')).toBe(true)
-      const caret = got.filter(l => l.includes('▶'))
+      const caret = got.filter(l => l.includes('▐'))
       expect(caret.length).toBe(1)
       expect(caret[0]!.includes(title)).toBe(true)
     }
     // A finished agent under the cursor is drawn at full strength, not dim.
-    const fin = layout(BUSY, view({ rows: 120, focused: true, cursor: 'a:a3' })).rows.find(r => r.text().includes('▶'))!
+    const fin = layout(BUSY, view({ rows: 120, focused: true, cursor: 'a:a3' })).rows.find(r => r.text().includes('▐'))!
     expect(fin.buttons.find(b => b.key === 'a:a3')!.dim).toBe(undefined)
   })
 
@@ -659,7 +659,7 @@ describe('focus: the cursor card is heavy, the cursor row bold and whole', () =>
     const got = l.rows.map(r => r.text())
     const at = got.findIndex(t => t.includes('word0'))
     const wrapped = got.slice(at, at + 3)
-    expect(wrapped[0]!.includes('▶ ● word0')).toBe(true)
+    expect(wrapped[0]!.includes('▐ ● word0')).toBe(true)
     // Continuations sit at the title's column, inside the heavy card.
     for (const t of wrapped.slice(1)) expect(/^ ┃ {4}word\d+/.test(t)).toBe(true)
     expect(wrapped[2]!.endsWith('…  ┃')).toBe(true)
@@ -687,7 +687,7 @@ describe('focus: the cursor card is heavy, the cursor row bold and whole', () =>
       ],
     }
     const got = lines(m, { width: 60, focused: true, cursor: 's:n' })
-    const at = got.findIndex(t => t.includes('▶ a very long'))
+    const at = got.findIndex(t => t.includes('▐ a very long'))
     expect(got[at + 1]!.startsWith(' ┃  ')).toBe(true)
     expect(got.join(' ').includes('the card it sits in')).toBe(true)
     const pr = lines(QUIET, { width: 48, focused: true, cursor: 'p:acme-store/admin-web#433' })
@@ -744,7 +744,7 @@ describe("sections and another session's PRs", () => {
     const at = got.findIndex(l => l.startsWith(' │  st-api'))
     return got
       .slice(at)
-      .filter(l => /^ [│┃]▶? *(#\d+|[+−] ?\d+ more)/.test(l))
+      .filter(l => /^ [│┃]▐? *(#\d+|[+−] ?\d+ more)/.test(l))
       .slice(0, 5)
   }
 
@@ -795,11 +795,11 @@ describe("sections and another session's PRs", () => {
     }
   })
 
-  test('the cursor on a PR row: heavy card, accent ▶, bold title wrapped whole', () => {
+  test('the cursor on a PR row: heavy card, accent ▐, bold title wrapped whole', () => {
     const l = layout(WITH_PRS, view({ rows: 40, focused: true, cursor: key(527) }))
     const got = l.rows.map(r => r.text())
     expect(got.some(t => t.startsWith(' ┏━ acme-store'))).toBe(true)
-    const at = got.findIndex(t => t.startsWith(' ┃▶ #527'))
+    const at = got.findIndex(t => t.startsWith(' ┃▐ #527'))
     expect(l.rows[at]!.cells[2]!.s.c).toBe('accent')
     expect(got[at]!.endsWith('✗ apps/api failed  ┃')).toBe(true)
     expect(got[at]!.includes('…')).toBe(false)

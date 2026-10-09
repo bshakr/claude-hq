@@ -1088,13 +1088,14 @@ export function layout(m: HqModel, view: View): Layout {
   for (const r of m.flare ? [flare, ...content] : content) {
     if (r.item !== undefined) for (const b of r.buttons) owner[b.key] ??= r.item
   }
-  // Each drawn item's caret; the cursor's shows the marker.
+  // Each drawn item's caret; the cursor's shows the marker. The engine's focus
+  // ring inverts it, so a right-half block reads as an accent bar on the left.
   const capped = new Set<string>()
   for (const r of out) {
     if (!r.head || r.item === undefined || !actions[r.item] || capped.has(r.item)) continue
     capped.add(r.item)
     const isCursor = view.focused && view.cursor === r.item
-    r.button(r.mark ?? 2, isCursor ? '▶' : ' ', { key: caretKey(r.item), action: actions[r.item]! }, isCursor ? tok('accent') : {})
+    r.button(r.mark ?? 2, isCursor ? '▐' : ' ', { key: caretKey(r.item), action: actions[r.item]! }, isCursor ? tok('accent') : {})
   }
   return { rows: out, items, itemLine, owner, actions, region, bodyLen: content.length, scroll }
 }
