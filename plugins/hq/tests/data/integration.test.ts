@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
+import type { PublishedSession } from '../../hooks/model/types'
 
 import * as SUB from './subagent-fixtures'
 
@@ -200,7 +201,7 @@ test('integration: publishes this session from its own registry row, one ps per 
   await clock.settle()
 
   const published = pubOf(fx)
-  expect(Object.keys(published).sort()).toEqual(['agents', 'agentsRunning', 'owned', 'pid', 'prSummary', 'sessionId', 'updatedAt'])
+  expect(Object.keys(published).sort()).toEqual(['agents', 'agentsRunning', 'owned', 'pid', 'prSummary', 'prs', 'sessionId', 'updatedAt'])
   expect(published).toEqual({
     sessionId: SID,
     pid: 100,
@@ -209,6 +210,7 @@ test('integration: publishes this session from its own registry row, one ps per 
     prSummary: { total: 0, broken: 0, waiting: 0, inProgress: 0 },
     agents: [],
     owned: [],
+    prs: [],
   })
   expect(fx.ps).toBe(1)
   // on main: no branch to own, no GitHub call
@@ -294,6 +296,8 @@ test('integration: the branch checked out in the session cwd owns its PR; an unw
   ])
   expect(pubOf(fx).owned).toEqual([{ repo: 'acme/app', number: 275 }])
   expect(pubOf(fx).prSummary).toEqual({ total: 1, broken: 0, waiting: 1, inProgress: 0 })
+  // Title and URL ride along, so other sessions' cards list and link it without asking GitHub.
+  expect((pubOf(fx) as PublishedSession).prs?.map(p => [p.number, p.url, p.merge])).toEqual([[275, expect.any(String), 'unknown']])
 
   // No watcher file: GitHub is re-read every 2 minutes, and the merge is seen.
   fx.states[275] = 'MERGED'
@@ -303,6 +307,7 @@ test('integration: the branch checked out in the session cwd owns its PR; an unw
   expect(fx.gh.at(-1)).toEqual(['gh', 'pr', 'view', '275', '-R', 'acme/app', '--json', 'title,url,state'])
   await clock.advance(5_000)
   expect(pubOf(fx).prSummary).toEqual({ total: 0, broken: 0, waiting: 0, inProgress: 0 })
+  expect(pubOf(fx).prs).toEqual([])
   const stored = store.get(`owned:${SID}`) as { claims: { number: number; ghState?: string; endedAt?: number }[] }
   expect(stored.claims.map(c => [c.number, c.ghState, c.endedAt !== undefined])).toEqual([[275, 'MERGED', true]])
 
@@ -571,7 +576,7 @@ test(
     expect(asked[0]!.includes('Rebuild the pipeline as v2')).toBe(true)
     expect(drawn.includes('Pipeline v2 rearchitecture')).toBe(true)
     expect(drawn.includes('day 3')).toBe(true)
-    expect(drawn.includes('stage 4 of 7: kind stage · 1 PR merged, 1 open')).toBe(true)
+    expect(drawn.includes('stage 4 of 7: kind stage · 1 PR merged')).toBe(true)
     expect(fx.gh.filter(a => a[1] === 'api').length).toBe(1)
     expect((store.get('goal:w1') as { goal: string }).goal).toBe('Pipeline v2 rearchitecture')
 

@@ -31,6 +31,8 @@ export class Row {
   gutter?: 'fail' | 'wait' | 'run'
   /** Column the cursor marker takes on a head row. */
   mark?: number
+  /** A section divider inside a card: its label, '' for a bare rule. Never a cursor stop. */
+  section?: string
 
   constructor(W: number) {
     this.W = W

@@ -961,6 +961,7 @@ async function start($: EngineInterface): Promise<void> {
             }
           }),
         owned: Object.values(S.claims).map(c => ({ repo: c.repo, number: c.number })),
+        prs: S.prs.filter(p => !isEnded(p.merge)),
         ...(doing ? { doing } : {}),
         ...(t => (t ? { todos: t } : {}))(todoProgress(todosOf(S.activity).map((x, i) => ({ id: String(i), ...x })))),
         ...(g => (g?.goal ? { goal: { goal: g.goal, ...(g.step ? { step: g.step } : {}), at: g.at } } : {}))(goals.get(S.sessionId)),

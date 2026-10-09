@@ -142,6 +142,7 @@ export function toSessionVM(
     ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
     ...(real ? { statusSince: wait.since } : typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
     ...(fresh ? { agentsRunning: fresh.agentsRunning, prSummary: fresh.prSummary } : {}),
+    ...(fresh?.prs?.length ? { prs: fresh.prs } : {}),
     ...(!fresh && agents?.length ? { agentsRunning: agents.length } : {}),
     ...(agents?.length ? { agents: [...agents] } : {}),
     ...(d => (d ? { detail: d } : {}))(detailOf(row, branch, fresh?.doing)),

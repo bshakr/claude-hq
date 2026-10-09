@@ -14,33 +14,35 @@ Run a few Claude Code sessions, each with its own subagents and pull requests, a
  │  ● fix the retry backoff                               3m  │
  │    Bash: npm test                                     40s  │
  │  todos 1/3 ━━━─────  ● Running the webhook specs           │
+ ├─ pull requests ────────────────────────────────────────────┤
+ │  #212  Webhooks: retry with backoff        ▰▰▰▰▰▰▱▱▱▱ 5/9  │
+ │        ci running · no gallery · ci-wait                   │
  ╰────────────────────────────────────────────────────────────╯
 
  ── other sessions ────────────────────────────────────────────
 
  ╭─ work ─────────────────────────────────────────────────────╮
- │  api               1 PR · day 1 · ◆ waiting 2m  ▰▰▰▰▱ 63%  │
+ │  api         ✗ 1 PR red · day 1 · ◆ waiting 2m  ▰▰▰▰▱ 63%  │
  │  Migrating the orders table                                │
  │  ◆ asks: Bash: rails db:migrate                            │
- │                                                            │
+ ├─ pull requests ────────────────────────────────────────────┤
+ │  #87  Orders: split address columns     ✗ apps/api failed  │
+ │  #88  Orders: backfill the new columns         ci running  │
+ ├────────────────────────────────────────────────────────────┤
  │  docs                                ● busy 6m  ▰▰▱▱▱ 22%  │
  │  ENG-123 (setup guide): drafting the install steps         │
+ ├─ agents ───────────────────────────────────────────────────┤
  │  ● Check links                                 haiku · 1m  │
- ╰────────────────────────────────────────────────────────────╯
-
- ╭─ pull requests ────────────────────────────────────────────╮
- │  #212  Webhooks: retry with backoff        ▰▰▰▰▰▰▱▱▱▱ 5/9  │
- │        ci running · no gallery · ci-wait                   │
  ╰────────────────────────────────────────────────────────────╯
 ```
 
 ## What you get
 
 - **This session at a glance.** What it is doing right now, its todo list, the background commands it waits on, and each subagent with its model, age and latest step.
-- **Every other session.** A one-line goal and current step (summarised by Haiku), its day count, context fill, PR counts and running agents. Ticket and ADR ids get a few-word gloss.
+- **Every other session.** A one-line goal and current step (summarised by Haiku), its day count, context fill, running agents, and its open PRs one line each, most urgent first, each a click away. Ticket and ADR ids get a few-word gloss.
 - **"Asks: …" when a session waits on you.** A permission prompt, a question or a plan to approve shows on its card, and you get a desktop notification once per new wait.
 - **One press to get there.** Click or Enter on a session brings its terminal forward. If HQ can't find the terminal, it copies the resume command instead.
-- **Your PRs, with checks.** The PRs this session owns, with a checks bar and merge state. Click one to open it.
+- **Your PRs, with checks.** The PRs this session owns, in its card's `pull requests` section, with a checks bar and merge state. Click one to open it.
 - **Wake on CI red, merge or conflict.** When an owned PR goes red, merges, conflicts or falls behind, HQ toasts and starts a turn in the owning session to triage it. It never merges or pushes.
 - **Plan usage in the header.** Your 5-hour and weekly limits, next to the count of what needs you.
 

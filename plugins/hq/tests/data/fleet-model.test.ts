@@ -67,6 +67,21 @@ test('fleet: registry row → session VM; shell reads as idle; stale publish ign
     detail: 'webapp-ui · ENG-1940-promote',
   })
   expect(toSessionVM(row, undefined, { ...pub, updatedAt: NOW - 31_000 }, NOW).agentsRunning).toBe(undefined)
+  // Its published open PRs ride onto the card while the publish is fresh, and only then.
+  const pr = {
+    repo: 'acme/app',
+    number: 7,
+    title: 'Fix it',
+    url: 'https://github.com/acme/app/pull/7',
+    ci: { kind: 'failed' as const, done: 2, total: 2, failed: 1, firstFailing: 'api' },
+    merge: 'mergeable' as const,
+    gallery: 'none' as const,
+    watcher: 'ci-wait' as const,
+    claimedBy: 'main',
+  }
+  expect(toSessionVM(row, undefined, { ...pub, prs: [pr] }, NOW).prs).toEqual([pr])
+  expect(toSessionVM(row, undefined, { ...pub, prs: [pr], updatedAt: NOW - 31_000 }, NOW).prs).toBe(undefined)
+  expect('prs' in toSessionVM(row, undefined, { ...pub, prs: [] }, NOW)).toBe(false)
   expect(parseRegistryRow('{not json')).toBe(undefined)
   expect(parsePsPids('  38348\n45327\n')).toEqual(new Set([38348, 45327]))
 })

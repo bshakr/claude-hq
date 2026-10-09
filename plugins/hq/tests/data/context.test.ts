@@ -279,7 +279,10 @@ describe('pr-link counting', () => {
     const states = new Map<string, PrState>([[prKey('acmeco/webapp-ui', 270), 'MERGED']])
     expect(prText(d.prs, states)).toBe('1 PR merged, 1 more linked')
     states.set(prKey('acmeco/webapp-ui', 271), 'OPEN')
-    expect(prText(d.prs, states)).toBe('1 PR merged, 1 open')
+    // Open PRs are the card's own rows, not a count.
+    expect(prText(d.prs, states)).toBe('1 PR merged')
+    states.set(prKey('acmeco/webapp-ui', 270), 'OPEN')
+    expect(prText(d.prs, states)).toBe(undefined)
     expect(prText([], states)).toBe(undefined)
   })
 
@@ -413,7 +416,7 @@ describe('the card', () => {
       detail: 'webapp-ui',
       day: 3,
       step: 'stage 4 of 7: kind stage',
-      prText: '12 PRs merged, 1 open',
+      prText: '12 PRs merged',
       todos: { done: 5, total: 9, active: 'Implement ENG-1947 withhold file' },
       agents: [
         {
@@ -434,11 +437,12 @@ describe('the card', () => {
     }
     const rows = layout(m, { width: 58, rows: 40, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0 }).rows.map(r => r.text())
     const top = rows.findIndex(l => l.includes('╭─ webapp-ui'))
-    expect(rows.slice(top, top + 7)).toEqual([
+    expect(rows.slice(top, top + 8)).toEqual([
       ' ╭─ webapp-ui ──────────────────────────────────────────╮',
       ' │  Pipeline v2 rearchitecture       day 3 · ● busy 1m  │',
-      ' │  stage 4 of 7: kind stage · 12 PRs merged, 1 open    │',
+      ' │  stage 4 of 7: kind stage · 12 PRs merged            │',
       ' │  todos 5/9 ● Implement ENG-1947 withhold file        │',
+      ' ├─ agents ─────────────────────────────────────────────┤',
       ' │  ● Implement ENG-1947 withhold file      opus · 26s  │',
       ' │    Read rake spec patterns and report leaky spec     │',
       ' ╰──────────────────────────────────────────────────────╯',
