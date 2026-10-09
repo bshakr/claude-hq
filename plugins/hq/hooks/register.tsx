@@ -6,7 +6,7 @@ import { currentModel, installData } from './data/index'
 import { NOTIFY_STORE_KEY, parseNotifyArg } from './data/notify'
 import { LATEST_KEY, MANIFEST_URL, headerNotice, installOf, knownMarketplacesPath, manifestVersion, runUpdate } from './data/update'
 import type { HeaderNotice, Install } from './data/update'
-import { MATCH_BG_USAGE, parseMatchBg, themePath, themeTarget, withBackground } from './data/theme'
+import { MATCH_BG_USAGE, notAFile, parseMatchBg, themePath, themeTarget, withBackground } from './data/theme'
 import { WAKE_KEY, parseWake } from './data/wake'
 import type { HqModel } from './model/types'
 import { caretItem, caretKey, pressedItem, ringMove } from './ui/caret'
@@ -83,16 +83,28 @@ async function readInstall($: EngineInterface): Promise<Install | undefined> {
 
 /** Sets the side panel colour in the custom theme in use, else in hq's own theme for the person to pick once. */
 async function matchBackground($: EngineInterface, hex: string): Promise<string> {
-  const setting = (await $.config.list()).find(row => row.key === 'theme')?.value
-  const target = themeTarget(setting)
-  const path = themePath((await $.env.get('HOME')) ?? '', target.slug)
-  const current = (await $.fs.exists(path)) ? await $.fs.read(path) : undefined
-  const text = withBackground(typeof current === 'string' ? current : undefined, target, hex)
-  if (text === undefined) return `hq: ${path} is not a theme JSON object; left as it was.`
-  await $.fs.write(path, text)
-  return target.base === undefined
-    ? `Side panel set to ${hex} in theme ${target.slug}.`
-    : `Side panel set to ${hex} in theme ${target.slug}: pick it in /theme once; later runs apply here live, other open sessions on restart.`
+  try {
+    const row = (await $.config.list()).find(r => r.key === 'theme')
+    if (!row) return 'hq: no theme setting is visible here, so match-bg cannot tell which theme to change.'
+    const target = themeTarget(row.value, hex)
+    if ('refuse' in target) return target.refuse
+    // Claude Code reads themes from $CLAUDE_CONFIG_DIR/themes when that is set.
+    const home = await $.env.get('HOME')
+    const configDir = (await $.env.get('CLAUDE_CONFIG_DIR')) || (home ? `${home}/.claude` : undefined)
+    if (!configDir) return 'hq: neither CLAUDE_CONFIG_DIR nor HOME is set, so there is no themes folder to write to.'
+    const path = themePath(configDir, target.slug)
+    const exists = await $.fs.exists(path)
+    if (!exists && target.base === undefined) return notAFile(target.slug)
+    const current = exists ? await $.fs.read(path) : undefined
+    const text = withBackground(typeof current === 'string' ? current : undefined, target, hex)
+    if (text === undefined) return `hq: ${path} is not a theme JSON object; left as it was.`
+    await $.fs.write(path, text)
+    return target.base === undefined
+      ? `Side panel set to ${hex} in theme ${target.slug}.`
+      : `Side panel set to ${hex} in theme ${target.slug}: pick it in /theme once; later runs apply live in every session.`
+  } catch (thrown) {
+    return `hq: match-bg failed: ${thrown instanceof Error ? thrown.message : String(thrown)}`
+  }
 }
 
 async function checkUpdate($: EngineInterface): Promise<void> {

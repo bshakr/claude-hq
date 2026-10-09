@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 import type { Engine } from 'claude-code/testing'
 
-import { MATCH_BG_USAGE, parseMatchBg, themeTarget, withBackground } from '../../hooks/data/theme'
+import { MATCH_BG_USAGE, baseFor, notAFile, parseMatchBg, themeTarget, withBackground } from '../../hooks/data/theme'
 
 const HOME = '/home/u'
 const ENGINE = { plugin: 'engine', tier: 'core' } as const
@@ -16,11 +16,23 @@ describe('parsing', () => {
     expect(parseMatchBg('wake on')).toBeUndefined()
   })
 
-  test('a custom theme is its own target; a built-in base carries over, auto and unknown read as dark', () => {
-    expect(themeTarget('custom:mocha')).toEqual({ slug: 'mocha' })
-    expect(themeTarget('light-ansi')).toEqual({ slug: 'hq-light-ansi', base: 'light-ansi' })
-    expect(themeTarget('auto')).toEqual({ slug: 'hq-dark', base: 'dark' })
-    expect(themeTarget(undefined)).toEqual({ slug: 'hq-dark', base: 'dark' })
+  test('a custom theme is its own target; an explicit built-in base carries over', () => {
+    expect(themeTarget('custom:mocha', '#fff')).toEqual({ slug: 'mocha' })
+    expect(themeTarget('light-ansi', '#000')).toEqual({ slug: 'hq-light-ansi', base: 'light-ansi' })
+    expect(themeTarget('dark', '#ffffff')).toEqual({ slug: 'hq-dark', base: 'dark' })
+  })
+
+  test('auto and unknown settings take light or dark from the colour', () => {
+    expect(themeTarget('auto', '#fdf6e3')).toEqual({ slug: 'hq-light', base: 'light' })
+    expect(themeTarget('auto', '#1e1e2e')).toEqual({ slug: 'hq-dark', base: 'dark' })
+    expect(themeTarget(undefined, '#FFF')).toEqual({ slug: 'hq-light', base: 'light' })
+    expect(baseFor('#777')).toBe('dark')
+    expect(baseFor('#999')).toBe('light')
+  })
+
+  test('plugin, traversal and safe-mode slugs are refused', () => {
+    for (const slug of ['catppuccin:mocha', '../settings', 'a/b', 'a\\b', '..', 'mocha (disabled in safe mode)'])
+      expect(themeTarget(`custom:${slug}`, '#000')).toEqual({ refuse: notAFile(slug) })
   })
 })
 
@@ -48,13 +60,23 @@ describe('the theme file', () => {
     })
   })
 
+  test('overrides that are an array are replaced by an object', () => {
+    const text = JSON.stringify({ name: 'Mocha', base: 'dark', overrides: ['#000'] })
+    expect(JSON.parse(withBackground(text, { slug: 'mocha' }, '#fff')!).overrides).toEqual({ composerSidebarBackground: '#fff' })
+  })
+
   test('a file that is not a JSON object is left alone', () => {
     expect(withBackground('{oops', { slug: 'mocha' }, '#fff')).toBeUndefined()
     expect(withBackground('[]', { slug: 'mocha' }, '#fff')).toBeUndefined()
   })
 })
 
-function host(on: On, theme: string, files: Record<string, string>) {
+function host(
+  on: On,
+  theme: string,
+  files: Record<string, string>,
+  opts: { home?: string; configDir?: string; writeFails?: boolean; noThemeRow?: boolean } = {},
+) {
   const h = { toasts: [] as string[] }
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
@@ -64,13 +86,18 @@ function host(on: On, theme: string, files: Record<string, string>) {
     h.toasts.push(e.text)
     return { value: undefined }
   })
-  on('env.get', ($, e) => ({ value: e.name === 'HOME' ? HOME : undefined }))
+  on('env.get', ($, e) => ({
+    value: e.name === 'HOME' ? ('home' in opts ? opts.home : HOME) : e.name === 'CLAUDE_CONFIG_DIR' ? opts.configDir : undefined,
+  }))
   on('config.list', () => ({
-    value: [{ key: 'theme', label: 'Theme', kind: 'choice' as const, value: theme, provider: ENGINE, isLocked: false }],
+    value: opts.noThemeRow
+      ? []
+      : [{ key: 'theme', label: 'Theme', kind: 'choice' as const, value: theme, provider: ENGINE, isLocked: false }],
   }))
   on('fs.exists', ($, e) => ({ value: files[e.path] !== undefined }))
   on('fs.read', ($, e) => ({ value: files[e.path]! }))
   on('fs.write', ($, e) => {
+    if (opts.writeFails) return { deny: 'EACCES: permission denied' }
     files[e.path] = e.text
     return { value: undefined }
   })
@@ -91,7 +118,7 @@ test('/hq match-bg on a built-in theme writes hq-<base>.json and says to pick it
     overrides: { composerSidebarBackground: '#1e1e2e' },
   })
   expect(h.toasts).toEqual([
-    'Side panel set to #1e1e2e in theme hq-dark-ansi: pick it in /theme once; later runs apply here live, other open sessions on restart.',
+    'Side panel set to #1e1e2e in theme hq-dark-ansi: pick it in /theme once; later runs apply live in every session.',
   ])
 })
 
@@ -112,4 +139,58 @@ test('/hq match-bg without a colour toasts the usage and writes nothing', { opti
   await run($, 'match-bg')
   expect(files).toEqual({})
   expect(h.toasts).toEqual([MATCH_BG_USAGE])
+})
+
+test('/hq match-bg refuses a custom theme with no file and writes nothing', { options: { autoOpen: false } }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const h = host(on, 'custom:mocha', files)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await run($, 'match-bg #11111b')
+  expect(files).toEqual({})
+  expect(h.toasts).toEqual([notAFile('mocha')])
+})
+
+test('/hq match-bg refuses a plugin theme and writes nothing', { options: { autoOpen: false } }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const h = host(on, 'custom:catppuccin:mocha', files)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await run($, 'match-bg #11111b')
+  expect(files).toEqual({})
+  expect(h.toasts).toEqual([notAFile('catppuccin:mocha')])
+})
+
+test('/hq match-bg toasts a failed write', { options: { autoOpen: false } }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const h = host(on, 'dark', files, { writeFails: true })
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await run($, 'match-bg #1e1e2e')
+  expect(files).toEqual({})
+  expect(h.toasts).toHaveLength(1)
+  expect(h.toasts[0]).toMatch(/^hq: match-bg failed: .*EACCES/)
+})
+
+test('/hq match-bg refuses without CLAUDE_CONFIG_DIR or HOME', { options: { autoOpen: false } }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const h = host(on, 'dark', files, { home: undefined })
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await run($, 'match-bg #1e1e2e')
+  expect(files).toEqual({})
+  expect(h.toasts).toEqual(['hq: neither CLAUDE_CONFIG_DIR nor HOME is set, so there is no themes folder to write to.'])
+})
+
+test('/hq match-bg writes under CLAUDE_CONFIG_DIR when it is set', { options: { autoOpen: false } }, async ($, on) => {
+  const files: Record<string, string> = {}
+  host(on, 'dark', files, { configDir: '/cfg' })
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await run($, 'match-bg #1e1e2e')
+  expect(Object.keys(files)).toEqual(['/cfg/themes/hq-dark.json'])
+})
+
+test('/hq match-bg refuses when no theme row is listed', { options: { autoOpen: false } }, async ($, on) => {
+  const files: Record<string, string> = {}
+  const h = host(on, 'dark', files, { noThemeRow: true })
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await run($, 'match-bg #1e1e2e')
+  expect(files).toEqual({})
+  expect(h.toasts).toEqual(['hq: no theme setting is visible here, so match-bg cannot tell which theme to change.'])
 })
