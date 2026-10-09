@@ -224,7 +224,11 @@ for (const wake of [undefined, false] as const) {
 
     watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z')
     await clock.advance(2_000)
-    expect(h.toasts).toEqual(['acme/app#40 CI went red: rspec'])
+    expect(h.toasts).toEqual(
+      wake === false
+        ? ['acme/app#40 CI went red: rspec']
+        : ['acme/app#40 CI went red: rspec', 'HQ started this turn because acme/app#40 CI went red: rspec · /hq wake off to stop'],
+    )
     expect(h.prompts).toEqual(
       wake === false
         ? []
@@ -235,7 +239,7 @@ for (const wake of [undefined, false] as const) {
     expect(h.statuses.at(-1)).toBe('hq: PRs 1 red')
 
     await clock.advance(10_000)
-    expect(h.toasts).toHaveLength(1)
+    expect(h.toasts).toHaveLength(wake === false ? 1 : 2)
     expect(h.prompts).toHaveLength(wake === false ? 0 : 1)
   })
 }
@@ -253,7 +257,8 @@ for (const [stored, wakes] of [
       const clock = await begin($, on)
       watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z')
       await clock.advance(2_000)
-      expect(h.toasts).toEqual(['acme/app#40 CI went red: rspec'])
+      expect(h.toasts.filter(t => !t.startsWith('HQ started'))).toEqual(['acme/app#40 CI went red: rspec'])
+      expect(h.toasts.length).toBe(wakes ? 2 : 1)
       expect(h.prompts).toHaveLength(wakes ? 1 : 0)
     },
   )
@@ -267,13 +272,13 @@ test('a merge wakes with the other owned open PRs to rebase-check; alone it only
 
   watchFile(h, 40, [ok('lint')], 'MERGED', '2026-10-08T00:01:00Z')
   await clock.advance(2_000)
-  expect(h.toasts).toEqual(['acme/app#40 merged'])
+  expect(h.toasts).toEqual(['acme/app#40 merged', 'HQ started this turn because acme/app#40 merged · /hq wake off to stop'])
   expect(h.prompts).toHaveLength(1)
   expect(h.prompts[0]).toContain('[hq] acme/app#40 merged. Other owned open PRs in that repo: #41 ')
 
   watchFile(h, 41, [ok('lint')], 'MERGED', '2026-10-08T00:02:00Z')
   await clock.advance(2_000)
-  expect(h.toasts).toEqual(['acme/app#40 merged', 'acme/app#41 merged'])
+  expect(h.toasts.filter(t => !t.startsWith('HQ started'))).toEqual(['acme/app#40 merged', 'acme/app#41 merged'])
   expect(h.prompts).toHaveLength(1)
   expect(h.statuses.at(-1)).toBe('hq: PRs 2 merged')
 })
@@ -317,4 +322,31 @@ test('/hq wake off and on persist in the store', async ($, on) => {
     }),
   ).toMatchObject({ text: 'hq waking is on.' })
   expect(h.store.get('wake')).toBe(true)
+})
+
+test('the wake notice shows once per machine: a second wake, or a store that has seen it, stays quiet', async ($, on) => {
+  const h = host(on, [40, 41])
+  watchFile(h, 40, [ok('lint'), pending('rspec')])
+  watchFile(h, 41, [ok('lint'), pending('rspec')])
+  const clock = await begin($, on)
+  watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z')
+  await clock.advance(2_000)
+  watchFile(h, 41, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:02:00Z')
+  await clock.advance(2_000)
+  expect(h.prompts).toHaveLength(2)
+  expect(h.toasts.filter(t => t.startsWith('HQ started'))).toEqual([
+    'HQ started this turn because acme/app#40 CI went red: rspec · /hq wake off to stop',
+  ])
+  expect(h.store.get('noticed:wake')).toBe(true)
+})
+
+test('a machine that has seen the wake notice wakes without it', async ($, on) => {
+  const h = host(on, [40])
+  h.store.set('noticed:wake', true)
+  watchFile(h, 40, [ok('lint'), pending('rspec')])
+  const clock = await begin($, on)
+  watchFile(h, 40, [ok('lint'), failing('rspec')], 'OPEN', '2026-10-08T00:01:00Z')
+  await clock.advance(2_000)
+  expect(h.prompts).toHaveLength(1)
+  expect(h.toasts).toEqual(['acme/app#40 CI went red: rspec'])
 })

@@ -112,8 +112,10 @@ export function withPrStatus(base: string, prs: readonly PrVM[]): string {
   return base === '' ? `hq: ${part}` : `${base} · ${part}`
 }
 
-/** What one tick's owned-PR transitions say: a toast each, and at most one wake prompt. */
-export function newsOf(previous: readonly PrVM[], next: readonly PrVM[]): { toasts: string[]; prompt: string | null } {
+/** What one tick's owned-PR transitions say: a toast each, and at most one wake prompt with the first change that woke it. */
+export function newsOf(previous: readonly PrVM[], next: readonly PrVM[]): { toasts: string[]; prompt: string | null; reason?: string } {
   const transitions = detectTransitions(previous, next)
-  return { toasts: transitions.map(toastText), prompt: wakePrompt(transitions) }
+  const prompt = wakePrompt(transitions)
+  const first = transitions.find(t => promptLine(t) !== null)
+  return { toasts: transitions.map(toastText), prompt, ...(prompt !== null && first ? { reason: toastText(first) } : {}) }
 }

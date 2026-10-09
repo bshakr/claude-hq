@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 import type { PublishedSession } from '../../hooks/model/types'
 
+import { SUMMARIES_NOTICE } from '../../hooks/data/notices'
 import * as SUB from './subagent-fixtures'
 
 const HOME = '/home/u'
@@ -509,6 +510,11 @@ test(
     registry(fx)
     fakeHost(on, fx)
     const asked: string[] = []
+    const toasts: string[] = []
+    on('ui.toast', ($, e) => {
+      toasts.push(e.text)
+      return { value: undefined }
+    })
     on('model.complete', ($, e) => {
       asked.push(e.prompt)
       return {
@@ -590,6 +596,9 @@ test(
     await clock.advance(2_000)
     await clock.advance(2_000)
     expect(asked.length).toBe(2)
+    // The first Haiku call on this machine says so, once; the second is quiet.
+    expect(toasts).toEqual([SUMMARIES_NOTICE])
+    expect(store.get('noticed:summaries')).toBe(true)
     // Only the appended bytes were read after the first pass.
     expect(fx.tails.filter(p => p === path).length).toBeGreaterThan(1)
   },
@@ -674,6 +683,11 @@ for (const how of ['config', 'store'] as const) {
       fx.linear = { 'ENG-4810': 'Raw cart import: keep every statement line' }
       fx.files[`${HOME}/code/x/docs/adr/0019-append-only-raw-cart-data.md`] = '# Raw cart data is append-only\n'
       let calls = 0
+      const toasts: string[] = []
+      on('ui.toast', ($, e) => {
+        toasts.push(e.text)
+        return { value: undefined }
+      })
       on('model.complete', () => {
         calls++
         return {
@@ -711,6 +725,7 @@ for (const how of ['config', 'store'] as const) {
       const drawn = JSON.stringify(await ui.drawn())
       await ui.unmount()
       expect(calls).toBe(0)
+      expect(toasts.includes(SUMMARIES_NOTICE)).toBe(false)
       expect(fx.ran.filter(a => a[0] === 'linear')).toEqual([])
       expect(drawn.includes('ENG-4810 cart import')).toBe(true)
       expect(drawn.includes('should not show')).toBe(false)

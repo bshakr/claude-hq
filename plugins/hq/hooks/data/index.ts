@@ -77,6 +77,7 @@ import type { BranchClaim, OwnedState, PrFiles, StoredClaim } from './prs'
 import { W, installWaits, loopOf, onCallEnd, onCallStart, onLoopEnd, onMainAnswer, onPromptOrigin, otherWait, ownWait } from './waiting'
 import { NOTIFIED_PRUNE_MS, NOTIFY_STORE_KEY, NOTIFY_TITLE, claimName, dueNotifications, notifyWaits } from './notify'
 import { WAKE_KEY, newsOf } from './wake'
+import { SUMMARIES_NOTICE, SUMMARIES_NOTICE_KEY, WAKE_NOTICE_KEY, noticeOnce, wakeNotice } from './notices'
 import { SUMMARIES_KEY, config, effective } from '../config'
 
 /** An owned PR with no live watcher is re-read from GitHub this often. */
@@ -248,6 +249,9 @@ async function start($: EngineInterface): Promise<void> {
       pruned: [...new Set([...(S.agents.pruned ?? []), ...(Array.isArray(storedAgents.pruned) ? storedAgents.pruned : [])])],
     }
   }
+
+  const notice = (key: string, text: string) =>
+    noticeOnce({ get: k => $.store.get(k), set: (k, v) => $.store.set(k, v), toast: t => $.ui.toast(t, { timeoutMs: 12_000 }) }, key, text)
 
   const repoCache = new Map<string, string | null>()
   const branchCache = new Map<string, { at: number; branch: string | undefined }>()
@@ -570,6 +574,7 @@ async function start($: EngineInterface): Promise<void> {
     goalInflight.add(sid)
     await $.store.set(goalKey(sid), { ...(base ?? { at: 0 }), failedAt: S.now })
     const prTitles = d.prs.flatMap(p => prStates.get(prStateKey(p.repo, p.number))?.title ?? []).slice(-12)
+    void notice(SUMMARIES_NOTICE_KEY, SUMMARIES_NOTICE)
     void refreshGoal(d, base, { prTitles, idTitles: ids.titles }, S.now, req =>
       $.model.complete({ model: GOAL_MODEL, system: req.system, prompt: req.prompt, maxTokens: 200, effort: 'low', timeoutMs: 30_000 }),
     )
@@ -651,6 +656,7 @@ async function start($: EngineInterface): Promise<void> {
     const due = new Map([...glossCache].filter((kv): kv is [string, GlossEntry] => briefDue(kv[1], S.now)))
     if (due.size === 0) return
     briefInflight = true
+    void notice(SUMMARIES_NOTICE_KEY, SUMMARIES_NOTICE)
     void briefBatch(due, S.now, req =>
       $.model.complete({
         model: GLOSS_MODEL,
@@ -828,8 +834,10 @@ async function start($: EngineInterface): Promise<void> {
     S.prs = Object.entries(S.claims).map(([key, claim]) => prFromSources(claim, files.get(key) ?? {}, pid => alive.has(pid)))
     const news = newsOf(previousPrs, S.prs)
     for (const text of news.toasts) $.ui.toast(text, { timeoutMs: 8000 })
-    if (news.prompt !== null && effective(await $.store.get(WAKE_KEY), config().wake))
+    if (news.prompt !== null && effective(await $.store.get(WAKE_KEY), config().wake)) {
       $.prompt.submit({ text: news.prompt }).catch(() => undefined)
+      if (news.reason !== undefined) await notice(WAKE_NOTICE_KEY, wakeNotice(news.reason))
+    }
 
     const branches = new Map<string, string | undefined>()
     const published = new Map<string, PublishedSession>()
