@@ -47,6 +47,8 @@ The pane opens by itself once per session when the terminal is at least 144 colu
 
 Built on macOS. On Linux the pane, tmux jumps and the watchers work; opening a PR and focusing terminal apps use macOS tools.
 
+**Pane has a grey or blue background inside tmux?** Claude Code can't match your theme without truecolor. Add `set -ga terminal-overrides ",xterm-ghostty:Tc"` (use your `$TERM`) to `~/.tmux.conf`, set `"CLAUDE_CODE_TMUX_TRUECOLOR": "1"` under `env` in `~/.claude/settings.json`, then detach and reattach.
+
 ## Usage
 
 | Command | Does |
