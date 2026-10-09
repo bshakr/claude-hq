@@ -62,7 +62,9 @@ const ALL = new Set([29637, 32938, 33267, 45327, 50001])
 const GHOSTTY: TermEnv = { env: { __CFBundleIdentifier: 'com.mitchellh.ghostty' } }
 
 const agent: OtherAgentVM = { id: 'a1', title: 'Pair bg and terminal rows', startedAt: NOW - 30_000 }
-const topics = new Map([[WORKER.sessionId, { title: 'Polish HQ dashboard layout and animations' }]])
+const topics = new Map([
+  [WORKER.sessionId, { title: 'Polish HQ dashboard layout and animations', jumpTitles: ['Polish HQ dashboard layout and animations'] }],
+])
 const agents = new Map([[WORKER.sessionId, [agent]]])
 const contexts = new Map<string, SessionContext>([[WORKER.sessionId, { goal: 'HQ dashboard polish', step: 'pairing rows' }]])
 const terms = new Map([
@@ -76,7 +78,7 @@ const fleetFrom = (selfId: string, selfPid: number, alive = ALL, waits = new Map
 const cards = (f: ReturnType<typeof buildFleet>) => f.others.flatMap(g => g.sessions)
 
 describe('a front-end and its bg worker are one card for every viewer', () => {
-  test('seen from a third session: one card in the front-end group, worker content, front-end jump', () => {
+  test('seen from a third session: one card in the front-end group, worker content, front-end jump with the worker titles', () => {
     const f = fleetFrom(THIRD.sessionId, THIRD.pid)
     const paired = f.others.find(g => g.tmuxSession === 'devbox-local')!.sessions
     expect(paired.length).toBe(1)
@@ -95,6 +97,7 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
       pid: 29637,
       term: GHOSTTY,
       tmux: 'devbox-local:@0.%1',
+      titles: ['Polish HQ dashboard layout and animations'],
     })
     expect(cards(f).some(s => s.sessionId === FRONT.sessionId)).toBe(false)
   })
@@ -179,7 +182,7 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
       bg: true,
       jobId: '990b185e',
       openIn: 'webapp-ui',
-      title: 'Polish HQ dashboard layout and animations',
+      titles: ['Polish HQ dashboard layout and animations'],
     })
 
     const noWorker = cards(fleetFrom(THIRD.sessionId, THIRD.pid, new Set([29637, 45327, 50001])))

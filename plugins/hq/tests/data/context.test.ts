@@ -11,6 +11,7 @@ import {
   goalText,
   ingest,
   ingestLines,
+  jumpTitlesOf,
   parseGoalReply,
   parsePrStates,
   prKey,
@@ -173,6 +174,17 @@ function neverCompacted(): Digest {
 }
 
 describe('transcript digest', () => {
+  test('jump titles: the newest /rename title leads, the newest AI title follows; the card keeps the newest of either', () => {
+    const d = emptyDigest()
+    ingest(d, title('First AI') + line({ type: 'custom-title', customTitle: 'Renamed' }) + title('Second AI'))
+    expect(jumpTitlesOf(d)).toEqual(['Renamed', 'Second AI'])
+    expect(goalText(undefined, d)).toBe('Second AI')
+    const ai = emptyDigest()
+    ingest(ai, title('Only AI'))
+    expect(jumpTitlesOf(ai)).toEqual(['Only AI'])
+    expect(jumpTitlesOf(emptyDigest())).toEqual([])
+  })
+
   test('a never-compacted session: first prompt, distinct titles, PRs deduped, meta and notifications skipped', () => {
     const d = neverCompacted()
     expect(d.firstPrompt).toBe('Rebuild the classification pipeline as v2 with a kind stage')

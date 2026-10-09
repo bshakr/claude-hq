@@ -42,20 +42,25 @@ const TERMINAL_JXA = `function run(argv) {
 }`
 
 // Ghostty exposes no tty or per-surface id to the process, so the pick is by cwd then title, in pickGhostty.
-const GHOSTTY_LIST_JXA = `function run() {
+// Ghostty reports the shell's logical $PWD; the registry holds Claude Code's realpath, so resolve before comparing.
+// Batched property reads: one Apple event each, not three per terminal, inside the exec timeout.
+const GHOSTTY_LIST_JXA = `ObjC.import('stdlib')
+function run() {
   const app = Application('Ghostty')
   if (!app.running()) return '[]'
-  return JSON.stringify(app.terminals().map(t => ({ id: t.id(), cwd: t.workingDirectory(), name: t.name() })))
+  const ids = app.terminals.id(), cwds = app.terminals.workingDirectory(), names = app.terminals.name()
+  const real = p => { if (!p) return p; try { return $.realpath(p, null) } catch (e) { return p } }
+  return JSON.stringify(ids.map((id, i) => ({ id, cwd: real(cwds[i]), name: names[i] })))
 }`
 
+// app.terminals includes the quick terminal, which no window's tabs list; focus raises the window itself.
 const GHOSTTY_FOCUS_JXA = `function run(argv) {
   const app = Application('Ghostty')
-  for (const w of app.windows()) for (const tab of w.tabs()) for (const t of tab.terminals()) {
-    if (t.id() !== argv[0]) continue
-    try { app.selectTab(tab) } catch (e) {}
-    app.focus(t); app.activate(); return 'ok'
-  }
-  return 'none'
+  const i = app.terminals.id().indexOf(argv[0])
+  if (i < 0) return 'none'
+  const t = app.terminals.at(i)
+  if (t.id() !== argv[0]) return 'none'
+  app.focus(t); app.activate(); return 'ok'
 }`
 
 export interface GhosttyTerminal {
@@ -64,17 +69,27 @@ export interface GhosttyTerminal {
   name?: string
 }
 
-const dir = (p: string) => p.replace(/\/+$/, '') || '/'
+const dir = (p: string) => p.normalize('NFC').replace(/\/+$/, '') || '/'
 // Claude Code titles the tab "✳ <title>", or "◐"/"◑" while it works.
-const bare = (name: string) => name.replace(/^[\u2733\u25D0\u25D1]\s*/, '').trim()
+const CLAUDE_GLYPH = /^[\u2733\u25D0\u25D1]\s*/
+const bare = (name: string) => name.replace(CLAUDE_GLYPH, '').trim().normalize('NFC')
 
 /** The one terminal in the session's cwd, narrowed by title when several share it; undefined when unsure. */
-export function pickGhostty(terms: readonly GhosttyTerminal[], cwd: string, title?: string): string | undefined {
+export function pickGhostty(terms: readonly GhosttyTerminal[], cwd: string, titles: readonly string[] = []): string | undefined {
+  const want = titles.map(t => t.trim().normalize('NFC')).filter(Boolean)
   const here = terms.filter(t => t.cwd && dir(t.cwd) === dir(cwd))
-  if (here.length === 1) return here[0]!.id
-  if (!title) return undefined
-  const named = here.filter(t => t.name && bare(t.name) === title.trim())
-  return named.length === 1 ? named[0]!.id : undefined
+  if (here.length === 1) {
+    const name = here[0]!.name ?? ''
+    // Another Claude session whose shell sits in this folder too.
+    if (want.length && CLAUDE_GLYPH.test(name) && !want.includes(bare(name))) return undefined
+    return here[0]!.id
+  }
+  for (const title of want) {
+    const named = here.filter(t => t.name && bare(t.name) === title)
+    if (named.length === 1) return named[0]!.id
+    if (named.length > 1) return undefined
+  }
+  return undefined
 }
 
 async function focusGhostty(j: SessionJump, exec: Exec): Promise<boolean> {
@@ -87,7 +102,7 @@ async function focusGhostty(j: SessionJump, exec: Exec): Promise<boolean> {
     return false
   }
   if (!Array.isArray(terms)) return false
-  const id = pickGhostty(terms, j.cwd, j.title)
+  const id = pickGhostty(terms, j.cwd, j.titles)
   return id ? said(exec, ['osascript', '-l', 'JavaScript', '-e', GHOSTTY_FOCUS_JXA, String(id)], 'ok') : false
 }
 

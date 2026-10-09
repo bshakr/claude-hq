@@ -174,15 +174,15 @@ describe('the strategy chain', () => {
     expect(h.argvs()).toEqual([['open', '-b', 'com.example.term']])
   })
 
-  test('the jump carries the transcript title, which Claude Code also writes as the terminal title', () => {
+  test('the jump carries the titles Claude Code may have written as the terminal title', () => {
     const row = parseRegistryRow(JSON.stringify({ pid: 9, sessionId: 's', cwd: '/w' }))!
-    expect(jumpOf(row, { env: {} }, undefined, 'Fix login')).toEqual({
+    expect(jumpOf(row, { env: {} }, undefined, ['Fix login', 'AI login fix'])).toEqual({
       kind: 'session',
       sessionId: 's',
       cwd: '/w',
       pid: 9,
       term: { env: {} },
-      title: 'Fix login',
+      titles: ['Fix login', 'AI login fix'],
     })
   })
 
@@ -222,13 +222,55 @@ describe('Ghostty', () => {
       { id: 'C', cwd: '/Users/me/code/other', name: '✳ Fix login' },
     ]
     expect(pickGhostty(terms.slice(1), '/Users/me/code/app/')).toBe('B')
-    expect(pickGhostty(terms, '/Users/me/code/app', 'Fix login')).toBe('A')
-    expect(pickGhostty(terms, '/Users/me/code/app', 'Ship the release')).toBe('B')
-    expect(pickGhostty([...terms, { id: 'D', cwd: '/Users/me/code/app', name: 'Fix login' }], '/Users/me/code/app', 'Fix login')).toBe(
+    expect(pickGhostty(terms, '/Users/me/code/app', ['Fix login'])).toBe('A')
+    expect(pickGhostty(terms, '/Users/me/code/app', ['Ship the release'])).toBe('B')
+    expect(pickGhostty([...terms, { id: 'D', cwd: '/Users/me/code/app', name: 'Fix login' }], '/Users/me/code/app', ['Fix login'])).toBe(
       undefined,
     )
     expect(pickGhostty(terms, '/Users/me/code/app')).toBe(undefined)
-    expect(pickGhostty(terms, '/nowhere', 'Fix login')).toBe(undefined)
+    expect(pickGhostty(terms, '/nowhere', ['Fix login'])).toBe(undefined)
+  })
+
+  test('pick: the /rename title or the AI title matches, since the rename may be kept off the terminal title', () => {
+    const terms = [
+      { id: 'A', cwd: '/w', name: '✳ AI login fix' },
+      { id: 'B', cwd: '/w', name: '✳ Other' },
+    ]
+    expect(pickGhostty(terms, '/w', ['Fix login', 'AI login fix'])).toBe('A')
+    expect(pickGhostty([...terms, { id: 'C', cwd: '/w', name: '◐ Fix login' }], '/w', ['Fix login', 'AI login fix'])).toBe('C')
+  })
+
+  test('pick: cwds compare NFC on both sides', () => {
+    const nfd = '/Users/me/cafe\u0301'
+    expect(pickGhostty([{ id: 'A', cwd: nfd }], '/Users/me/caf\u00e9')).toBe('A')
+    expect(pickGhostty([{ id: 'A', cwd: '/Users/me/caf\u00e9' }], nfd)).toBe('A')
+  })
+
+  test('pick: a lone tab in the cwd titled by another Claude session is refused; a plain shell is accepted', () => {
+    expect(pickGhostty([{ id: 'A', cwd: '/w', name: '✳ Someone else' }], '/w', ['Fix login'])).toBe(undefined)
+    expect(pickGhostty([{ id: 'A', cwd: '/w', name: '◑ Fix login' }], '/w', ['Fix login'])).toBe('A')
+    expect(pickGhostty([{ id: 'A', cwd: '/w', name: 'zsh' }], '/w', ['Fix login'])).toBe('A')
+    expect(pickGhostty([{ id: 'A', cwd: '/w', name: '✳ Someone else' }], '/w')).toBe('A')
+  })
+
+  test('the list script reads each property once for all terminals and resolves cwds to their realpath', async () => {
+    const h = host({ osascript: { stdout: '[]' } })
+    await runJump(jump(ghostty), h.exec)
+    const script = h.argvs()[0]![4]!
+    expect(script).toContain('app.terminals.id()')
+    expect(script).toContain('app.terminals.workingDirectory()')
+    expect(script).toContain('app.terminals.name()')
+    expect(script).toContain('$.realpath(')
+    expect(script).not.toMatch(/\.map\(t => /)
+  })
+
+  test('the focus script resolves the terminal from app.terminals, which holds the quick terminal no window lists', async () => {
+    const h = host({ osascript: [list({ id: 'T1', cwd: '/Users/me/code/app', name: 'zsh' }), { stdout: 'ok' }] })
+    await runJump(jump(ghostty), h.exec)
+    const script = h.argvs()[1]![4]!
+    expect(script).toContain('app.terminals')
+    expect(script).toContain('app.focus(t)')
+    expect(script).not.toContain('windows()')
   })
 
   test('a unique cwd match is focused by id', async () => {
@@ -249,7 +291,7 @@ describe('Ghostty', () => {
         { stdout: 'ok' },
       ],
     })
-    expect(await runJump(jump(ghostty, { title: 'Fix login' }), h.exec)).toBe(undefined)
+    expect(await runJump(jump(ghostty, { titles: ['Fix login'] }), h.exec)).toBe(undefined)
     expect(h.argvs()[1]![5]).toBe('T2')
   })
 
@@ -263,7 +305,7 @@ describe('Ghostty', () => {
       { throws: true },
     ]) {
       const h = host({ osascript: reply })
-      expect(await runJump(jump(ghostty, { title: 'A' }), h.exec)).toBe(undefined)
+      expect(await runJump(jump(ghostty, { titles: ['A'] }), h.exec)).toBe(undefined)
       expect(h.argvs()).toHaveLength(2)
       expect(h.argvs()[1]).toEqual(['open', '-b', 'com.mitchellh.ghostty'])
     }

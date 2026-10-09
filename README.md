@@ -8,7 +8,7 @@
 
 - **A card per session.** Its goal, what it is doing now, its context fill, its agents and its open PRs with CI state.
 - **Knows when you're needed.** A permission prompt, a question, or a reply that ends in a question turns the card yellow and sends one desktop notification.
-- **One press to get there.** Enter or a click brings the session's terminal forward: its tmux pane, its exact tab in Ghostty, iTerm2, Terminal, WezTerm, kitty, zellij, Supacode or cmux, its VS Code or Cursor window, or a background session. If none can, it copies the resume command.
+- **One press to get there.** Enter or a click brings the session's terminal forward: its tmux pane, its exact tab in Ghostty (several tabs in one folder with no matching title just raise Ghostty), iTerm2, Terminal, WezTerm, kitty, zellij, Supacode or cmux, its VS Code or Cursor window, or a background session. If none can, it copies the resume command.
 - **PRs a click away.** Checks bar and merge state per PR, worst first. Click to open it.
 - **Wakes on your PRs.** When a PR the session owns goes red, merges, conflicts or falls behind, HQ starts a turn there to deal with it. It never merges or pushes.
 - **PR watchers included.** `pr-ci-wait <pr>` and `pr-merge-wait <pr>` land on the Bash tool's PATH for Claude to run in the background.
