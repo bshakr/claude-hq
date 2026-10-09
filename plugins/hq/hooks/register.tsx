@@ -6,6 +6,7 @@ import { currentModel, installData } from './data/index'
 import { NOTIFY_STORE_KEY, parseNotifyArg } from './data/notify'
 import { LATEST_KEY, MANIFEST_URL, headerNotice, installOf, knownMarketplacesPath, manifestVersion, runUpdate } from './data/update'
 import type { HeaderNotice, Install } from './data/update'
+import { MATCH_BG_USAGE, parseMatchBg, themePath, themeTarget, withBackground } from './data/theme'
 import { WAKE_KEY, parseWake } from './data/wake'
 import type { HqModel } from './model/types'
 import { caretItem, caretKey, pressedItem, ringMove } from './ui/caret'
@@ -36,6 +37,7 @@ export const HELP = [
   '  wake, notify and summaries default to the plugin config; a toggle here overrides it on this machine.',
   '/hq reset    forget those toggles, so the plugin config applies again',
   '/hq update   update HQ from the plugin store (then /reload-plugins)',
+  '/hq match-bg <#hex>  paint the side panel your terminal background colour',
   '/hq help     this list',
   '',
   'ctrl+x tab moves the keys from the prompt to the pane, Esc moves them back. For a chord of your own,',
@@ -77,6 +79,20 @@ async function readInstall($: EngineInterface): Promise<Install | undefined> {
     }
   }
   return installOf(root, manifestVersion(await text(`${root}/.claude-plugin/plugin.json`)), known ? await text(known) : undefined)
+}
+
+/** Sets the side panel colour in the custom theme in use, else in hq's own theme for the person to pick once. */
+async function matchBackground($: EngineInterface, hex: string): Promise<string> {
+  const setting = (await $.config.list()).find(row => row.key === 'theme')?.value
+  const target = themeTarget(setting)
+  const path = themePath((await $.env.get('HOME')) ?? '', target.slug)
+  const current = (await $.fs.exists(path)) ? await $.fs.read(path) : undefined
+  const text = withBackground(typeof current === 'string' ? current : undefined, target, hex)
+  if (text === undefined) return `hq: ${path} is not a theme JSON object; left as it was.`
+  await $.fs.write(path, text)
+  return target.base === undefined
+    ? `Side panel set to ${hex} in theme ${target.slug}.`
+    : `Side panel set to ${hex} in theme hq: pick "hq" in /theme once; later /hq match-bg runs apply live.`
 }
 
 async function checkUpdate($: EngineInterface): Promise<void> {
@@ -160,7 +176,7 @@ async function startPane($: EngineInterface, isInteractive: boolean): Promise<vo
     await $.command.register({
       name: COMMAND,
       description: 'Pane of what needs you: agents, PRs and other sessions',
-      argumentHint: '[close | wake on|off | notify on|off | summaries on|off | update | help]',
+      argumentHint: '[close | wake on|off | notify on|off | summaries on|off | update | match-bg <#hex> | help]',
       immediate: true,
     })
   } catch (thrown) {
@@ -280,6 +296,11 @@ export const register: Register = (on, options) => {
       return {
         text: `hq toggles reset to the plugin config: wake ${word(c.wake)}, notify ${word(c.notify)}, summaries ${word(c.summaries)}.`,
       }
+    }
+    const bg = parseMatchBg(args)
+    if (bg !== undefined) {
+      $.ui.toast(bg === 'usage' ? MATCH_BG_USAGE : await matchBackground($, bg))
+      return {}
     }
     const summaries = /^summaries(?:\s+(on|off))?$/.exec(args)
     if (summaries) {
