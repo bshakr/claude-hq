@@ -18,9 +18,9 @@ describe('parsing', () => {
 
   test('a custom theme is its own target; a built-in base carries over, auto and unknown read as dark', () => {
     expect(themeTarget('custom:mocha')).toEqual({ slug: 'mocha' })
-    expect(themeTarget('light-ansi')).toEqual({ slug: 'hq', base: 'light-ansi' })
-    expect(themeTarget('auto')).toEqual({ slug: 'hq', base: 'dark' })
-    expect(themeTarget(undefined)).toEqual({ slug: 'hq', base: 'dark' })
+    expect(themeTarget('light-ansi')).toEqual({ slug: 'hq-light-ansi', base: 'light-ansi' })
+    expect(themeTarget('auto')).toEqual({ slug: 'hq-dark', base: 'dark' })
+    expect(themeTarget(undefined)).toEqual({ slug: 'hq-dark', base: 'dark' })
   })
 })
 
@@ -35,14 +35,14 @@ describe('the theme file', () => {
   })
 
   test("hq's own theme takes the current base and keeps overrides already there", () => {
-    expect(JSON.parse(withBackground(undefined, { slug: 'hq', base: 'dark-ansi' }, '#fff')!)).toEqual({
-      name: 'hq',
+    expect(JSON.parse(withBackground(undefined, { slug: 'hq-dark-ansi', base: 'dark-ansi' }, '#fff')!)).toEqual({
+      name: 'hq-dark-ansi',
       base: 'dark-ansi',
       overrides: { composerSidebarBackground: '#fff' },
     })
-    const old = JSON.stringify({ name: 'hq', base: 'dark', overrides: { claude: '#f5c2e7' } })
-    expect(JSON.parse(withBackground(old, { slug: 'hq', base: 'light' }, '#fff')!)).toEqual({
-      name: 'hq',
+    const old = JSON.stringify({ name: 'hq-light', base: 'dark', overrides: { claude: '#f5c2e7' } })
+    expect(JSON.parse(withBackground(old, { slug: 'hq-light', base: 'light' }, '#fff')!)).toEqual({
+      name: 'hq-light',
       base: 'light',
       overrides: { claude: '#f5c2e7', composerSidebarBackground: '#fff' },
     })
@@ -80,17 +80,19 @@ function host(on: On, theme: string, files: Record<string, string>) {
 const run = ($: Engine, args: string) =>
   $.command.run({ command: 'hq', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
 
-test('/hq match-bg on a built-in theme writes hq.json and says to pick it once', { options: { autoOpen: false } }, async ($, on) => {
+test('/hq match-bg on a built-in theme writes hq-<base>.json and says to pick it once', { options: { autoOpen: false } }, async ($, on) => {
   const files: Record<string, string> = {}
   const h = host(on, 'dark-ansi', files)
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
   await run($, 'match-bg #1e1e2e')
-  expect(JSON.parse(files[`${HOME}/.claude/themes/hq.json`]!)).toEqual({
-    name: 'hq',
+  expect(JSON.parse(files[`${HOME}/.claude/themes/hq-dark-ansi.json`]!)).toEqual({
+    name: 'hq-dark-ansi',
     base: 'dark-ansi',
     overrides: { composerSidebarBackground: '#1e1e2e' },
   })
-  expect(h.toasts).toEqual(['Side panel set to #1e1e2e in theme hq: pick "hq" in /theme once; later /hq match-bg runs apply live.'])
+  expect(h.toasts).toEqual([
+    'Side panel set to #1e1e2e in theme hq-dark-ansi: pick it in /theme once; later runs apply here live, other open sessions on restart.',
+  ])
 })
 
 test('/hq match-bg on a custom theme updates that file in place', { options: { autoOpen: false } }, async ($, on) => {

@@ -47,17 +47,17 @@ The pane opens by itself once per session when the terminal is at least 144 colu
 
 Built on macOS. On Linux the pane, tmux jumps and the watchers work; opening a PR and focusing terminal apps use macOS tools.
 
-**Pane sits on a grey or brown block?** Claude Code fills its side panel with the theme's `composerSidebarBackground`. Run `/hq match-bg #1e1e2e` with your terminal background colour: on a custom theme it updates that theme, otherwise it writes `~/.claude/themes/hq.json` on your current theme, which you pick once in `/theme`. Or write the file yourself and pick it:
+**Pane sits on a grey or brown block?** Claude Code fills its side panel with the theme's `composerSidebarBackground`. Run `/hq match-bg #1e1e2e` with your terminal background colour: on a custom theme it updates that theme, otherwise it writes `~/.claude/themes/hq-<base>.json` on your current theme, which you pick once in `/theme`. Or write the file yourself and pick it:
 
 ```json
 {
-  "name": "hq",
+  "name": "hq-dark",
   "base": "dark",
   "overrides": { "composerSidebarBackground": "#1e1e2e" }
 }
 ```
 
-Saving the theme again from the `/theme` editor can drop the override; run `/hq match-bg` again if it does.
+Other open sessions keep the theme they loaded until they restart, and picking it in `/theme` there writes that stale copy back over the file. Restart them instead, or run `/hq match-bg` again if the override is gone.
 
 ## Usage
 

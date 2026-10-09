@@ -92,7 +92,7 @@ async function matchBackground($: EngineInterface, hex: string): Promise<string>
   await $.fs.write(path, text)
   return target.base === undefined
     ? `Side panel set to ${hex} in theme ${target.slug}.`
-    : `Side panel set to ${hex} in theme hq: pick "hq" in /theme once; later /hq match-bg runs apply live.`
+    : `Side panel set to ${hex} in theme ${target.slug}: pick it in /theme once; later runs apply here live, other open sessions on restart.`
 }
 
 async function checkUpdate($: EngineInterface): Promise<void> {
