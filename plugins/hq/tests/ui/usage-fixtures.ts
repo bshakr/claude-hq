@@ -1,4 +1,4 @@
-// Context meters and plan usage (ADR 0007), apart from the sheet's fixtures so those stay as drawn.
+// Context meters and plan usage, apart from the sheet's fixtures so those stay as drawn.
 import type { ContextUsage, HqModel, OtherSessionVM } from '../../hooks/model/types'
 import { NOW } from './fixtures'
 

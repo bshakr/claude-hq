@@ -167,15 +167,15 @@ export const OTHERS_BUSY: TmuxGroupVM[] = [
   ]),
   group('devbox-local', [sess({ sessionId: 's-home', name: 'home', statusSince: NOW - 5 * M }, 'devbox-local')]),
   group('webapp-ui', [sess({ sessionId: 's-mono-r', name: 'webapp-ui-research', statusSince: NOW - 22 * M }, 'webapp-ui', '@2')]),
-  group('travel-map', [
+  group('photo-site', [
     sess(
-      { sessionId: 's-travel', name: 'travel', statusSince: NOW - 40 * M, prSummary: { total: 1, broken: 0, waiting: 0, inProgress: 0 } },
-      'travel-map',
+      { sessionId: 's-photos', name: 'photos', statusSince: NOW - 40 * M, prSummary: { total: 1, broken: 0, waiting: 0, inProgress: 0 } },
+      'photo-site',
     ),
   ]),
-  group('rota-roster', [
-    sess({ sessionId: 's-rota', name: 'rota', statusSince: NOW - 3 * H }, 'rota-roster'),
-    sess({ sessionId: 's-rota-r', name: 'rota-research', statusSince: NOW - 3 * H }, 'rota-roster', '@2'),
+  group('blog-engine', [
+    sess({ sessionId: 's-blog', name: 'blog', statusSince: NOW - 3 * H }, 'blog-engine'),
+    sess({ sessionId: 's-blog-r', name: 'blog-research', statusSince: NOW - 3 * H }, 'blog-engine', '@2'),
   ]),
   group('finance', [sess({ sessionId: 's-fin', name: 'finance', statusSince: NOW - 49 * H }, 'finance')]),
 ]
@@ -299,7 +299,7 @@ export const ACTIVE: HqModel = {
       { text: 'Read the claims code', status: 'completed' },
       { text: 'Rewrite ownership', status: 'completed' },
       { text: 'Rewriting the layout', status: 'in_progress' },
-      { text: 'Write ADR 0002', status: 'pending' },
+      { text: 'Write the docs', status: 'pending' },
       { text: 'Run the gates', status: 'pending' },
     ],
     waiting: [{ text: 'pr-ci-wait 276', since: NOW - 3 * M }],

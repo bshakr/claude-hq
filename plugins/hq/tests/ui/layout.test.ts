@@ -47,7 +47,7 @@ describe('the sheet, cell for cell', () => {
   test('(e) 88 cols', () => expectSheet(lines(BUSY, { width: 88 }), SHEET.e88))
   test('(f) long list', () => expectSheet(lines(LONG), SHEET.f80))
   test('(f2) long list, focused, scrolled to the bottom', () =>
-    expectSheet(lines(LONG, { focused: true, cursor: 's:s-rota-r', scroll: 99 }), SHEET.f2))
+    expectSheet(lines(LONG, { focused: true, cursor: 's:s-blog-r', scroll: 99 }), SHEET.f2))
   test('(f3) long list on a 34-row pane', () => expectSheet(lines(LONG, { rows: 34 }), SHEET.f3))
   test("(g) other sessions' PRs, unfocused", () => expectSheet(lines(WITH_PRS, { rows: 40 }), SHEET.g80))
   test("(g') cursor on st-api's second PR", () =>
@@ -111,7 +111,7 @@ describe('every state, every width', () => {
   test('truncation ends in one …, names and refs never cut', () => {
     for (const width of [40, 60]) {
       const text = lines(BUSY, { width, rows: 90 }).join('\n')
-      for (const keep of ['#212', '#214', '#431', '#433', '#429', '#522', 'st-api', 'webapp-ui-research', 'rota-research']) {
+      for (const keep of ['#212', '#214', '#431', '#433', '#429', '#522', 'st-api', 'webapp-ui-research', 'blog-research']) {
         expect(text.includes(keep)).toBe(true)
       }
       expect(text.includes('……')).toBe(false)
@@ -127,8 +127,8 @@ describe('every state, every width', () => {
         'acme-store',
         'devbox-local',
         'webapp-ui',
-        'travel-map',
-        'rota-roster',
+        'photo-site',
+        'blog-engine',
         'finance',
       ])
       for (const l of got.filter(t => /^ [╭│╰├]/.test(t))) {
@@ -226,9 +226,9 @@ describe('targets', () => {
       's:s-st-docs',
       's:s-home',
       's:s-mono-r',
-      's:s-travel',
-      's:s-rota',
-      's:s-rota-r',
+      's:s-photos',
+      's:s-blog',
+      's:s-blog-r',
       's:s-fin',
     ])
     const buttons = l.rows.flatMap(r => r.buttons)
@@ -314,7 +314,7 @@ describe('scrolling and motion', () => {
 
   test('scrollFor keeps the cursor row inside the window', () => {
     const l = layout(LONG, view({ rows: 34 }))
-    const key = 's:s-rota-r'
+    const key = 's:s-blog-r'
     const s = scrollFor(l, key, 0)
     const line = l.itemLine[key]!
     expect(line >= s && line < s + l.region).toBe(true)

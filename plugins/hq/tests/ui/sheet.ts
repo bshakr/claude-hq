@@ -54,17 +54,17 @@ export const a80 = [
   ' │  webapp-ui-research                                              idle 22m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────────────────────────────────────────────╮',
-  ' │  travel                                                   1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────────────────────────────────────────────╮',
+  ' │  photos                                                   1 PR · idle 40m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ rota-roster ──────────────────────────────────────────────────────────────╮',
-  ' │  rota                                                             idle 3h  │',
+  ' ╭─ blog-engine ──────────────────────────────────────────────────────────────╮',
+  ' │  blog                                                             idle 3h  │',
   ' │                                                                            │',
-  ' │  rota-research                                                    idle 3h  │',
+  ' │  blog-research                                                    idle 3h  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   ' ↓ 4 rows below, nothing that needs you',
-  ' ⌃g focus · click a PR to open it, a session to switch to it',
+  ' ctrl+x tab focus · click a PR to open it, a session to switch to it',
 ]
 
 export const aFocusFlare = [
@@ -121,17 +121,17 @@ export const aFocusFlare = [
   ' │  webapp-ui-research                                              idle 22m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────────────────────────────────────────────╮',
-  ' │  travel                                                   1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────────────────────────────────────────────╮',
+  ' │  photos                                                   1 PR · idle 40m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ rota-roster ──────────────────────────────────────────────────────────────╮',
-  ' │  rota                                                             idle 3h  │',
+  ' ╭─ blog-engine ──────────────────────────────────────────────────────────────╮',
+  ' │  blog                                                             idle 3h  │',
   ' │                                                                            │',
-  ' │  rota-research                                                    idle 3h  │',
+  ' │  blog-research                                                    idle 3h  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   ' ↓ 4 rows below, nothing that needs you',
-  ' j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt',
+  ' j: next · k: prev · ⏎ open, switch or expand · esc prompt',
 ]
 
 export const b80 = [
@@ -167,14 +167,14 @@ export const b80 = [
   ' │  webapp-ui-research                                              idle 22m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────────────────────────────────────────────╮',
-  ' │  travel                                                   1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────────────────────────────────────────────╮',
+  ' │  photos                                                   1 PR · idle 40m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ rota-roster ──────────────────────────────────────────────────────────────╮',
-  ' │  rota                                                             idle 3h  │',
+  ' ╭─ blog-engine ──────────────────────────────────────────────────────────────╮',
+  ' │  blog                                                             idle 3h  │',
   ' │                                                                            │',
-  ' │  rota-research                                                    idle 3h  │',
+  ' │  blog-research                                                    idle 3h  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
   ' ╭─ finance ──────────────────────────────────────────────────────────────────╮',
@@ -198,7 +198,7 @@ export const b80 = [
   '',
   '',
   '',
-  ' ⌃g focus · click a PR to open it, a session to switch to it',
+  ' ctrl+x tab focus · click a PR to open it, a session to switch to it',
 ]
 
 export const bFocus433 = [
@@ -234,14 +234,14 @@ export const bFocus433 = [
   ' │  webapp-ui-research                                              idle 22m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────────────────────────────────────────────╮',
-  ' │  travel                                                   1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────────────────────────────────────────────╮',
+  ' │  photos                                                   1 PR · idle 40m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ rota-roster ──────────────────────────────────────────────────────────────╮',
-  ' │  rota                                                             idle 3h  │',
+  ' ╭─ blog-engine ──────────────────────────────────────────────────────────────╮',
+  ' │  blog                                                             idle 3h  │',
   ' │                                                                            │',
-  ' │  rota-research                                                    idle 3h  │',
+  ' │  blog-research                                                    idle 3h  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
   ' ╭─ finance ──────────────────────────────────────────────────────────────────╮',
@@ -265,7 +265,7 @@ export const bFocus433 = [
   '',
   '',
   '',
-  ' j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt',
+  ' j: next · k: prev · ⏎ open, switch or expand · esc prompt',
 ]
 
 export const c80 = [
@@ -322,17 +322,17 @@ export const c80 = [
   ' │  webapp-ui-research                                              idle 22m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────────────────────────────────────────────╮',
-  ' │  travel                                                   1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────────────────────────────────────────────╮',
+  ' │  photos                                                   1 PR · idle 40m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ rota-roster ──────────────────────────────────────────────────────────────╮',
-  ' │  rota                                                             idle 3h  │',
+  ' ╭─ blog-engine ──────────────────────────────────────────────────────────────╮',
+  ' │  blog                                                             idle 3h  │',
   ' │                                                                            │',
-  ' │  rota-research                                                    idle 3h  │',
+  ' │  blog-research                                                    idle 3h  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   ' ↓ 4 rows below, nothing that needs you',
-  ' j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt',
+  ' j: next · k: prev · ⏎ open, switch or expand · esc prompt',
 ]
 
 export const e40 = [
@@ -389,17 +389,17 @@ export const e40 = [
   ' │  webapp-ui-research      idle 22m  │',
   ' ╰────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────╮',
-  ' │  travel           1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────╮',
+  ' │  photos           1 PR · idle 40m  │',
   ' ╰────────────────────────────────────╯',
   '',
-  ' ╭─ rota-roster ──────────────────────╮',
-  ' │  rota                     idle 3h  │',
+  ' ╭─ blog-engine ──────────────────────╮',
+  ' │  blog                     idle 3h  │',
   ' │                                    │',
-  ' │  rota-research            idle 3h  │',
+  ' │  blog-research            idle 3h  │',
   ' ╰────────────────────────────────────╯',
   ' ↓ 4 rows below, nothing that needs you',
-  ' ⌃g focus · click a PR to open it, a se…',
+  ' ctrl+x tab focus · click a PR to open …',
 ]
 
 export const e88 = [
@@ -456,17 +456,17 @@ export const e88 = [
   ' │  webapp-ui-research                                                      idle 22m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────────────────────────────────────────────────────╮',
-  ' │  travel                                                           1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────────────────────────────────────────────────────╮',
+  ' │  photos                                                           1 PR · idle 40m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ rota-roster ──────────────────────────────────────────────────────────────────────╮',
-  ' │  rota                                                                     idle 3h  │',
+  ' ╭─ blog-engine ──────────────────────────────────────────────────────────────────────╮',
+  ' │  blog                                                                     idle 3h  │',
   ' │                                                                                    │',
-  ' │  rota-research                                                            idle 3h  │',
+  ' │  blog-research                                                            idle 3h  │',
   ' ╰────────────────────────────────────────────────────────────────────────────────────╯',
   ' ↓ 4 rows below, nothing that needs you',
-  ' ⌃g focus · click a PR to open it, a session to switch to it',
+  ' ctrl+x tab focus · click a PR to open it, a session to switch to it',
 ]
 
 export const f80 = [
@@ -533,7 +533,7 @@ export const f80 = [
   '',
   ' ╭─ webapp-ui ────────────────────────────────────────────────────────────────╮',
   ' ↓ 12 rows below, nothing that needs you',
-  ' ⌃g focus · click a PR to open it, a session to switch to it',
+  ' ctrl+x tab focus · click a PR to open it, a session to switch to it',
 ]
 
 export const f2 = [
@@ -590,17 +590,17 @@ export const f2 = [
   ' │  webapp-ui-research                                              idle 22m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ╭─ travel-map ───────────────────────────────────────────────────────────────╮',
-  ' │  travel                                                   1 PR · idle 40m  │',
+  ' ╭─ photo-site ───────────────────────────────────────────────────────────────╮',
+  ' │  photos                                                   1 PR · idle 40m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
-  ' ┏━ rota-roster ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
-  ' ┃  rota                                                             idle 3h  ┃',
+  ' ┏━ blog-engine ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+  ' ┃  blog                                                             idle 3h  ┃',
   ' ┃                                                                            ┃',
-  ' ┃▐ rota-research                                                    idle 3h  ┃',
+  ' ┃▐ blog-research                                                    idle 3h  ┃',
   ' ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛',
   '',
-  ' j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt',
+  ' j: next · k: prev · ⏎ open, switch or expand · esc prompt',
 ]
 
 export const f3 = [
@@ -637,7 +637,7 @@ export const f3 = [
   ' │  acme-store/api                                                            │',
   ' │  #522  Bookings: idempotent webhook replay                 ▰▰▰▰▰▰▰▰▰▰ 6/6  │',
   ' ↓ 42 rows below   ✗ 1 broken   ◆ 2 waiting on you',
-  ' ⌃g focus · click a PR to open it, a session to switch to it',
+  ' ctrl+x tab focus · click a PR to open it, a session to switch to it',
 ]
 
 export const g80 = [
@@ -680,7 +680,7 @@ export const g80 = [
   '',
   '',
   '',
-  ' ⌃g focus · click a PR to open it, a session to switch to it',
+  ' ctrl+x tab focus · click a PR to open it, a session to switch to it',
 ]
 
 export const g2 = [
@@ -723,5 +723,5 @@ export const g2 = [
   '',
   '',
   '',
-  ' j: next · k: prev · ⏎ open, switch or expand · ⌃g prompt',
+  ' j: next · k: prev · ⏎ open, switch or expand · esc prompt',
 ]

@@ -4,6 +4,8 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 import { SUMMARIES_KEY, config, effective, resolveConfig, setConfig } from './config'
 import { currentModel, installData } from './data/index'
 import { NOTIFY_STORE_KEY, parseNotifyArg } from './data/notify'
+import { LATEST_KEY, MANIFEST_URL, headerNotice, installOf, knownMarketplacesPath, manifestVersion, runUpdate } from './data/update'
+import type { HeaderNotice, Install } from './data/update'
 import { WAKE_KEY, parseWake } from './data/wake'
 import type { HqModel } from './model/types'
 import { caretItem, caretKey, pressedItem, ringMove } from './ui/caret'
@@ -23,8 +25,9 @@ const expanded = atom({ plugin: 'hq', key: 'expanded' } as const, [])
 const scroll = atom({ plugin: 'hq', key: 'scroll' } as const, 0)
 const phase = atom({ plugin: 'hq', key: 'phase' } as const, 0)
 const autoOpened = atom({ plugin: 'hq', key: 'autoOpened' } as const, false)
-const HELP = [
-  '/hq          open the pane (⌃g moves the keys between it and the prompt)',
+export const NARROW_TOAST = 'HQ is ready · /hq opens the pane'
+export const HELP = [
+  '/hq          open the pane',
   '/hq close    close the pane',
   '/hq wake on  wake this session on its own PRs going red, merging, conflicting or behind (default)',
   '/hq wake off toasts only, never start a turn',
@@ -32,10 +35,13 @@ const HELP = [
   '/hq summaries on|off  Haiku goal lines and id glosses on cards',
   '  wake, notify and summaries default to the plugin config; a toggle here overrides it on this machine.',
   '/hq reset    forget those toggles, so the plugin config applies again',
+  '/hq update   update HQ from the plugin store (then /reload-plugins)',
   '/hq help     this list',
   '',
+  'ctrl+x tab moves the keys from the prompt to the pane, Esc moves them back. For a chord of your own,',
+  'bind abovePrompt:focus in ~/.claude/keybindings.json.',
   'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
-  'Enter on an agent expands it, on +N finished shows the rest. Esc returns the keys to the prompt.',
+  'Enter on an agent expands it, on +N finished shows the rest.',
 ].join('\n')
 
 /** Motion only while something visibly runs: the session's own turn, a running agent, checks in progress, a busy session. */
@@ -54,6 +60,55 @@ let refresh: (() => Promise<void>) | undefined
 let syncMotion: (() => Promise<void>) | undefined
 let last: Layout | undefined
 let isPaneOpen = false
+let notice: HeaderNotice | undefined
+let install: Install | undefined
+let updateTimer: Timer | undefined
+const UPDATE_RECHECK_MS = 60 * 60_000
+
+/** The plugin-store install this module runs from; undefined under --plugin-dir or a local marketplace. */
+async function readInstall($: EngineInterface): Promise<Install | undefined> {
+  const root = $.plugin.root
+  const known = knownMarketplacesPath(root)
+  const text = async (path: string) => {
+    try {
+      return await $.fs.read(path)
+    } catch {
+      return undefined
+    }
+  }
+  return installOf(root, manifestVersion(await text(`${root}/.claude-plugin/plugin.json`)), known ? await text(known) : undefined)
+}
+
+async function checkUpdate($: EngineInterface): Promise<void> {
+  // "Updated to" holds for the whole load; only an "available" line is re-checked.
+  if (notice?.kind === 'updated') return
+  const trafficOff = Boolean(await $.env.get('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'))
+  const next = await headerNotice(
+    install,
+    { enabled: config().updateCheck, trafficOff },
+    {
+      now: await $.clock.now(),
+      get: key => $.store.get(key),
+      set: (key, value) => $.store.set(key, value),
+      fetchManifest: async () => {
+        const r = await $.http.fetch(MANIFEST_URL)
+        return r.ok ? r.text : undefined
+      },
+    },
+  )
+  if (next?.kind !== notice?.kind || next?.version !== notice?.version) {
+    notice = next
+    await refresh?.()
+  }
+}
+
+async function startUpdates($: EngineInterface): Promise<void> {
+  if (updateTimer !== undefined) return
+  install = await readInstall($)
+  if (install === undefined) return
+  updateTimer = $.clock.every(UPDATE_RECHECK_MS, () => void checkUpdate($).catch(() => undefined))
+  await checkUpdate($)
+}
 
 async function startPane($: EngineInterface, isInteractive: boolean): Promise<void> {
   let motion: Timer | undefined
@@ -93,16 +148,19 @@ async function startPane($: EngineInterface, isInteractive: boolean): Promise<vo
     try {
       isPaneOpen = (await $.ui.open({ id: PANE, title: 'hq' })).isPlaced
       await syncMotion?.()
+      if (!isPaneOpen) $.ui.toast(NARROW_TOAST)
     } catch {
       // no pane on this surface; /hq still opens it
     }
   }
 
+  if (isInteractive) void startUpdates($).catch(() => undefined)
+
   try {
     await $.command.register({
       name: COMMAND,
       description: 'Pane of what needs you: agents, PRs and other sessions',
-      argumentHint: '[close | wake on|off | notify on|off | summaries on|off | help]',
+      argumentHint: '[close | wake on|off | notify on|off | summaries on|off | update | help]',
       immediate: true,
     })
   } catch (thrown) {
@@ -185,7 +243,11 @@ export const register: Register = (on, options) => {
       const opened = await $.ui.open({ id: PANE, title: 'hq' })
       isPaneOpen = true
       await syncMotion?.()
-      return { text: opened.isPlaced ? 'hq pane opened. ⌃g moves the keys to it.' : 'hq pane is waiting for room to draw.' }
+      return {
+        text: opened.isPlaced
+          ? 'hq pane opened. ctrl+x tab moves the keys to it, or bind your own chord to abovePrompt:focus.'
+          : 'hq pane is waiting for room to draw.',
+      }
     }
     if (args === 'close') {
       await $.ui.close({ id: PANE })
@@ -201,6 +263,16 @@ export const register: Register = (on, options) => {
       return { text: `hq notifications ${notify ? 'on' : 'off'}.` }
     }
     if (args === 'help') return { text: HELP }
+    if (args === 'update') {
+      const latest = await $.store.get(LATEST_KEY)
+      const said = await runUpdate(
+        install ?? (await readInstall($)),
+        argv => $.process.run(argv, { timeoutMs: 180_000 }),
+        typeof latest === 'string' ? latest : undefined,
+      )
+      $.ui.toast(said, { timeoutMs: 12_000 })
+      return {}
+    }
     if (args === 'reset') {
       for (const key of [WAKE_KEY, NOTIFY_STORE_KEY, SUMMARIES_KEY]) await $.store.delete(key)
       const c = config()
@@ -268,6 +340,7 @@ export const register: Register = (on, options) => {
       scroll: await read($, scroll),
       phase: await read($, phase),
       ...(config().warning ? { warning: config().warning } : {}),
+      ...(notice ? { notice } : {}),
     }
     const l = layout(currentModel(), view)
     last = l
