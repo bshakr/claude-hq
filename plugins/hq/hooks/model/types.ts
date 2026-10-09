@@ -29,6 +29,8 @@ export type Jump =
       bg?: true
       jobId?: string
       openIn?: string
+      /** The transcript's AI or /rename title, which Claude Code also writes as the terminal title. */
+      title?: string
       term: TermEnv
     }
 

@@ -41,6 +41,56 @@ const TERMINAL_JXA = `function run(argv) {
   return 'none'
 }`
 
+// Ghostty exposes no tty or per-surface id to the process, so the pick is by cwd then title, in pickGhostty.
+const GHOSTTY_LIST_JXA = `function run() {
+  const app = Application('Ghostty')
+  if (!app.running()) return '[]'
+  return JSON.stringify(app.terminals().map(t => ({ id: t.id(), cwd: t.workingDirectory(), name: t.name() })))
+}`
+
+const GHOSTTY_FOCUS_JXA = `function run(argv) {
+  const app = Application('Ghostty')
+  for (const w of app.windows()) for (const tab of w.tabs()) for (const t of tab.terminals()) {
+    if (t.id() !== argv[0]) continue
+    try { app.selectTab(tab) } catch (e) {}
+    app.focus(t); app.activate(); return 'ok'
+  }
+  return 'none'
+}`
+
+export interface GhosttyTerminal {
+  id: string
+  cwd?: string
+  name?: string
+}
+
+const dir = (p: string) => p.replace(/\/+$/, '') || '/'
+// Claude Code titles the tab "✳ <title>", or "◐"/"◑" while it works.
+const bare = (name: string) => name.replace(/^[\u2733\u25D0\u25D1]\s*/, '').trim()
+
+/** The one terminal in the session's cwd, narrowed by title when several share it; undefined when unsure. */
+export function pickGhostty(terms: readonly GhosttyTerminal[], cwd: string, title?: string): string | undefined {
+  const here = terms.filter(t => t.cwd && dir(t.cwd) === dir(cwd))
+  if (here.length === 1) return here[0]!.id
+  if (!title) return undefined
+  const named = here.filter(t => t.name && bare(t.name) === title.trim())
+  return named.length === 1 ? named[0]!.id : undefined
+}
+
+async function focusGhostty(j: SessionJump, exec: Exec): Promise<boolean> {
+  let terms: GhosttyTerminal[]
+  try {
+    const r = await exec(['osascript', '-l', 'JavaScript', '-e', GHOSTTY_LIST_JXA])
+    if (r.exitCode !== 0) return false
+    terms = JSON.parse(r.stdout ?? '') as GhosttyTerminal[]
+  } catch {
+    return false
+  }
+  if (!Array.isArray(terms)) return false
+  const id = pickGhostty(terms, j.cwd, j.title)
+  return id ? said(exec, ['osascript', '-l', 'JavaScript', '-e', GHOSTTY_FOCUS_JXA, String(id)], 'ok') : false
+}
+
 export interface Strategy {
   name: string
   /** Whether this host can be what holds the session, from its env and tty alone. */
@@ -53,6 +103,8 @@ const env = (j: SessionJump, k: string) => j.term.env[k]
 const bundle = (j: SessionJump) => env(j, '__CFBundleIdentifier')
 // A multiplexer's panes inherit the outer terminal's env, which names the wrong pane.
 const muxed = (j: SessionJump) => !!(j.tmux || env(j, 'TMUX') || env(j, 'ZELLIJ'))
+// Supacode and cmux embed libghostty and may say TERM_PROGRAM=ghostty; their bundle id tells them apart.
+const isGhostty = (j: SessionJump) => (bundle(j) ? bundle(j) === 'com.mitchellh.ghostty' : env(j, 'TERM_PROGRAM') === 'ghostty')
 const isCursor = (j: SessionJump) =>
   !!env(j, 'CURSOR_TRACE_ID') || /todesktop/.test(bundle(j) ?? '') || /\/Cursor\.app\//.test(env(j, 'VSCODE_GIT_ASKPASS_NODE') ?? '')
 
@@ -173,6 +225,11 @@ export const STRATEGIES: readonly Strategy[] = [
       if (done) await activate(j, exec)
       return done
     },
+  },
+  {
+    name: 'Ghostty',
+    applies: j => !muxed(j) && !!j.cwd && isGhostty(j),
+    run: focusGhostty,
   },
   {
     name: 'editor',

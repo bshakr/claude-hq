@@ -3,7 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import { jumpOf, parseRegistryRow } from '../../hooks/data/fleet'
 import { parsePsTerm } from '../../hooks/data/term'
 import type { HqModel, TermEnv } from '../../hooks/model/types'
-import { resumeCommand, resumeOnly, strategiesFor } from '../../hooks/ui/focus'
+import { pickGhostty, resumeCommand, resumeOnly, strategiesFor } from '../../hooks/ui/focus'
 import type { Exec, SessionJump } from '../../hooks/ui/focus'
 import { pressJump, runJump } from '../../hooks/ui/jump'
 import { RESUME_HINT, layout } from '../../hooks/ui/layout'
@@ -20,12 +20,13 @@ const jump = (term: TermEnv, extra: Partial<SessionJump> = {}): SessionJump => (
 
 type Reply = { exitCode?: number; stdout?: string; throws?: boolean }
 
-/** Answers by argv[0] (or "argv0 argv1"); records every command and its env. */
-function host(replies: Record<string, Reply> = {}) {
+/** Answers by argv[0] (or "argv0 argv1"), a list answering successive calls; records every command and its env. */
+function host(replies: Record<string, Reply | Reply[]> = {}) {
   const ran: { argv: string[]; env?: Record<string, string> }[] = []
   const exec: Exec = async (argv, init) => {
     ran.push({ argv, ...(init?.env ? { env: init.env } : {}) })
-    const r = replies[`${argv[0]} ${argv[1]}`] ?? replies[argv[0]!] ?? {}
+    const got = replies[`${argv[0]} ${argv[1]}`] ?? replies[argv[0]!] ?? {}
+    const r = (Array.isArray(got) ? got.shift() : got) ?? {}
     if (r.throws) throw new Error(`spawn ${argv[0]} ENOENT`)
     return { exitCode: r.exitCode ?? 0, stdout: r.stdout ?? '', stderr: '' }
   }
@@ -165,12 +166,31 @@ describe('the strategy chain', () => {
     expect(cursor.argvs()).toEqual([['cursor', '/Users/me/code/app']])
   })
 
-  test('Ghostty and any other macOS app are raised by bundle id', async () => {
+  test('any other macOS app is raised by bundle id', async () => {
     const h = host()
-    const j = jump({ tty: '/dev/ttys9', env: { __CFBundleIdentifier: 'com.mitchellh.ghostty' } })
+    const j = jump({ tty: '/dev/ttys9', env: { __CFBundleIdentifier: 'com.example.term' } })
     expect(strategiesFor(j).map(s => s.name)).toEqual(['app'])
     expect(await runJump(j, h.exec)).toBe(undefined)
-    expect(h.argvs()).toEqual([['open', '-b', 'com.mitchellh.ghostty']])
+    expect(h.argvs()).toEqual([['open', '-b', 'com.example.term']])
+  })
+
+  test('the jump carries the transcript title, which Claude Code also writes as the terminal title', () => {
+    const row = parseRegistryRow(JSON.stringify({ pid: 9, sessionId: 's', cwd: '/w' }))!
+    expect(jumpOf(row, { env: {} }, undefined, 'Fix login')).toEqual({
+      kind: 'session',
+      sessionId: 's',
+      cwd: '/w',
+      pid: 9,
+      term: { env: {} },
+      title: 'Fix login',
+    })
+  })
+
+  test('Ghostty: TERM_PROGRAM or its bundle id selects it; Supacode and cmux, which embed it, do not', () => {
+    const names = (env: Record<string, string>) => strategiesFor(jump({ env })).map(s => s.name)
+    expect(names({ __CFBundleIdentifier: 'com.mitchellh.ghostty' })).toEqual(['Ghostty', 'app'])
+    expect(names({ TERM_PROGRAM: 'ghostty' })).toEqual(['Ghostty'])
+    expect(names({ TERM_PROGRAM: 'ghostty', __CFBundleIdentifier: 'com.cmuxterm.app' })).toEqual(['app'])
   })
 
   test('a missing binary or a timeout is a miss, never a throw: the chain ends at the resume command', async () => {
@@ -188,6 +208,84 @@ describe('the strategy chain', () => {
     expect(resumeOnly(jump({ env: {} }))).toBe(true)
     expect(resumeOnly({ kind: 'tmux', target: 'a:@1.%1' })).toBe(false)
     expect(resumeCommand(jump({ env: {} }, { cwd: "/Users/me/my app's" }))).toBe(`cd '/Users/me/my app'\\''s' && claude --resume sid-1`)
+  })
+})
+
+describe('Ghostty', () => {
+  const ghostty = { env: { TERM_PROGRAM: 'ghostty', __CFBundleIdentifier: 'com.mitchellh.ghostty' } }
+  const list = (...t: object[]) => ({ stdout: JSON.stringify(t) + '\n' })
+
+  test('pick: the one terminal in the cwd; several narrowed by title, tolerant of the status glyph and a trailing slash', () => {
+    const terms = [
+      { id: 'A', cwd: '/Users/me/code/app/', name: '✳ Fix login' },
+      { id: 'B', cwd: '/Users/me/code/app', name: '◐ Ship the release' },
+      { id: 'C', cwd: '/Users/me/code/other', name: '✳ Fix login' },
+    ]
+    expect(pickGhostty(terms.slice(1), '/Users/me/code/app/')).toBe('B')
+    expect(pickGhostty(terms, '/Users/me/code/app', 'Fix login')).toBe('A')
+    expect(pickGhostty(terms, '/Users/me/code/app', 'Ship the release')).toBe('B')
+    expect(pickGhostty([...terms, { id: 'D', cwd: '/Users/me/code/app', name: 'Fix login' }], '/Users/me/code/app', 'Fix login')).toBe(
+      undefined,
+    )
+    expect(pickGhostty(terms, '/Users/me/code/app')).toBe(undefined)
+    expect(pickGhostty(terms, '/nowhere', 'Fix login')).toBe(undefined)
+  })
+
+  test('a unique cwd match is focused by id', async () => {
+    const h = host({
+      osascript: [list({ id: 'T1', cwd: '/Users/me/code/app', name: 'zsh' }, { id: 'T2', cwd: '/tmp', name: 'zsh' }), { stdout: 'ok\n' }],
+    })
+    expect(await runJump(jump(ghostty), h.exec)).toBe(undefined)
+    expect(h.argvs()).toHaveLength(2)
+    expect(h.argvs()[0]!.slice(0, 3)).toEqual(['osascript', '-l', 'JavaScript'])
+    expect(h.argvs()[0]![4]).toContain("Application('Ghostty')")
+    expect(h.argvs()[1]![5]).toBe('T1')
+  })
+
+  test('several terminals in the cwd: the title picks one', async () => {
+    const h = host({
+      osascript: [
+        list({ id: 'T1', cwd: '/Users/me/code/app', name: '✳ Other work' }, { id: 'T2', cwd: '/Users/me/code/app', name: '◑ Fix login' }),
+        { stdout: 'ok' },
+      ],
+    })
+    expect(await runJump(jump(ghostty, { title: 'Fix login' }), h.exec)).toBe(undefined)
+    expect(h.argvs()[1]![5]).toBe('T2')
+  })
+
+  test('ambiguous, unmatched, a broken reply or a script error: no focus, Ghostty is raised by bundle id instead', async () => {
+    const two = list({ id: 'T1', cwd: '/Users/me/code/app', name: '✳ A' }, { id: 'T2', cwd: '/Users/me/code/app', name: '✳ A' })
+    for (const reply of [
+      two,
+      list({ id: 'T9', cwd: '/elsewhere', name: 'x' }),
+      { stdout: 'not json' },
+      { exitCode: 1 },
+      { throws: true },
+    ]) {
+      const h = host({ osascript: reply })
+      expect(await runJump(jump(ghostty, { title: 'A' }), h.exec)).toBe(undefined)
+      expect(h.argvs()).toHaveLength(2)
+      expect(h.argvs()[1]).toEqual(['open', '-b', 'com.mitchellh.ghostty'])
+    }
+  })
+
+  test('the focus script finding nothing falls through to the app', async () => {
+    const h = host({ osascript: [list({ id: 'T1', cwd: '/Users/me/code/app' }), { stdout: 'none' }] })
+    expect(await runJump(jump(ghostty), h.exec)).toBe(undefined)
+    expect(h.argvs()[2]).toEqual(['open', '-b', 'com.mitchellh.ghostty'])
+  })
+
+  test('without a bundle id a miss ends at the resume command', async () => {
+    const h = host({ osascript: { exitCode: 1 } })
+    expect(await runJump(jump({ env: { TERM_PROGRAM: 'ghostty' } }), h.exec)).toEqual({
+      resume: 'cd /Users/me/code/app && claude --resume sid-1',
+      tried: ['Ghostty'],
+    })
+  })
+
+  test('tmux inside Ghostty uses tmux, never the Ghostty script', () => {
+    expect(strategiesFor(jump({ env: { ...ghostty.env, TMUX: '/tmp/t,1,2' } }, { tmux: 'a:@1.%2' })).map(s => s.name)).toEqual(['tmux'])
+    expect(strategiesFor(jump({ env: { ...ghostty.env, TMUX: '/tmp/t,1,2' } })).map(s => s.name)).toEqual([])
   })
 })
 

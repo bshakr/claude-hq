@@ -179,6 +179,7 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
       bg: true,
       jobId: '990b185e',
       openIn: 'webapp-ui',
+      title: 'Polish HQ dashboard layout and animations',
     })
 
     const noWorker = cards(fleetFrom(THIRD.sessionId, THIRD.pid, new Set([29637, 45327, 50001])))
