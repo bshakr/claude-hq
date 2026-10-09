@@ -331,3 +331,66 @@ export const ACTIVE: HqModel = {
     ),
   })),
 }
+
+/** Another session's open PRs, listed out of urgency order: green, running, red, conflict, merged. */
+export const OTHER_PRS: PrVM[] = [
+  pr({ repo: API, number: 530, title: 'Bookings: cancel window respects the studio timezone' }),
+  pr({
+    repo: API,
+    number: 531,
+    title: 'Payouts: batch Stripe transfers per studio',
+    ci: { kind: 'running', done: 3, total: 6, failed: 0 },
+  }),
+  pr({
+    repo: API,
+    number: 527,
+    title: 'Refunds: partial refund keeps the original fee split',
+    ci: { kind: 'failed', done: 6, total: 6, failed: 1, firstFailing: 'apps/api' },
+  }),
+  pr({ repo: API, number: 528, title: 'Members: merge duplicate accounts by email', merge: 'conflicting' }),
+  pr({ repo: API, number: 520, title: 'Old: merged one', merge: 'merged', mergedAt: NOW - 9 * M }),
+]
+
+/** This session with two agents and one red PR; another card whose sessions own PRs. */
+export const WITH_PRS: HqModel = {
+  now: NOW,
+  counts: { waiting: 0, broken: 2, inProgress: 2, sessions: 3 },
+  current: {
+    label: LABEL,
+    agents: AGENTS.filter(a => a.id === 'a1' || a.id === 'a2'),
+    prs: PRS.filter(p => p.number === 212),
+  },
+  others: [
+    group('acme-store', [
+      sess(
+        {
+          sessionId: 's-st-api',
+          name: 'st-api',
+          status: 'busy',
+          statusSince: NOW - 4 * M,
+          step: 'refund fee split',
+          prSummary: { total: 4, broken: 2, waiting: 0, inProgress: 1 },
+          prs: OTHER_PRS,
+        },
+        'acme-store',
+        '@3',
+      ),
+      sess(
+        {
+          sessionId: 's-st-admin',
+          name: 'st-admin',
+          statusSince: NOW - 6 * M,
+          prSummary: { total: 2, broken: 0, waiting: 0, inProgress: 1 },
+          prs: [
+            pr({ repo: ADMIN, number: 433, title: 'Stat cards: one-decimal trend deltas', gallery: 'linked' }),
+            pr({ repo: ADMIN, number: 434, title: 'Members table: sticky header', ci: { kind: 'running', done: 2, total: 7, failed: 0 } }),
+          ],
+        },
+        'acme-store',
+        '@4',
+      ),
+    ]),
+    group('finance', [sess({ sessionId: 's-fin', name: 'finance', statusSince: NOW - 49 * H }, 'finance')]),
+  ],
+  statusText: '',
+}

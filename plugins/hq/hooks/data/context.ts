@@ -291,18 +291,17 @@ export function prsToLook(d: Pick<Digest, 'prs'>): Digest['prs'] {
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
-/** "12 PRs merged, 1 open", or "3 PRs linked" while no state is known. */
+/** "12 PRs merged, 1 closed", or "3 PRs linked" while no state is known; open PRs are the card's own rows. */
 export function prText(prs: Digest['prs'], states: ReadonlyMap<string, PrState>): string | undefined {
   if (prs.length === 0) return undefined
   const n = { MERGED: 0, OPEN: 0, CLOSED: 0, unknown: 0 }
   for (const p of prs) n[states.get(prKey(p.repo, p.number)) ?? 'unknown']++
   const parts: [number, string][] = [
     [n.MERGED, 'merged'],
-    [n.OPEN, 'open'],
     [n.CLOSED, 'closed'],
   ]
   const known = parts.filter(([k]) => k > 0)
-  if (known.length === 0) return `${plural(prs.length, 'PR')} linked`
+  if (known.length === 0) return n.unknown ? `${plural(n.unknown, 'PR')} linked` : undefined
   const [first, ...rest] = known
   const out = [`${plural(first![0], 'PR')} ${first![1]}`, ...rest.map(([k, w]) => `${k} ${w}`)]
   if (n.unknown) out.push(`${n.unknown} more linked`)

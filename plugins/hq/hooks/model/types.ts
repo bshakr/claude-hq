@@ -124,6 +124,8 @@ export interface OtherSessionVM {
   /** from that session's own /hq publish file, when it runs /hq */
   agentsRunning?: number
   prSummary?: { total: number; broken: number; waiting: number; inProgress: number }
+  /** The open PRs it owns, from its publish file. */
+  prs?: PrVM[]
   /** Its running subagents, newest first: from its publish file, else its subagent transcripts. */
   agents?: OtherAgentVM[]
   jump?: Jump
@@ -247,6 +249,8 @@ export interface PublishedSession {
   agents?: OtherAgentVM[]
   /** The PRs this session owns (ADR 0002). */
   owned?: { repo: string; number: number }[]
+  /** Its open owned PRs as its own pane draws them, so other cards can list and link them. */
+  prs?: PrVM[]
   /** Its task list's progress, so others need not reconstruct it from the transcript. */
   todos?: TodoProgress
   /** Its own goal summary, so other sessions reuse it instead of asking the model again. */

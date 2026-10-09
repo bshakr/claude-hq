@@ -82,10 +82,10 @@ export function parseWake(args: string): 'on' | 'off' | null {
 }
 
 const BUCKETS = ['green', 'running', 'red', 'conflict', 'rebase', 'open', 'merged'] as const
-type Bucket = (typeof BUCKETS)[number]
+export type Bucket = (typeof BUCKETS)[number]
 
 /** One bucket per PR, the most urgent first, so a red PR that is also behind counts once. */
-function bucketOf(pr: PrVM): Bucket | undefined {
+export function bucketOf(pr: PrVM): Bucket | undefined {
   if (pr.merge === 'merged') return 'merged'
   if (isEnded(pr.merge)) return undefined
   if (pr.ci.kind === 'failed') return 'red'

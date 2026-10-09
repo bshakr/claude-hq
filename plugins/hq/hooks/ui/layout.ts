@@ -17,6 +17,8 @@ import { resumeOnly } from './focus'
 import { Row } from './row'
 import type { Action, Sty, Tok } from './row'
 import { expandIds } from '../data/ids'
+import { bucketOf } from '../data/wake'
+import type { Bucket } from '../data/wake'
 import { age, cellLen, clip, elapsed, plural, wrap, wrapCapped } from './text'
 import { accountParts, meterParts, partsWidth, putRight } from './meter'
 import type { Part } from './meter'
@@ -83,8 +85,14 @@ type Ctx = {
 const FRAME_MIN = 20
 
 /** Rounded at rest; heavy on the card holding the cursor. */
-const ROUND = { tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│' }
-const HEAVY = { tl: '┏', tr: '┓', bl: '┗', br: '┛', h: '━', v: '┃' }
+const ROUND = { tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│', lj: '├', rj: '┤' }
+const HEAVY = { tl: '┏', tr: '┓', bl: '┗', br: '┛', h: '━', v: '┃', lj: '┣', rj: '┫' }
+
+/** A section divider row; `card` draws it joined to the border. */
+const section = (IW: number, label = ''): Row => Object.assign(new Row(IW), { section: label })
+
+/** A divider then its rows, or nothing when there are none. */
+const withSection = (IW: number, label: string, rows: Row[]): Row[] => (rows.length ? [section(IW, label), ...rows] : [])
 
 const THIS_SESSION = 'this session'
 
@@ -95,7 +103,15 @@ function card(x: Ctx, title: string, tone: Tok, inner: Row[], current = false): 
   if (W < FRAME_MIN) {
     const h = new Row(W)
     h.put(0, clip(title, W), label)
-    return [h, ...inner.map(r => Object.assign(new Row(W).inset(2, r), { mark: 0 }))]
+    return [
+      h,
+      ...inner.map(r => {
+        if (r.section === undefined) return Object.assign(new Row(W).inset(2, r), { mark: 0 })
+        const d = new Row(W)
+        d.put(0, clip(r.section ? `── ${r.section}` : '──', W), DIM)
+        return d
+      }),
+    ]
   }
   const g = x.cursor !== null && inner.some(r => r.item === x.cursor) ? HEAVY : ROUND
   const edge = tok(tone)
@@ -109,6 +125,17 @@ function card(x: Ctx, title: string, tone: Tok, inner: Row[], current = false): 
   top.fill(end + 1, W - 2, g.h, edge)
   top.put(W - 2, g.tr, edge)
   const side = (r: Row) => {
+    if (r.section !== undefined) {
+      const d = new Row(W)
+      d.put(1, g.lj, edge)
+      d.fill(2, W - 2, g.h, edge)
+      if (r.section) {
+        d.put(3, ' ')
+        d.put(d.put(4, clip(r.section, W - 8), DIM), ' ')
+      }
+      d.put(W - 2, g.rj, edge)
+      return d
+    }
     const s = new Row(W)
     s.inset(4, r)
     s.put(1, g.v, edge)
@@ -498,14 +525,15 @@ function sessionCard(m: HqModel, x0: Ctx): Row[] {
   inner.push(...nowRows(cur.now, x, cur.goal ? { full: [], pct: [] } : meter, on))
   if (cur.todos?.length) inner.push(todoRow(cur.todos, x))
   if (cur.waiting?.length) inner.push(...waitingRows(cur.waiting, x))
-  if (inner.length && cur.agents.length) inner.push(new Row(x.IW))
-  inner.push(...agentBlock(cur.agents, x))
+  const sections = [...withSection(x.IW, 'agents', agentBlock(cur.agents, x)), ...withSection(x.IW, 'pull requests', prSection(cur.prs, x))]
+  // Without a line of its own the card would open on a divider.
   if (inner.length === 0) {
     const r = new Row(x.IW)
     r.put(0, 'nothing running', DIM)
     inner.push(r)
   }
-  const tone = worst(cur.agents.filter(a => a.status === 'failed').map(() => 'fail' as const))
+  inner.push(...sections)
+  const tone = worst([...cur.agents.filter(a => a.status === 'failed').map(() => 'fail' as const), ...cur.prs.map(prTone)])
   return card(x, cur.goal && cur.title ? cur.title : THIS_SESSION, tone, inner, true)
 }
 
@@ -546,7 +574,48 @@ function otherAgentRows(s: OtherSessionVM, under: () => Row, x: Ctx): Row[] {
 export const RESUME_HINT = '↵ copies resume'
 
 function sessionTone(s: OtherSessionVM): Tok {
-  return (s.prSummary?.broken ?? 0) > 0 ? 'fail' : s.status === 'waiting' ? 'wait' : 'rule'
+  const own: Tok = (s.prSummary?.broken ?? 0) > 0 ? 'fail' : s.status === 'waiting' ? 'wait' : 'rule'
+  return worst([own, ...(s.prs ?? []).map(prTone)])
+}
+
+const OTHER_PRS_SHOWN = 3
+/** The status line's urgency, most urgent first. */
+const URGENCY: readonly Bucket[] = ['red', 'conflict', 'rebase', 'running', 'green', 'open']
+const urgency = (p: PrVM) => {
+  const b = bucketOf(p)
+  return b ? URGENCY.indexOf(b) : URGENCY.length
+}
+export const morePrsKey = (s: OtherSessionVM) => `${sessionKey(s)}:prs`
+export const morePrsId = (s: OtherSessionVM) => `+prs:${s.sessionId}`
+export const sessionPrKey = (s: OtherSessionVM, p: PrVM) => `${sessionKey(s)}:${prKey(p)}`
+
+/** Another session's open PRs, one line each, most urgent first: three, then a `+N more PRs` toggle. */
+function otherPrRows(s: OtherSessionVM, x: Ctx): Row[] {
+  const open = (s.prs ?? [])
+    .filter(p => prKind(p) !== 'gone')
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => urgency(a.p) - urgency(b.p) || a.i - b.i)
+    .map(o => o.p)
+  if (!open.length) return []
+  const id = morePrsId(s)
+  const expanded = x.expanded.has(id)
+  const shown = open.length > OTHER_PRS_SHOWN && !expanded ? open.slice(0, OTHER_PRS_SHOWN) : open
+  const tcol = Math.max(...shown.map(p => cellLen(`#${p.number}`))) + 2
+  const out = shown.flatMap(p => prRows(p, tcol, x, sessionPrKey(s, p), true))
+  const n = open.length - OTHER_PRS_SHOWN
+  if (n > 0) {
+    const key = morePrsKey(s)
+    const action: Action = { kind: 'toggle', id }
+    x.actions[key] = action
+    const r = new Row(x.IW)
+    r.item = key
+    r.head = true
+    const label = expanded ? `− ${n} more ${n === 1 ? 'PR' : 'PRs'}` : `+${n} more ${n === 1 ? 'PR' : 'PRs'}`
+    if (x.cursor === key) r.button(0, label, { key, action }, FOCUS)
+    else r.button(0, label, { key, action, dim: true }, DIM)
+    out.push(r)
+  }
+  return out
 }
 
 function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
@@ -639,7 +708,7 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
     out.push(t)
   }
   if (s.status === 'waiting' && s.wait && s.wait.kind !== 'turn') out.push(asksRow(s, s.wait, under(), x))
-  out.push(...otherAgentRows(s, under, x))
+  out.push(...withSection(IW, 'agents', otherAgentRows(s, under, x)), ...withSection(IW, 'pull requests', otherPrRows(s, x)))
   return out
 }
 
@@ -661,10 +730,14 @@ function asksRow(s: OtherSessionVM, w: WaitVM, a: Row, x: Ctx): Row {
 
 function groupCard(group: TmuxGroupVM, x: Ctx): Row[] {
   const inner: Row[] = []
-  group.sessions.forEach((s, i) => {
-    if (i > 0) inner.push(new Row(x.IW))
-    inner.push(...otherRows(s, x))
-  })
+  let sectioned = false
+  for (const s of group.sessions) {
+    // After a session with sections a bare rule, so the next session does not read as one of its rows.
+    if (inner.length) inner.push(sectioned ? section(x.IW) : new Row(x.IW))
+    const rows = otherRows(s, x)
+    sectioned = rows.some(r => r.section !== undefined)
+    inner.push(...rows)
+  }
   return card(x, group.tmuxSession || (group.background ? 'background' : 'no tmux'), worst(group.sessions.map(sessionTone)), inner)
 }
 
@@ -774,15 +847,16 @@ const GALLERY: Record<PrVM['gallery'], string> = {
   unknown: '',
 }
 
-function prRows(p: PrVM, tcol: number, x: Ctx): Row[] {
+/** A PR's rows; `compact` is one line with its status on the right, for another session's card. */
+function prRows(p: PrVM, tcol: number, x: Ctx, key = prKey(p), compact = false): Row[] {
   const { IW, now } = x
   const k = prKind(p)
-  const key = prKey(p)
   x.actions[key] = { kind: 'jump', jump: { kind: 'url', url: p.url } }
   const r = new Row(IW)
   r.item = key
   r.head = true
-  r.gutter = k === 'fail' ? 'fail' : k === 'wait' ? 'wait' : k === 'run' ? 'run' : undefined
+  // The session's own row already counts toward the scroll indicators.
+  if (!compact) r.gutter = k === 'fail' ? 'fail' : k === 'wait' ? 'wait' : k === 'run' ? 'run' : undefined
   const ref = `#${p.number}`
   const out = [r]
   /** The title as its Button; on the cursor row the whole title, wrapped under itself. */
@@ -813,6 +887,13 @@ function prRows(p: PrVM, tcol: number, x: Ctx): Row[] {
   }
   const needs = k === 'fail' || k === 'wait'
   r.put(0, ref, needs ? { bold: true, href: p.url } : { href: p.url })
+  if (compact) {
+    const [t, st] = p.ci.kind === 'failed' ? ciFact(p.ci) : (mergeFact(p) ?? ciFact(p.ci))
+    const fits = IW - tcol - cellLen(t) - 2 >= 10
+    if (fits) r.right(t, st)
+    title(IW - tcol - (fits ? cellLen(t) + 2 : 0), false)
+    return out
+  }
   const bar = IW >= 56 ? 10 : 6
   const barW = bar + 1 + 5
   const took = IW - tcol - barW - 2 >= 10 ? checkBar(r, bar, p.ci, x.phase) : 0
@@ -841,7 +922,9 @@ function prRows(p: PrVM, tcol: number, x: Ctx): Row[] {
   return out
 }
 
-function prCard(prs: readonly PrVM[], x: Ctx): Row[] {
+/** This session's PRs grouped by repo, each with its checks bar and facts line. */
+function prSection(prs: readonly PrVM[], x: Ctx): Row[] {
+  if (!prs.length) return []
   const groups = groupPrs(prs)
   const tcol = Math.max(...prs.map(p => cellLen(`#${p.number}`))) + 2
   const inner: Row[] = []
@@ -854,9 +937,12 @@ function prCard(prs: readonly PrVM[], x: Ctx): Row[] {
     }
     for (const p of g.prs) inner.push(...prRows(p, tcol, x))
   })
-  const kinds = prs.map(prKind)
-  const tone = worst(kinds.map(k => (k === 'fail' ? 'fail' : k === 'wait' ? 'wait' : 'rule')))
-  return card(x, 'pull requests', tone, inner)
+  return inner
+}
+
+function prTone(p: PrVM): Tok {
+  const k = prKind(p)
+  return k === 'fail' ? 'fail' : k === 'wait' ? 'wait' : 'rule'
 }
 
 // ---------- hint and indicators ----------
@@ -919,7 +1005,6 @@ export function body(m: HqModel, x: Ctx): Row[] {
   const out: Row[] = [...sessionCard(m, x)]
   if (m.others.length) out.push(new Row(x.W), divider(x.W))
   for (const g of m.others) out.push(new Row(x.W), ...groupCard(g, x))
-  if (m.current.prs.length) out.push(new Row(x.W), ...prCard(m.current.prs, x))
   return out
 }
 
