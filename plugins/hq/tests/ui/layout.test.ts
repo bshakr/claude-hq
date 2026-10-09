@@ -131,7 +131,8 @@ const runsOf = (r: Row): Run[] =>
     .segs()
     .filter(s => s.t.trim() && s.t !== '│' && (s.s.c || s.s.bold || s.s.dim))
     .map(s => ({ col: s.col, t: s.t.trimEnd(), tok: [s.s.bold ? 'bold' : '', s.s.c ?? (s.s.dim ? 'dim' : '')].filter(Boolean).join('+') }))
-const BORDER = /^[╭╮╰╯│─]+$/
+// A heavy run holds a corner or side, so the todo bar's ━ is not taken for one.
+const BORDER = /^[╭╮╰╯│─]+$|^━*[┏┓┗┛┃][━┏┓┗┛┃]*$/
 const coloured = (rows: Row[]) => rows.flatMap(r => r.segs().filter(s => s.s.c && s.t.trim() && !BORDER.test(s.t)))
 const borderTone = (rows: Row[], title: string) => rows.find(r => r.text().startsWith(` ╭─ ${title}`))!.cells[1]!.s.c
 
@@ -174,10 +175,10 @@ describe('colour', () => {
     expect(runsOf(facts('#522'))).toContainEqual({ col: 41, t: 'no watcher', tok: 'wait' })
   })
 
-  test('quiet has no coloured cell but the borders; focus adds only ▌ and ▶', () => {
-    expect(coloured(layout(QUIET, view()).rows).length).toBe(0)
+  test("quiet has no coloured cell but the borders and this session's title; focus adds only ▌ and ▶", () => {
+    expect(coloured(layout(QUIET, view()).rows).map(s => `${s.t}=${s.s.c}`)).toEqual(['this session=accent'])
     const focused = layout(QUIET, view({ focused: true, cursor: 'p:acme-store/admin-web#433' }))
-    expect(coloured(focused.rows).map(s => `${s.t}=${s.s.c}`)).toEqual(['▌=accent', '▶=accent'])
+    expect(coloured(focused.rows).map(s => `${s.t}=${s.s.c}`)).toEqual(['▌=accent', 'this session=accent', '▶=accent'])
   })
 
   test('unfocused draws no cursor even with one remembered', () => {
@@ -320,9 +321,8 @@ describe('scrolling and motion', () => {
 describe('this session: one card for now, todos, waiting and agents', () => {
   test('now, todos and waiting open the card; agents follow after a blank; no sub-heading or rule', () => {
     const got = lines(ACTIVE)
-    expect(got.slice(4, 22)).toEqual([
+    expect(got.slice(4, 20)).toEqual([
       ' ╭─ this session ─────────────────────────────────────────────────────────────╮',
-      ' │                                                                            │',
       ' │  ● Fix the stale PR list in hq and scope wave-watcher wakes to the o…  2m  │',
       ' │    Check CI on 276                                                     4s  │',
       ' │  todos 2/5 ━━━─────  ● Rewriting the layout                                │',
@@ -337,7 +337,6 @@ describe('this session: one card for now, todos, waiting and agents', () => {
       ' │                                                                            │',
       ' │  ✓ Adversarial review: refunds PR → 3 findings: 1 HIGH (refund r…  3m ago  │',
       ' │    ✓ Find refund callers → 4 callers, all in app/ledger            5m ago  │',
-      ' │                                                                            │',
       ' ╰────────────────────────────────────────────────────────────────────────────╯',
     ])
     const at = (t: string) => got.findIndex(l => l.includes(t))
@@ -347,7 +346,7 @@ describe('this session: one card for now, todos, waiting and agents', () => {
 
   test('colours: blue for the running turn, the todo bar and the background wait; never yellow', () => {
     const rows = layout(ACTIVE, view()).rows
-    const toks = coloured(rows.slice(6, 10)).map(x => `${x.t}=${x.s.c}`)
+    const toks = coloured(rows.slice(5, 9)).map(x => `${x.t}=${x.s.c}`)
     expect(toks).toEqual(['●=run', '━━━=run', '●=run', '◷=run'])
   })
 
@@ -364,14 +363,14 @@ describe('this session: one card for now, todos, waiting and agents', () => {
       },
     }
     const rows = layout(m, view()).rows
-    expect(rows[6]!.text()).toBe(' │  ○ idle · Ship it                                                      1m  │')
-    expect(coloured([rows[6]!])).toEqual([])
-    expect(rows[7]!.text()).toBe(' │                                                                            │')
-    expect(rows[8]!.text().startsWith(' │  ✗ Capture screenshot pairs')).toBe(true)
+    expect(rows[5]!.text()).toBe(' │  ○ idle · Ship it                                                      1m  │')
+    expect(coloured([rows[5]!])).toEqual([])
+    expect(rows[6]!.text()).toBe(' │                                                                            │')
+    expect(rows[7]!.text().startsWith(' │  ✗ Capture screenshot pairs')).toBe(true)
   })
 
   test('an empty session says so', () => {
-    expect(lines(EMPTY)[4]).toBe(' │  nothing running                                                           │')
+    expect(lines(EMPTY)[3]).toBe(' │  nothing running                                                           │')
   })
 
   test("an agent inside one long call reads ◷ with what it waits on and the call's age", () => {
@@ -501,7 +500,7 @@ describe('this session: finished agents, the waiting now line, the goal line', (
   test('idle with agents running reads ◷ waiting on N agents, timed by the longest-running one', () => {
     const m = { ...BUSY, current: { ...BUSY.current, now: { prompt: 'agent reported: done', since: BUSY.now - 60_000, idle: true } } }
     const got = lines(m)
-    expect(got[6]).toBe(' │  ◷ waiting on 1 agent                                             14m 20s  │')
+    expect(got[5]).toBe(' │  ◷ waiting on 1 agent                                             14m 20s  │')
     expect(got.some(l => l.includes('idle ·'))).toBe(false)
     const waitsOnly = {
       ...QUIET,
@@ -511,15 +510,15 @@ describe('this session: finished agents, the waiting now line, the goal line', (
         waiting: [{ text: 'pr-ci-wait 276', since: QUIET.now - 3 * 60_000 }],
       },
     }
-    expect(lines(waitsOnly)[4]!.includes('◷ waiting on 1 background task')).toBe(true)
+    expect(lines(waitsOnly)[3]!.includes('◷ waiting on 1 background task')).toBe(true)
   })
 
   test('without a goal the context meter rides on the now line, not a line of its own', () => {
     const m: HqModel = { ...ACTIVE, current: { ...ACTIVE.current, context: { percent: 36, window: 1_000_000, source: 'live' } } }
     const got = lines(m)
     expect(got[4]!.startsWith(' ╭─ this session')).toBe(true)
-    expect(got[6]!.startsWith(' │  ● Fix the stale PR list')).toBe(true)
-    expect(got[6]!.endsWith('2m  ▰▰▱▱▱ 36%  │')).toBe(true)
+    expect(got[5]!.startsWith(' │  ● Fix the stale PR list')).toBe(true)
+    expect(got[5]!.endsWith('2m  ▰▰▱▱▱ 36%  │')).toBe(true)
     expect(got.filter(l => l.includes('36%')).length).toBe(1)
   })
 
@@ -534,11 +533,11 @@ describe('this session: finished agents, the waiting now line, the goal line', (
       },
     }
     const got = lines(m)
-    expect(got[4]!.startsWith(' ╭─ claude-hq ─')).toBe(true)
-    expect(got[6]).toBe(' │  Ship the HQ layout fixes                       day 3 · ● busy  ▰▰▱▱▱ 36%  │')
-    expect(got[7]).toBe(' │  Rewriting the agent rows                                                  │')
-    expect(got[8]!.startsWith(' │  ● Fix the stale PR list')).toBe(true)
-    expect(got[8]!.endsWith('2m  │')).toBe(true)
+    expect(got[4]!.startsWith(' ╭─ claude-hq · this session ─')).toBe(true)
+    expect(got[5]).toBe(' │  Ship the HQ layout fixes                       day 3 · ● busy  ▰▰▱▱▱ 36%  │')
+    expect(got[6]).toBe(' │  Rewriting the agent rows                                                  │')
+    expect(got[7]!.startsWith(' │  ● Fix the stale PR list')).toBe(true)
+    expect(got[7]!.endsWith('2m  │')).toBe(true)
     const noGoal = lines({ ...m, current: { ...m.current, goal: undefined } })
     expect(noGoal[4]!.startsWith(' ╭─ this session')).toBe(true)
   })
@@ -560,5 +559,153 @@ describe('this session: finished agents, the waiting now line, the goal line', (
       expect(stepped).toBeGreaterThan(0)
       expect(b.some(r => r.text().includes('◦ Run') || r.text().includes('◦ busy'))).toBe(false)
     }
+  })
+})
+
+describe('focus: the cursor card is heavy, the cursor row bold and whole', () => {
+  const tops = (m: HqModel, over: Partial<View>) => lines(m, { rows: 120, ...over }).filter(l => /^ [╭┏]/.test(l))
+
+  test('heavy lines only on the card holding the cursor, and only while the pane is focused', () => {
+    const on = tops(BUSY, { focused: true, cursor: 'a:a1' })
+    expect(on.filter(l => l.startsWith(' ┏━'))).toEqual([on[0]!])
+    expect(on[0]!.startsWith(' ┏━ this session ')).toBe(true)
+    const pr = tops(BUSY, { focused: true, cursor: 'p:acmeco/webapp-ui#212' })
+    expect(pr.filter(l => l.startsWith(' ┏━')).map(l => l.slice(4).split(' ')[0])).toEqual(['pull'])
+    const rows = layout(BUSY, view({ rows: 120, focused: true, cursor: 's:s-st-admin' })).rows
+    const top = rows.find(r => r.text().startsWith(' ┏━ acme-store'))!
+    // The card keeps its status colour: st-api waits on the person.
+    expect(top.cells[1]!.s.c).toBe('wait')
+    expect(lines(BUSY, { rows: 120, cursor: 'a:a1' }).some(l => /[┏┓┗┛┃]/.test(l))).toBe(false)
+    expect(lines(BUSY, { rows: 120, focused: true, cursor: 'flare' }).some(l => /[┏┓┗┛┃]/.test(l))).toBe(false)
+  })
+
+  test('the cursor row alone takes the caret and bold; its card-mates keep their style', () => {
+    const rows = layout(BUSY, view({ rows: 120, focused: true, cursor: 'a:a1' })).rows
+    const marked = rows.filter(r => r.text().includes('▶'))
+    expect(marked.length).toBe(1)
+    expect(marked[0]!.text().includes('▶ ◷ Implement ledger refund reconcile')).toBe(true)
+    // Every glyph on these rows is one cell, so a string index is a cell index.
+    const titleOf = (r: Row, t: string) => r.cells[r.text().indexOf(t)]!.s
+    expect(titleOf(marked[0]!, 'Implement')).toEqual({ bold: true, btn: 'a:a1' })
+    // The status dot keeps its own colour.
+    expect(marked[0]!.cells[4]!.s.c).toBe('run')
+    const sibling = rows.find(r => r.text().includes('Run ledger specs and report') && r.head)!
+    expect(titleOf(sibling, 'Run ledger').bold).toBe(undefined)
+    const finished = rows.find(r => r.text().includes('Adversarial review'))!
+    expect(titleOf(finished, 'Adversarial').dim).toBe(true)
+  })
+
+  test('the cursor moves between agents of one card: the card stays heavy, caret and bold follow', () => {
+    for (const [cursor, title] of [
+      ['a:a1', 'Implement ledger'],
+      ['a:a2', 'Run ledger specs'],
+      ['a:a3', 'Adversarial review'],
+    ] as const) {
+      const got = lines(BUSY, { rows: 120, focused: true, cursor })
+      expect(got.filter(l => l.startsWith(' ┏━')).length).toBe(1)
+      expect(got.find(l => l.startsWith(' ┏━'))!.includes('this session')).toBe(true)
+      const caret = got.filter(l => l.includes('▶'))
+      expect(caret.length).toBe(1)
+      expect(caret[0]!.includes(title)).toBe(true)
+    }
+    // A finished agent under the cursor is drawn at full strength, not dim.
+    const fin = layout(BUSY, view({ rows: 120, focused: true, cursor: 'a:a3' })).rows.find(r => r.text().includes('▶'))!
+    expect(fin.buttons.find(b => b.key === 'a:a3')!.dim).toBe(undefined)
+  })
+
+  const LONG_TITLE = Array.from({ length: 40 }, (_, i) => `word${i}`).join(' ')
+  const longAgent: AgentVM = {
+    id: 'big',
+    title: LONG_TITLE,
+    status: 'running',
+    background: true,
+    startedAt: BUSY.now - 60_000,
+    toolCount: 1,
+    files: [],
+    now: 'working',
+  }
+  const BIG: HqModel = { ...QUIET, current: { ...QUIET.current, agents: [longAgent] } }
+
+  test('the cursor row shows its whole text, wrapped under itself, at most three lines', () => {
+    const rest = lines(BIG, { cursor: 'a:big' })
+    const at0 = rest.findIndex(l => l.includes('word0'))
+    expect(rest[at0]!.includes('…')).toBe(true)
+    expect(rest[at0 + 1]!.includes('working')).toBe(true)
+
+    const l = layout(BIG, view({ focused: true, cursor: 'a:big' }))
+    const got = l.rows.map(r => r.text())
+    const at = got.findIndex(t => t.includes('word0'))
+    const wrapped = got.slice(at, at + 3)
+    expect(wrapped[0]!.includes('▶ ● word0')).toBe(true)
+    // Continuations sit at the title's column, inside the heavy card.
+    for (const t of wrapped.slice(1)) expect(/^ ┃ {4}word\d+/.test(t)).toBe(true)
+    expect(wrapped[2]!.endsWith('…  ┃')).toBe(true)
+    expect(got[at + 3]!.includes('working')).toBe(true)
+    // Every grown line belongs to the item; only the first is its head and holds its one Button.
+    const grown = l.rows.slice(at, at + 4)
+    expect(grown.every(r => r.item === 'a:big')).toBe(true)
+    expect(grown.filter(r => r.head).length).toBe(1)
+    expect(l.rows.flatMap(r => r.buttons).filter(b => b.key === 'a:big').length).toBe(1)
+    // Items after it still map to their own first line.
+    const pr = 'p:acme-store/admin-web#433'
+    expect(l.rows[l.itemLine[pr]! + 2]!.text().includes('#433')).toBe(true)
+    expect(got.filter(t => /[┏┃┗]/.test(t)).every(t => cellLen(t) === 79)).toBe(true)
+  })
+
+  test('a session and a PR under the cursor wrap the same way', () => {
+    const name = 'a very long session name that keeps going well past the width of the card it sits in'
+    const m: HqModel = {
+      ...QUIET,
+      others: [
+        {
+          tmuxSession: 'x',
+          sessions: [{ sessionId: 'n', name, windowLabel: '', status: 'idle', jump: { kind: 'tmux', target: 'x:@1.%1' } }],
+        },
+      ],
+    }
+    const got = lines(m, { width: 60, focused: true, cursor: 's:n' })
+    const at = got.findIndex(t => t.includes('▶ a very long'))
+    expect(got[at + 1]!.startsWith(' ┃  ')).toBe(true)
+    expect(got.join(' ').includes('the card it sits in')).toBe(true)
+    const pr = lines(QUIET, { width: 48, focused: true, cursor: 'p:acme-store/admin-web#433' })
+    const p = pr.findIndex(t => t.includes('#433'))
+    expect(pr[p + 1]!.includes('trend deltas')).toBe(true)
+  })
+})
+
+describe('this session stands apart', () => {
+  test('its title is the accent, bold, with a dim · this session; a divider then the other cards', () => {
+    const m: HqModel = { ...BUSY, current: { ...BUSY.current, title: 'claude-hq', goal: { text: 'Ship it' } } }
+    const rows = layout(m, view()).rows
+    const top = rows.findIndex(r => r.text().startsWith(' ╭─ claude-hq · this session ─'))
+    expect(top).toBe(2 + 2)
+    expect(rows[top]!.cells[4]!.s).toEqual({ c: 'accent', bold: true })
+    expect(rows[top]!.cells[4 + 'claude-hq'.length + 1]!.s).toEqual({ dim: true })
+    const bottom = rows.findIndex((r, i) => i > top && r.text().startsWith(' ╰'))
+    expect(rows[bottom + 1]!.text()).toBe('')
+    expect(rows[bottom + 2]!.text()).toBe(` ── other sessions ${'─'.repeat(60)}`)
+    expect(rows[bottom + 2]!.cells[1]!.s).toEqual({ dim: true })
+    expect(rows[bottom + 3]!.text()).toBe('')
+    expect(rows[bottom + 4]!.text().startsWith(' ╭─ acme-store')).toBe(true)
+    // No padding rows: the goal opens the card, its last line closes it.
+    expect(rows[top + 1]!.text().startsWith(' │  Ship it')).toBe(true)
+    expect(/^ │ +│$/.test(rows[bottom - 1]!.text())).toBe(false)
+  })
+
+  test('the suffix goes before the name is cut; the fallback title takes no suffix', () => {
+    const m: HqModel = { ...BUSY, current: { ...BUSY.current, title: 'claude-hq-with-a-long-name', goal: { text: 'Ship it' } } }
+    expect(lines(m, { width: 40 }).some(l => l.startsWith(' ╭─ claude-hq-with-a-long-name ─'))).toBe(true)
+    expect(lines(m, { width: 80 }).some(l => l.startsWith(' ╭─ claude-hq-with-a-long-name · this session ─'))).toBe(true)
+    expect(lines(BUSY).some(l => l.includes('this session · this session'))).toBe(false)
+  })
+
+  test('no other sessions, no divider', () => {
+    const m: HqModel = { ...QUIET, others: [] }
+    expect(lines(m, { rows: 90 }).some(l => l.includes('other sessions'))).toBe(false)
+    expect(lines(QUIET, { rows: 90 }).some(l => l.includes('other sessions'))).toBe(true)
+  })
+
+  test('heavy box lines are one cell wide', () => {
+    expect(cellLen('┏━┓┃┗┛')).toBe(6)
   })
 })
