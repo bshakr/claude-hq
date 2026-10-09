@@ -12,6 +12,7 @@ import {
   scrollFor,
   sessionPrKey,
 } from '../../hooks/ui/layout'
+import { caretItem, caretKey } from '../../hooks/ui/caret'
 import type { View } from '../../hooks/ui/layout'
 import type { Row } from '../../hooks/ui/row'
 import { cellLen } from '../../hooks/ui/text'
@@ -232,8 +233,12 @@ describe('targets', () => {
     ])
     const buttons = l.rows.flatMap(r => r.buttons)
     const shown = l.items.filter(k => l.rows.some(r => r.head && r.item === k))
-    for (const key of shown) expect(buttons.filter(b => b.key === key).length).toBe(1)
-    expect(buttons.map(b => b.key).filter(k => !l.items.includes(k))).toEqual(['j', 'k'])
+    for (const key of shown) {
+      expect(buttons.filter(b => b.key === key).length).toBe(1)
+      // Its caret presses the same thing.
+      expect(buttons.filter(b => b.key === caretKey(key)).map(b => b.action)).toEqual([l.actions[key]!])
+    }
+    expect(buttons.map(b => b.key).filter(k => !l.items.includes(k) && caretItem(k) === undefined)).toEqual(['j', 'k'])
     expect(l.actions.flare).toEqual({ kind: 'jump', jump: { kind: 'tmux', target: 'acme-store:@3.%6' } })
     expect(l.actions['p:acmeco/webapp-ui#212']).toEqual({
       kind: 'jump',
@@ -778,7 +783,10 @@ describe("sections and another session's PRs", () => {
     const url = { kind: 'jump', jump: { kind: 'url', url: 'https://github.com/acme-store/api/pull/528' } }
     expect(l.actions[key(528)]).toEqual(url)
     const row = l.rows.find(r => r.head && r.item === key(528))!
-    expect(row.buttons.map(b => [b.key, b.action])).toEqual([[key(528), url]])
+    expect(row.buttons.map(b => [b.key, b.action])).toEqual([
+      [key(528), url],
+      [caretKey(key(528)), url],
+    ])
     const at = l.items.indexOf('s:s-st-api')
     expect(l.items.slice(at, at + 5)).toEqual(['s:s-st-api', key(527), key(528), key(531), morePrsKey(st)])
     for (const r of l.rows.filter(x => /^ [├┣]/.test(x.text()))) {

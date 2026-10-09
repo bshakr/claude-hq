@@ -4,7 +4,7 @@ import { charWidth, cellLen } from './text'
 /** Colour tokens of the sheet; dim and bold are attributes, not tokens. */
 export type Tok = 'fail' | 'wait' | 'run' | 'ok' | 'accent' | 'rule'
 
-export type Sty = { c?: Tok; dim?: true; bold?: true; btn?: string; href?: string }
+export type Sty = { c?: Tok; dim?: true; bold?: true; underline?: true; btn?: string; href?: string }
 
 /** What pressing an element does. /hq never acts beyond a jump. */
 export type Action =
@@ -16,7 +16,8 @@ type Cell = { ch: string; s: Sty }
 
 export type Seg = { col: number; t: string; s: Sty }
 
-const same = (a: Sty, b: Sty) => a.c === b.c && a.dim === b.dim && a.bold === b.bold && a.btn === b.btn && a.href === b.href
+const same = (a: Sty, b: Sty) =>
+  a.c === b.c && a.dim === b.dim && a.bold === b.bold && a.underline === b.underline && a.btn === b.btn && a.href === b.href
 
 /** One pane row placed cell by cell, so widths are exact; never wider than W. */
 export class Row {
