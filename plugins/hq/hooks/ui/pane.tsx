@@ -2,7 +2,8 @@ import type { ElementTable, RenderElement, RenderNode } from 'claude-code'
 
 import { DEFAULT_TOKENS } from '../config'
 import { caretItem } from './caret'
-import type { Action, Row, Seg, Sty, Tok } from './row'
+import { CURSOR_CARET } from './layout'
+import type { Action, ButtonSpec, Row, Seg, Sty, Tok } from './row'
 
 /** ansi256 slots of the sheet's tokens (the validator refuses `ansi:<name>`). */
 export const TOKENS = DEFAULT_TOKENS
@@ -30,6 +31,19 @@ function textProps(s: Sty, hovered: boolean, tokens: Readonly<Record<Tok, string
   if (s.bold) props.bold = true
   if (s.underline) props.underline = true
   return props
+}
+
+export type HoverLook = { scope?: string; inverse: false; bold?: true; underline?: true }
+
+/**
+ * A Button's look under the pointer: the keyboard cursor's (bold, a PR link underlined too), never the
+ * engine's inverse, which the hover overrides win over. The cursor's caret keeps it: there the inverse
+ * is the focus ring. Outside an item's keyed Box a Button names its own hover scope.
+ */
+export function hoverLook(spec: ButtonSpec, caret: boolean, inItem: boolean): HoverLook | undefined {
+  if (caret) return spec.label === CURSOR_CARET ? undefined : { inverse: false }
+  const link = spec.action.kind === 'jump' && spec.action.jump.kind === 'url'
+  return { ...(inItem ? {} : { scope: `hq:${spec.key}` }), inverse: false, bold: true, ...(link ? { underline: true as const } : {}) }
 }
 
 function drawRow(row: Row, o: DrawOpts, hovered: boolean): RenderElement {
@@ -72,7 +86,8 @@ function drawRow(row: Row, o: DrawOpts, hovered: boolean): RenderElement {
     const caret = caretItem(spec.key) !== undefined
     if (spec.hotkey !== undefined) props.hotkey = spec.hotkey
     if (spec.dim) props.dimColor = true
-    if (hovered && !caret) props.hover = { underline: true }
+    const hover = hoverLook(spec, caret, hovered)
+    if (hover) props.hover = hover
     if (o.autoFocusKey === spec.key) props.autoFocus = true
     // A Button's own props carry no weight: bold, underline and the caret's colour ride in a Text child.
     const look: { color?: string; bold?: boolean; underline?: boolean } = {}
