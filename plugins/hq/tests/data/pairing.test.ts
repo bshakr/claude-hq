@@ -125,9 +125,28 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
     }
   })
 
-  test('an unpaired bg session keeps its own card, no tmux, its attach jump', () => {
+  test('an unpaired bg session: its own card in a background group, attached in a window of the viewer’s tmux session', () => {
     const c = cards(fleetFrom(THIRD.sessionId, THIRD.pid)).find(s => s.sessionId === LONE.sessionId)!
     expect(c.tmuxTarget).toBe(undefined)
+    expect(c.background).toBe(true)
+    expect(c.jump).toEqual({
+      kind: 'session',
+      sessionId: LONE.sessionId,
+      cwd: '/Users/me/code/x',
+      pid: 50001,
+      term: GHOSTTY,
+      bg: true,
+      jobId: 'aaaa1111',
+      openIn: 'webapp-ui',
+    })
+    const groups = fleetFrom(THIRD.sessionId, THIRD.pid).others
+    expect(groups.find(g => g.background)!.sessions.map(s => s.sessionId)).toEqual([LONE.sessionId])
+    expect(groups.some(g => g.tmuxSession === '' && !g.background)).toBe(false)
+  })
+
+  test('a viewer outside tmux has nowhere to open it: no openIn', () => {
+    const outside = rows(FRONT, WORKER, { ...THIRD, tmux: undefined }, LONE)
+    const c = cards(fleetFrom(THIRD.sessionId, THIRD.pid, ALL, new Map(), outside)).find(s => s.sessionId === LONE.sessionId)!
     expect(c.jump).toEqual({
       kind: 'session',
       sessionId: LONE.sessionId,
@@ -137,17 +156,20 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
       bg: true,
       jobId: 'aaaa1111',
     })
-    expect(
-      fleetFrom(THIRD.sessionId, THIRD.pid)
-        .others.find(g => g.tmuxSession === '')!
-        .sessions.map(s => s.sessionId),
-    ).toEqual([LONE.sessionId])
+  })
+
+  test('a plain session outside tmux still groups as no tmux, apart from background ones', () => {
+    const loose = { pid: 60001, sessionId: 'bbbb2222-0000', cwd: '/Users/me/code/y', kind: 'interactive', status: 'idle' }
+    const groups = fleetFrom(THIRD.sessionId, THIRD.pid, new Set([...ALL, 60001]), new Map(), rows(THIRD, LONE, loose)).others
+    expect(groups.find(g => g.tmuxSession === '' && !g.background)!.sessions.map(s => s.sessionId)).toEqual([loose.sessionId])
+    expect(groups.find(g => g.background)!.sessions.map(s => s.sessionId)).toEqual([LONE.sessionId])
   })
 
   test('a stale pair: the live half stands alone as before', () => {
     const noFront = cards(fleetFrom(THIRD.sessionId, THIRD.pid, new Set([32938, 45327, 50001])))
     const w = noFront.find(s => s.sessionId === WORKER.sessionId)!
     expect(w.tmuxTarget).toBe(undefined)
+    expect(w.background).toBe(true)
     expect(w.jump).toEqual({
       kind: 'session',
       sessionId: WORKER.sessionId,
@@ -156,6 +178,7 @@ describe('a front-end and its bg worker are one card for every viewer', () => {
       term: GHOSTTY,
       bg: true,
       jobId: '990b185e',
+      openIn: 'webapp-ui',
     })
 
     const noWorker = cards(fleetFrom(THIRD.sessionId, THIRD.pid, new Set([29637, 45327, 50001])))

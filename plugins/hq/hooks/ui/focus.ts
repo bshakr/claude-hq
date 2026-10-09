@@ -64,6 +64,12 @@ async function activate(j: SessionJump, exec: Exec): Promise<boolean> {
 
 export const STRATEGIES: readonly Strategy[] = [
   {
+    // A background session with no front-end has no pane to focus; open one in the viewer's tmux session.
+    name: 'tmux attach',
+    applies: j => !!j.bg && !!j.jobId && !!j.openIn,
+    run: (j, exec) => ok(exec, ['tmux', 'new-window', '-t', `${j.openIn}:`, '-c', j.cwd, '-n', j.jobId!, 'claude', 'attach', j.jobId!]),
+  },
+  {
     name: 'tmux',
     applies: j => !!j.tmux,
     run: async (j, exec) => {
@@ -181,9 +187,9 @@ export const STRATEGIES: readonly Strategy[] = [
   },
 ]
 
-/** The strategies worth trying for a session, in order; none for a background session. */
+/** The strategies worth trying for a session, in order; a background session can only be attached. */
 export function strategiesFor(j: SessionJump): Strategy[] {
-  return j.bg ? [] : STRATEGIES.filter(s => s.applies(j))
+  return STRATEGIES.filter(s => (s.name === 'tmux attach') === !!j.bg && s.applies(j))
 }
 
 /** Enter can only copy the resume command. */

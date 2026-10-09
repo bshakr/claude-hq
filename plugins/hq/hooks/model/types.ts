@@ -20,7 +20,17 @@ export interface TermEnv {
 export type Jump =
   | { kind: 'tmux'; target: string } // e.g. "acme-store:@3.%6"
   | { kind: 'url'; url: string }
-  | { kind: 'session'; sessionId: string; cwd: string; pid: number; tmux?: string; bg?: true; jobId?: string; term: TermEnv }
+  | {
+      kind: 'session'
+      sessionId: string
+      cwd: string
+      pid: number
+      tmux?: string
+      bg?: true
+      jobId?: string
+      openIn?: string
+      term: TermEnv
+    }
 
 export interface Flare {
   text: string // "st-api is waiting for your input"
@@ -130,6 +140,8 @@ export interface OtherSessionVM {
   wait?: WaitVM
   /** Its context window's fill (ADR 0007). */
   context?: ContextUsage
+  /** A background session no front-end is attached to. */
+  background?: true
 }
 
 /** A session's context fill: live from its own HQ, else estimated from its transcript (ADR 0007). */
@@ -169,6 +181,8 @@ export interface OtherAgentVM {
 
 export interface TmuxGroupVM {
   tmuxSession: string // "webapp-ui"
+  /** Background sessions with no front-end, drawn apart from sessions outside tmux. */
+  background?: true
   sessions: OtherSessionVM[]
 }
 

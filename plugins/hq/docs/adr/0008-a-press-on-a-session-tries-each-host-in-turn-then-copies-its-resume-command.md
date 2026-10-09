@@ -27,6 +27,7 @@ Enter or a click on a session card only ran `tmux switch-client`, so a session o
 | app | `__CFBundleIdentifier` (Ghostty, Warp, Alacritty, …) | `open -b <id>`: raises the app, not the tab | Ghostty's id confirmed on this Mac |
 
 - Fallback: a background session copies `claude attach <jobId>`; anything else copies `cd <cwd> && claude --resume <sessionId>`, through `$.ui.copy`, and the toast says so (or shows the command when nothing was copied). Only the fallback toasts. A card no strategy applies to shows a dim `↵ copies resume`.
+- As built (2026-10-09): a background session with no front-end attached (its front-end exited, the worker lives on under the daemon) is grouped under `background`, not `no tmux`. When the viewer is in tmux, a press runs `tmux new-window -t <viewer's session>: -c <cwd> -n <jobId> claude attach <jobId>`; otherwise it copies `claude attach <jobId>` and the toast says to paste it in a terminal.
 
 ## Consequences
 

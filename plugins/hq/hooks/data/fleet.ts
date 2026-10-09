@@ -121,6 +121,7 @@ export function toSessionVM(
   ctx: SessionContext = {},
   wait?: WaitVM,
   term?: TermEnv,
+  openIn?: string,
 ): OtherSessionVM {
   const { window } = splitTmux(row.tmux)
   const real = isRealWait(wait)
@@ -135,7 +136,8 @@ export function toSessionVM(
     windowLabel: window ? `${window} ${label}` : label,
     status,
     ...(row.tmux ? { tmuxTarget: row.tmux } : {}),
-    ...(j => (j ? { jump: j } : {}))(jumpOf(row, term)),
+    ...(j => (j ? { jump: j } : {}))(jumpOf(row, term, openIn)),
+    ...(row.kind === 'bg' && !row.tmux ? { background: true as const } : {}),
     ...(real ? { waitingFor: wait.text, wait } : status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
     ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
     ...(real ? { statusSince: wait.since } : typeof row.statusUpdatedAt === 'number' ? { statusSince: row.statusUpdatedAt } : {}),
@@ -153,7 +155,7 @@ export function toSessionVM(
 }
 
 /** A detected session focuses through ADR 0008's strategies; an undetected one keeps the plain tmux jump. */
-export function jumpOf(row: RegistryRow, term: TermEnv | undefined): Jump | undefined {
+export function jumpOf(row: RegistryRow, term: TermEnv | undefined, openIn?: string): Jump | undefined {
   if (!term) return row.tmux ? { kind: 'tmux', target: row.tmux } : undefined
   return {
     kind: 'session',
@@ -164,6 +166,7 @@ export function jumpOf(row: RegistryRow, term: TermEnv | undefined): Jump | unde
     ...(row.tmux ? { tmux: row.tmux } : {}),
     ...(row.kind === 'bg' ? { bg: true as const } : {}),
     ...(row.jobId ? { jobId: row.jobId } : {}),
+    ...(row.kind === 'bg' && row.jobId && openIn ? { openIn } : {}),
   }
 }
 
@@ -238,14 +241,18 @@ export function compareSessions(a: OtherSessionVM, b: OtherSessionVM): number {
 
 export function groupByTmux(sessions: readonly OtherSessionVM[]): TmuxGroupVM[] {
   const groups = new Map<string, OtherSessionVM[]>()
+  // tmux session names cannot contain ':', so this key never collides with one.
+  const BG = ':bg'
   for (const s of [...sessions].sort(compareSessions)) {
-    const key = splitTmux(s.tmuxTarget).session
+    const key = s.background && !s.tmuxTarget ? BG : splitTmux(s.tmuxTarget).session
     const list = groups.get(key) ?? []
     list.push(s)
     groups.set(key, list)
   }
   // Map keeps insertion order, and sessions were sorted, so the group of the most urgent session leads.
-  return [...groups].map(([tmuxSession, list]) => ({ tmuxSession, sessions: list }))
+  return [...groups].map(([key, list]) =>
+    key === BG ? { tmuxSession: '', background: true as const, sessions: list } : { tmuxSession: key, sessions: list },
+  )
 }
 
 /** The other session that has waited for input longest. */
@@ -330,6 +337,7 @@ export function buildFleet(
   terms: ReadonlyMap<number, TermEnv> = new Map(),
 ): { self?: RegistryRow; others: TmuxGroupVM[] } {
   const self = findSelf(rows, selfId, selfPid)
+  const here = splitTmux(selfTmux(rows, self)).session || undefined
   const vm = (r: RegistryRow) =>
     toSessionVM(
       r,
@@ -341,6 +349,7 @@ export function buildFleet(
       contexts.get(r.sessionId),
       waits.get(r.sessionId),
       terms.get(r.pid),
+      here,
     )
   const pairs = pairsOf(rows, r => isOtherRow(r, self, selfId, alive))
   const workers = new Set(pairs.values())
