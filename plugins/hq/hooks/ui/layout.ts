@@ -867,13 +867,6 @@ function mergeFact(p: PrVM): Fact | undefined {
   }
 }
 
-const GALLERY: Record<PrVM['gallery'], string> = {
-  linked: 'gallery linked',
-  'no-visual-change': 'no visual change',
-  none: 'no gallery',
-  unknown: '',
-}
-
 /** A PR's rows; `compact` is one line with its status on the right, for another session's card. */
 function prRows(p: PrVM, tcol: number, x: Ctx, key = prKey(p), compact = false): Row[] {
   const { IW, now } = x
@@ -931,7 +924,6 @@ function prRows(p: PrVM, tcol: number, x: Ctx, key = prKey(p), compact = false):
   const facts: Fact[] = [ciFact(p.ci)]
   const merge = mergeFact(p)
   if (merge) facts.push(merge)
-  if (GALLERY[p.gallery]) facts.push([GALLERY[p.gallery], DIM])
   if (p.watcher === 'none') facts.push(['no watcher', tok('wait')])
   else facts.push([p.watcher, DIM])
   if (p.stale) facts.push(['stale', DIM])

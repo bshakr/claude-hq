@@ -154,7 +154,7 @@ describe('another session read from its transcript', () => {
     })
     ingest(d, answerLine + replyLine)
     expect(d.ask).toBe(undefined)
-    expect(otherWait(undefined, d, 'idle', NOW + 9)).toEqual({ kind: 'turn', text: 'your turn', since: NOW + 9 })
+    expect(otherWait(undefined, d, 'idle', NOW + 9)).toEqual({ kind: 'turn', text: 'your turn', since: NOW })
     expect(otherWait(undefined, d, 'busy', NOW + 9)).toBe(undefined)
   })
   test('a last reply ending on a question is a question wait; the next prompt clears it', () => {
@@ -213,6 +213,38 @@ describe('another session read from its transcript', () => {
     const b = all.find(s => s.sessionId === 'b')!
     expect([a.status, a.statusSince, a.waitingFor, a.wait?.kind]).toEqual(['waiting', NOW - 10, 'Bash: rm -rf tmp/', 'permission'])
     expect([b.status, b.wait?.kind]).toEqual(['idle', 'turn'])
+  })
+  test("your turn counts from the transcript's last reply, not a later registry heartbeat", () => {
+    const d = emptyDigest()
+    ingest(d, askLine + answerLine)
+    ingest(d, `${JSON.stringify({ ...JSON.parse(replyLine), timestamp: new Date(NOW - 600_000).toISOString() })}\n`)
+    const heartbeat = NOW - 5_000
+    const wait = otherWait(undefined, d, 'idle', heartbeat)
+    expect(wait).toEqual({ kind: 'turn', text: 'your turn', since: NOW - 600_000 })
+    const bg: RegistryRow = { pid: 4, sessionId: 'w', cwd: '/c/w', kind: 'bg', jobId: 'j1', status: 'idle', statusUpdatedAt: heartbeat }
+    const fleet = buildFleet(
+      [bg],
+      new Set([4]),
+      'self',
+      new Map(),
+      new Map(),
+      NOW,
+      1,
+      new Map(),
+      new Map(),
+      new Map(),
+      new Map([['w', wait!]]),
+    )
+    const card = fleet.others.flatMap(g => g.sessions).find(s => s.sessionId === 'w')!
+    expect([card.wait?.kind, card.statusSince]).toEqual(['turn', NOW - 600_000])
+  })
+  test('your turn with no reply timestamp falls back to the registry time', () => {
+    const d = emptyDigest()
+    ingest(
+      d,
+      `${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Done.' }], stop_reason: 'end_turn' } })}\n`,
+    )
+    expect(otherWait(undefined, d, 'idle', NOW + 9)).toEqual({ kind: 'turn', text: 'your turn', since: NOW + 9 })
   })
 })
 
