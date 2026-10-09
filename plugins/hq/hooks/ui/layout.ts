@@ -575,7 +575,7 @@ function otherAgentRows(s: OtherSessionVM, under: () => Row, x: Ctx): Row[] {
   return out
 }
 
-/** On a card whose Enter can only copy the resume command (ADR 0008). */
+/** On a card whose Enter can only copy the resume command. */
 export const RESUME_HINT = '↵ copies resume'
 
 function sessionTone(s: OtherSessionVM): Tok {
