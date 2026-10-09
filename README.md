@@ -47,7 +47,17 @@ The pane opens by itself once per session when the terminal is at least 144 colu
 
 Built on macOS. On Linux the pane, tmux jumps and the watchers work; opening a PR and focusing terminal apps use macOS tools.
 
-**Pane has a grey or blue background inside tmux?** Claude Code can't match your theme without truecolor. Add `set -ga terminal-overrides ",xterm-ghostty:Tc"` (use your `$TERM`) to `~/.tmux.conf`, set `"CLAUDE_CODE_TMUX_TRUECOLOR": "1"` under `env` in `~/.claude/settings.json`, then detach and reattach.
+**Pane sits on a grey or brown block?** Claude Code fills its side panel with the theme's `composerSidebarBackground`. Run `/hq match-bg #1e1e2e` with your terminal background colour: on a custom theme it updates that theme, otherwise it writes `~/.claude/themes/hq-<base>.json` on your current theme, which you pick once in `/theme`. Every open session picks up the change live. Or write the file yourself and pick it:
+
+```json
+{
+  "name": "hq-dark",
+  "base": "dark",
+  "overrides": { "composerSidebarBackground": "#1e1e2e" }
+}
+```
+
+Inside tmux the colour only matches with truecolor on: add `set -ga terminal-overrides ",xterm-ghostty:Tc"` (use your `$TERM`) to `~/.tmux.conf`, set `"CLAUDE_CODE_TMUX_TRUECOLOR": "1"` under `env` in `~/.claude/settings.json`, then detach and reattach.
 
 ## Usage
 
@@ -60,6 +70,7 @@ Built on macOS. On Linux the pane, tmux jumps and the watchers work; opening a P
 | `/hq summaries on\|off` | Haiku goal lines and ticket glosses |
 | `/hq reset` | drop the three toggles above so settings.json applies again |
 | `/hq update` | update HQ from the plugin store; `/reload-plugins` applies it |
+| `/hq match-bg <#hex>` | paint Claude Code's side panel your terminal background colour |
 | `/hq help` | list the commands |
 
 `ctrl+x tab` moves the keys from the prompt to the pane. In the pane, `j`/`k` or Tab move, Enter or a click opens, Esc goes back to the prompt. For a single chord, bind one in `~/.claude/keybindings.json`:
