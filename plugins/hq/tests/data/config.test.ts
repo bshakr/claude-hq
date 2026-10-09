@@ -25,7 +25,7 @@ describe('colours', () => {
       accent: 'ansi256(6)',
       rule: 'ansi256(8)',
     })
-    expect([c.summaries, c.wake, c.notify, c.autoOpen]).toEqual([true, true, true, true])
+    expect([c.summaries, c.wake, c.notify, c.autoOpen, c.updateCheck]).toEqual([true, true, true, true, true])
     expect(c.warning).toBe(undefined)
   })
 
@@ -50,8 +50,8 @@ describe('colours', () => {
   })
 
   test('the switches read as given', () => {
-    const c = resolveConfig({ summaries: false, wake: false, notify: false, autoOpen: false })
-    expect([c.summaries, c.wake, c.notify, c.autoOpen]).toEqual([false, false, false, false])
+    const c = resolveConfig({ summaries: false, wake: false, notify: false, autoOpen: false, updateCheck: false })
+    expect([c.summaries, c.wake, c.notify, c.autoOpen, c.updateCheck]).toEqual([false, false, false, false, false])
   })
 })
 

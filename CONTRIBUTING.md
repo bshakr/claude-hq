@@ -32,3 +32,16 @@ npm test               # claude plugin test plugins/hq
 `types/claude-code/index.d.ts` is the API declaration the engine writes beside a plugin it loads, vendored so a fresh clone type-checks without a session. After upgrading Claude Code, start `claude --plugin-dir plugins/hq` once, copy `plugins/hq/.claude-plugin/types/claude-code/index.d.ts` over it, and bump the version CI installs in `.github/workflows/ci.yml` to match its first line. Your editor reads the engine-written copy through `plugins/hq/tsconfig.json`.
 
 The bundled `pr-ci-wait` and `pr-merge-wait` in `plugins/hq/bin` are plain bash, checked by `npm run check:scripts`.
+
+## Releasing
+
+1. Bump `version` in `plugins/hq/.claude-plugin/plugin.json`. Installed copies compare it with their own to offer an update. `.claude-plugin/marketplace.json` carries no version.
+2. Add a `## X.Y.Z` section at the top of `CHANGELOG.md`.
+3. Commit both and push to `main`.
+4. Tag from a clean checkout of that commit:
+
+   ```sh
+   claude plugin tag --push plugins/hq
+   ```
+
+   It checks plugin.json against the marketplace entry, then creates and pushes `hq--vX.Y.Z`. The `release` workflow checks that the tag matches plugin.json and publishes a GitHub release tagged `vX.Y.Z` whose notes are that version's CHANGELOG section. The "what's new" button in HQ opens that release page.

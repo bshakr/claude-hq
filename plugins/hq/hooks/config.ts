@@ -32,6 +32,7 @@ export type HqConfig = {
   wake: boolean
   notify: boolean
   autoOpen: boolean
+  updateCheck: boolean
 }
 
 /** `#rrggbb`, `ansi256(N)` or a bare `N` (0-255) to what Text's `color` takes; undefined when none of them. */
@@ -64,6 +65,7 @@ export function resolveConfig(options: PluginOptions | undefined): HqConfig {
     wake: bool(o.wake, true),
     notify: bool(o.notify, true),
     autoOpen: bool(o.autoOpen, true),
+    updateCheck: bool(o.updateCheck, true),
   }
 }
 

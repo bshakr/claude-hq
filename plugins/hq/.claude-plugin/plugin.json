@@ -64,6 +64,12 @@
       "description": "A desktop notification when another session starts waiting on you. /hq notify on|off overrides this on one machine.",
       "default": true
     },
+    "updateCheck": {
+      "type": "boolean",
+      "title": "Check for updates",
+      "description": "Once a day, fetch HQ's published plugin.json from GitHub and show a dim line in the pane header when a newer version is out. Off, or with CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC set: no request.",
+      "default": true
+    },
     "autoOpen": {
       "type": "boolean",
       "title": "Open the pane at start",

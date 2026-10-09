@@ -1,0 +1,51 @@
+name: release
+
+# `claude plugin tag --push` pushes hq--vX.Y.Z; the release is published as vX.Y.Z,
+# the tag HQ's "what's new" button links to. A bare vX.Y.Z push works too.
+on:
+  push:
+    tags:
+      - 'hq--v*'
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Version from the tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#hq--}"
+          version="${version#v}"
+          manifest="$(jq -r .version plugins/hq/.claude-plugin/plugin.json)"
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match plugin.json version $manifest"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Notes from CHANGELOG.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; found = ($2 == v || $2 == "[" v "]") ; next }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for $VERSION"
+            exit 1
+          fi
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            gh release edit "v$VERSION" --title "hq $VERSION" --notes-file notes.md
+          else
+            gh release create "v$VERSION" --target "$GITHUB_SHA" --title "hq $VERSION" --notes-file notes.md
+          fi

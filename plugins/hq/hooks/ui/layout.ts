@@ -18,6 +18,7 @@ import { resumeOnly } from './focus'
 import { Row } from './row'
 import type { Action, Sty, Tok } from './row'
 import { expandIds } from '../data/ids'
+import type { HeaderNotice } from '../data/update'
 import { bucketOf } from '../data/wake'
 import type { Bucket } from '../data/wake'
 import { age, cellLen, clip, elapsed, plural, wrap, wrapCapped } from './text'
@@ -37,6 +38,8 @@ export type View = {
   phase: number
   /** A config problem, drawn dim above the hint. */
   warning?: string
+  /** A newer HQ to update to, or the one this load just updated to; drawn dim in the header. */
+  notice?: HeaderNotice
 }
 
 export type Layout = {
@@ -164,13 +167,29 @@ const worst = (tones: readonly Tok[]): Tok => (tones.includes('fail') ? 'fail' :
 
 // ---------- header and flare ----------
 
-/** The pinned top row: plan usage right-aligned; narrowing drops the bars, then the week. */
-function header(r: Row, m: HqModel, focused: boolean) {
+export const WHATS_NEW_KEY = 'whatsnew'
+
+export const noticeText = (n: HeaderNotice) =>
+  n.kind === 'available' ? `hq ${n.version} available · /hq update` : `updated to ${n.version} · what's new`
+
+/**
+ * The pinned top row: plan usage right-aligned; narrowing drops the bars, then the week.
+ * An update notice sits on the left and wins the room when both cannot fit.
+ */
+function header(r: Row, m: HqModel, focused: boolean, notice: HeaderNotice | undefined, actions: Record<string, Action>) {
   if (focused) r.put(0, '▌', tok('accent'))
   const a = m.account
-  if (!a) return
-  const tries = [accountParts(a), accountParts(a, false), accountParts({ ...a, week: undefined }, false)]
-  for (const parts of tries) if (putRight(r, parts, 2)) return
+  const tries = a ? [accountParts(a), accountParts(a, false), accountParts({ ...a, week: undefined }, false)] : []
+  const minCol = notice ? 2 + cellLen(noticeText(notice)) + 2 : 2
+  for (const parts of tries) if (putRight(r, parts, minCol)) break
+  if (!notice) return
+  if (notice.kind === 'available') {
+    r.put(2, clip(noticeText(notice), r.W - 2), DIM)
+    return
+  }
+  const c = r.put(2, `updated to ${notice.version} · `, DIM)
+  actions[WHATS_NEW_KEY] = { kind: 'jump', jump: { kind: 'url', url: notice.url } }
+  r.button(c, "what's new", { key: WHATS_NEW_KEY, action: actions[WHATS_NEW_KEY], dim: true }, DIM)
 }
 
 const tmuxShort = (target: string) => target.replace(/\.%\d+$/, '')
@@ -1030,7 +1049,7 @@ export function layout(m: HqModel, view: View): Layout {
   }
 
   const top0 = new Row(W)
-  header(top0, m, view.focused)
+  header(top0, m, view.focused, view.notice, actions)
   const flare = new Row(W)
   flareRow(flare, m, actions)
   // Header, a blank, the flare when there is one, then the row the "above" indicator takes.
