@@ -99,13 +99,13 @@ describe('capture and clear in this session', () => {
   })
 })
 
-const TRAVEL_Q =
-  'Does that format and layout look right, especially dated homes, and leaving out derived fields so people never write them?'
-const TRAVEL = `I drafted the travel map as one YAML file per trip.\n\n\`\`\`yaml\nhomes:\n  - from: 2024-03-01\n\`\`\`\n\n**${TRAVEL_Q}**`
+const RECIPE_Q =
+  'Does that format and layout look right, especially dated steps, and leaving out derived fields so people never write them?'
+const RECIPE = `I drafted the recipe book as one YAML file per recipe.\n\n\`\`\`yaml\nsteps:\n  - from: 2024-03-01\n\`\`\`\n\n**${RECIPE_Q}**`
 
 describe('a reply that ends on a question', () => {
-  test('the travel-map reply asks; its question is the wait text', () => {
-    expect(trailingQuestion(TRAVEL)).toBe(TRAVEL_Q)
+  test('the recipe-book reply asks; its question is the wait text', () => {
+    expect(trailingQuestion(RECIPE)).toBe(RECIPE_Q)
   })
   test('a reply ending on a statement does not', () => {
     expect(trailingQuestion('Should we split it?\n\nI split it into two files and the tests pass.')).toBe(undefined)
@@ -122,11 +122,11 @@ describe('a reply that ends on a question', () => {
   })
   test('this session: the question is the wait until a new prompt; plain idle stays your turn', () => {
     resetWaits()
-    onMainAnswer(TRAVEL, 'answer', NOW)
-    expect(ownWait({ idle: true, since: NOW, prompt: 'map it' })).toEqual({ kind: 'question', text: TRAVEL_Q, since: NOW })
-    expect(ownWait({ idle: false, since: NOW, prompt: 'map it' })).toBe(undefined)
+    onMainAnswer(RECIPE, 'answer', NOW)
+    expect(ownWait({ idle: true, since: NOW, prompt: 'draft it' })).toEqual({ kind: 'question', text: RECIPE_Q, since: NOW })
+    expect(ownWait({ idle: false, since: NOW, prompt: 'draft it' })).toBe(undefined)
     onPromptOrigin('task-notification')
-    expect(ownWait({ idle: true, since: NOW, prompt: 'map it' })?.kind).toBe('question')
+    expect(ownWait({ idle: true, since: NOW, prompt: 'draft it' })?.kind).toBe('question')
     onPromptOrigin('composer')
     expect(ownWait({ idle: true, since: NOW, prompt: 'yes' })).toEqual({ kind: 'turn', text: 'your turn', since: NOW })
     onMainAnswer('All done.', 'answer', NOW + 1)
@@ -159,8 +159,8 @@ describe('another session read from its transcript', () => {
   })
   test('a last reply ending on a question is a question wait; the next prompt clears it', () => {
     const d = emptyDigest()
-    ingest(d, tLine({ type: 'assistant', message: { content: [{ type: 'text', text: TRAVEL }], stop_reason: 'end_turn' } }))
-    expect(otherWait(undefined, d, 'idle', NOW + 9)).toEqual({ kind: 'question', text: TRAVEL_Q, since: NOW })
+    ingest(d, tLine({ type: 'assistant', message: { content: [{ type: 'text', text: RECIPE }], stop_reason: 'end_turn' } }))
+    expect(otherWait(undefined, d, 'idle', NOW + 9)).toEqual({ kind: 'question', text: RECIPE_Q, since: NOW })
     expect(otherWait(undefined, d, 'busy', NOW + 9)).toBe(undefined)
     ingest(d, tLine({ type: 'user', message: { content: [{ type: 'text', text: 'yes' }] } }))
     expect(otherWait(undefined, d, 'idle', NOW + 9)).toBe(undefined)

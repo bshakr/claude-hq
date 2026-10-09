@@ -1,4 +1,4 @@
-// The context meter on a session's first line and the plan usage in the header (ADR 0007).
+// The context meter on a session's first line and the plan usage in the header.
 import type { AccountUsage, ContextUsage } from '../model/types'
 import type { Row, Sty } from './row'
 import { cellLen } from './text'

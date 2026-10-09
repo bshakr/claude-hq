@@ -168,7 +168,7 @@ export function prTone(pr: PrVM): PrTone {
   if (pr.stale) return 'waiting'
   if (pr.watcher === 'none' || pr.merge === 'behind' || pr.ci.kind === 'skippedRequired') return 'waiting'
   if (pr.ci.kind === 'running' || pr.ci.kind === 'registering') return 'progress'
-  // GitHub reports BLOCKED while required checks run too; only a finished PR is blocked on him.
+  // GitHub reports BLOCKED while required checks run too; only a finished PR is blocked on you.
   if (pr.merge === 'blocked') return 'waiting'
   return 'quiet'
 }

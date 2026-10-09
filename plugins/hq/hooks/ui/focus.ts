@@ -1,4 +1,4 @@
-// Bringing a session's terminal forward, whatever hosts it (ADR 0008). Pure: commands run through `Exec`.
+// Bringing a session's terminal forward, whatever hosts it. Pure: commands run through `Exec`.
 import type { Jump } from '../model/types'
 
 export type SessionJump = Extract<Jump, { kind: 'session' }>

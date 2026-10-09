@@ -1,6 +1,6 @@
 # Contributing
 
-The plugin lives in `plugins/hq`: `hooks/register.tsx` is the entry point, `hooks/data` reads sessions, transcripts and PRs, `hooks/ui` draws the pane, `tests` holds the specs, and `docs/adr` records the decisions. Change a decision by writing a new ADR, not by editing an accepted one.
+The plugin lives in `plugins/hq`: `hooks/register.tsx` is the entry point, `hooks/data` reads sessions, transcripts and PRs, `hooks/ui` draws the pane, and `tests` holds the specs.
 
 ## Run it from your checkout
 
