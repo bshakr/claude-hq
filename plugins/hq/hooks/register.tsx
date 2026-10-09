@@ -23,8 +23,9 @@ const expanded = atom({ plugin: 'hq', key: 'expanded' } as const, [])
 const scroll = atom({ plugin: 'hq', key: 'scroll' } as const, 0)
 const phase = atom({ plugin: 'hq', key: 'phase' } as const, 0)
 const autoOpened = atom({ plugin: 'hq', key: 'autoOpened' } as const, false)
-const HELP = [
-  '/hq          open the pane (⌃g moves the keys between it and the prompt)',
+export const NARROW_TOAST = 'HQ is ready · /hq opens the pane'
+export const HELP = [
+  '/hq          open the pane',
   '/hq close    close the pane',
   '/hq wake on  wake this session on its own PRs going red, merging, conflicting or behind (default)',
   '/hq wake off toasts only, never start a turn',
@@ -34,8 +35,10 @@ const HELP = [
   '/hq reset    forget those toggles, so the plugin config applies again',
   '/hq help     this list',
   '',
+  'ctrl+x tab moves the keys from the prompt to the pane, Esc moves them back. For a chord of your own,',
+  'bind abovePrompt:focus in ~/.claude/keybindings.json.',
   'In the pane: j/k or Tab move, Enter or a click opens a PR or brings a session forward,',
-  'Enter on an agent expands it, on +N finished shows the rest. Esc returns the keys to the prompt.',
+  'Enter on an agent expands it, on +N finished shows the rest.',
 ].join('\n')
 
 /** Motion only while something visibly runs: the session's own turn, a running agent, checks in progress, a busy session. */
@@ -93,6 +96,7 @@ async function startPane($: EngineInterface, isInteractive: boolean): Promise<vo
     try {
       isPaneOpen = (await $.ui.open({ id: PANE, title: 'hq' })).isPlaced
       await syncMotion?.()
+      if (!isPaneOpen) $.ui.toast(NARROW_TOAST)
     } catch {
       // no pane on this surface; /hq still opens it
     }
@@ -185,7 +189,11 @@ export const register: Register = (on, options) => {
       const opened = await $.ui.open({ id: PANE, title: 'hq' })
       isPaneOpen = true
       await syncMotion?.()
-      return { text: opened.isPlaced ? 'hq pane opened. ⌃g moves the keys to it.' : 'hq pane is waiting for room to draw.' }
+      return {
+        text: opened.isPlaced
+          ? 'hq pane opened. ctrl+x tab moves the keys to it, or bind your own chord to abovePrompt:focus.'
+          : 'hq pane is waiting for room to draw.',
+      }
     }
     if (args === 'close') {
       await $.ui.close({ id: PANE })

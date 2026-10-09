@@ -53,8 +53,8 @@ export type Layout = {
   scroll: number
 }
 
-export const UNFOCUSED_HINT = '⌃g focus · click a PR to open it, a session to switch to it'
-export const FOCUSED_HINT = '⏎ open, switch or expand · ⌃g prompt'
+export const UNFOCUSED_HINT = 'ctrl+x tab focus · click a PR to open it, a session to switch to it'
+export const FOCUSED_HINT = '⏎ open, switch or expand · esc prompt'
 
 const DIM: Sty = { dim: true }
 const tok = (c: Tok, extra: Sty = {}): Sty => ({ c, ...extra })

@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { resolveConfig } from '../../hooks/config'
+import { HELP, NARROW_TOAST } from '../../hooks/register'
 import { layout } from '../../hooks/ui/layout'
 import { drawPane } from '../../hooks/ui/pane'
 import { BUSY } from './fixtures'
@@ -23,15 +24,19 @@ const props = (isFocused: boolean) => ({
   view: {},
 })
 
-function host(on: On) {
-  const h = { opens: [] as string[], store: new Map<string, unknown>() }
+function host(on: On, isPlaced = true) {
+  const h = { opens: [] as string[], toasts: [] as string[], store: new Map<string, unknown>() }
+  on('ui.toast', ($, e) => {
+    h.toasts.push(e.text)
+    return { value: undefined }
+  })
   on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('ui.panes', () => ({ value: [] }))
   on('ui.open', ($, e) => {
     h.opens.push(e.id)
-    return { value: { isPlaced: true } }
+    return { value: isPlaced ? { isPlaced } : { isPlaced, reason: 'under 144 columns: 120' } }
   })
   on('store.get', ($, e) => ({ value: h.store.get(e.key) }))
   on('store.set', ($, e) => {
@@ -140,3 +145,31 @@ test(
     expect(await cmd('notify')).toMatchObject({ text: 'hq notifications are off.' })
   },
 )
+
+test('autoOpen on a narrow terminal: one toast per session says /hq opens the pane', async ($, on) => {
+  const h = host(on, false)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  expect(h.toasts.filter(t => t === NARROW_TOAST)).toEqual(['HQ is ready · /hq opens the pane'])
+})
+
+test('a placed pane brings no narrow-terminal toast', async ($, on) => {
+  const h = host(on)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  expect(h.toasts.includes(NARROW_TOAST)).toBe(false)
+})
+
+test('/hq help and /hq name the engine chord, ctrl+x tab, and how to bind your own', async ($, on) => {
+  host(on)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  const cmd = (args: string) =>
+    $.command.run({ command: 'hq', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 } })
+  const help = (await cmd('help')) as { text: string }
+  expect(help.text).toBe(HELP)
+  for (const text of [help.text, ((await cmd('')) as { text: string }).text]) {
+    expect(text).toContain('ctrl+x tab')
+    expect(text).toContain('abovePrompt:focus')
+    expect(text.includes('⌃g')).toBe(false)
+  }
+  expect(help.text).toContain('~/.claude/keybindings.json')
+})
