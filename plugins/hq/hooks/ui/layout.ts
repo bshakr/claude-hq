@@ -665,7 +665,7 @@ function groupCard(group: TmuxGroupVM, x: Ctx): Row[] {
     if (i > 0) inner.push(new Row(x.IW))
     inner.push(...otherRows(s, x))
   })
-  return card(x, group.tmuxSession || 'no tmux', worst(group.sessions.map(sessionTone)), inner)
+  return card(x, group.tmuxSession || (group.background ? 'background' : 'no tmux'), worst(group.sessions.map(sessionTone)), inner)
 }
 
 // ---------- pull requests ----------

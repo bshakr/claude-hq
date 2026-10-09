@@ -58,7 +58,14 @@ export async function pressJump(jump: Jump, io: JumpIO): Promise<boolean> {
   }
   if (out) {
     const copied = await io.copy(out.resume).catch(() => false)
-    io.toast(copied ? `hq: copied resume command: ${out.resume}` : `hq: can't focus it; run ${out.resume}`)
+    const bg = jump.kind === 'session' && jump.bg && jump.jobId
+    io.toast(
+      copied
+        ? bg
+          ? `hq: copied ${out.resume}; paste it in a terminal to open the background session`
+          : `hq: copied resume command: ${out.resume}`
+        : `hq: can't focus it; run ${out.resume}`,
+    )
   }
   return true
 }

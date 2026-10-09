@@ -191,6 +191,53 @@ describe('the strategy chain', () => {
   })
 })
 
+describe('a background session with no front-end', () => {
+  const bg = (extra: Partial<SessionJump> = {}) =>
+    jump({ env: { __CFBundleIdentifier: 'com.mitchellh.ghostty' } }, { cwd: '/Users/me', bg: true, jobId: '990b185e', ...extra })
+
+  test('attaches in a new window of the viewer’s tmux session', async () => {
+    const h = host()
+    const j = bg({ openIn: 'rotamonster' })
+    expect(resumeOnly(j)).toBe(false)
+    expect(await runJump(j, h.exec)).toBe(undefined)
+    expect(h.argvs()).toEqual([
+      ['tmux', 'new-window', '-t', 'rotamonster:', '-c', '/Users/me', '-n', '990b185e', 'claude', 'attach', '990b185e'],
+    ])
+  })
+
+  test('tmux refusing falls back to copying the attach command, with what to do with it', async () => {
+    const h = host({ 'tmux new-window': { exitCode: 1 } })
+    const copied: string[] = []
+    const toasts: string[] = []
+    const io = { run: h.exec, copy: async (t: string) => (copied.push(t), true), toast: (t: string) => void toasts.push(t) }
+    expect(await pressJump(bg({ openIn: 'rotamonster' }), io)).toBe(true)
+    expect(copied).toEqual(['claude attach 990b185e'])
+    expect(toasts).toEqual(['hq: copied claude attach 990b185e; paste it in a terminal to open the background session'])
+  })
+
+  test('the card is titled background and offers no copy hint when it can open', () => {
+    const view = { width: 60, rows: 30, focused: true, cursor: null, expanded: [], scroll: 0, phase: 0 }
+    const m = (j: SessionJump): HqModel => ({
+      ...EMPTY,
+      others: [
+        {
+          tmuxSession: '',
+          background: true,
+          sessions: [{ sessionId: 'w', name: 'HQ work', windowLabel: '', status: 'idle', background: true, jump: j }],
+        },
+      ],
+    })
+    const text = (j: SessionJump) =>
+      layout(m(j), view)
+        .rows.map(r => r.cells.map(c => c.ch).join(''))
+        .join('\n')
+    expect(text(bg({ openIn: 'rotamonster' }))).toContain('background')
+    expect(text(bg({ openIn: 'rotamonster' }))).not.toContain('no tmux')
+    expect(text(bg({ openIn: 'rotamonster' }))).not.toContain(RESUME_HINT)
+    expect(text(bg())).toContain(RESUME_HINT)
+  })
+})
+
 describe('the card and the press', () => {
   const model = (term: TermEnv): HqModel => ({
     ...EMPTY,
