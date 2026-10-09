@@ -112,6 +112,8 @@ HQ reads Claude Code's local session files under `~/.claude/` and each session w
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to run it from a clone and run the checks.
 
+Report a security issue privately, as [SECURITY.md](SECURITY.md) describes.
+
 ## License
 
 [MIT](LICENSE)
