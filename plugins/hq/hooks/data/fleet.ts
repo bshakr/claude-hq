@@ -98,6 +98,8 @@ export interface SessionContext {
 export interface SessionTopic {
   title?: string
   firstPrompt?: string
+  /** What Claude Code titles the terminal: the /rename title else the AI one, then the AI one (the rename may not reach the title). */
+  jumpTitles?: string[]
 }
 
 const DEFAULT_BRANCHES = new Set(['main', 'master'])
@@ -138,7 +140,7 @@ export function toSessionVM(
     windowLabel: window ? `${window} ${label}` : label,
     status,
     ...(row.tmux ? { tmuxTarget: row.tmux } : {}),
-    ...(j => (j ? { jump: j } : {}))(jumpOf(row, term, openIn)),
+    ...(j => (j ? { jump: j } : {}))(jumpOf(row, term, openIn, topic.jumpTitles)),
     ...(row.kind === 'bg' && !row.tmux ? { background: true as const } : {}),
     ...(real ? { waitingFor: wait.text, wait } : status === 'waiting' && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
     ...(wait?.kind === 'turn' && status === 'idle' ? { wait } : {}),
@@ -158,7 +160,7 @@ export function toSessionVM(
 }
 
 /** A detected session focuses through the strategies in ui/focus.ts; an undetected one keeps the plain tmux jump. */
-export function jumpOf(row: RegistryRow, term: TermEnv | undefined, openIn?: string): Jump | undefined {
+export function jumpOf(row: RegistryRow, term: TermEnv | undefined, openIn?: string, titles?: readonly string[]): Jump | undefined {
   if (!term) return row.tmux ? { kind: 'tmux', target: row.tmux } : undefined
   return {
     kind: 'session',
@@ -170,6 +172,7 @@ export function jumpOf(row: RegistryRow, term: TermEnv | undefined, openIn?: str
     ...(row.kind === 'bg' ? { bg: true as const } : {}),
     ...(row.jobId ? { jobId: row.jobId } : {}),
     ...(row.kind === 'bg' && row.jobId && openIn ? { openIn } : {}),
+    ...(titles?.length ? { titles: [...titles] } : {}),
   }
 }
 
@@ -341,13 +344,14 @@ export function buildFleet(
 ): { self?: RegistryRow; others: TmuxGroupVM[] } {
   const self = findSelf(rows, selfId, selfPid)
   const here = splitTmux(selfTmux(rows, self)).session || undefined
-  const vm = (r: RegistryRow) =>
+  // A paired front-end's transcript is not read, so its jump takes the worker's titles.
+  const vm = (r: RegistryRow, topicOf = r) =>
     toSessionVM(
       r,
       branches.get(r.cwd),
       published.get(r.sessionId),
       now,
-      topics.get(r.sessionId),
+      topics.get(topicOf.sessionId),
       agents.get(r.sessionId),
       contexts.get(r.sessionId),
       waits.get(r.sessionId),
@@ -360,7 +364,7 @@ export function buildFleet(
     .filter(r => isOtherRow(r, self, selfId, alive) && !workers.has(r))
     .map(r => {
       const worker = pairs.get(r)
-      return worker ? mergePair(vm(r), vm({ ...worker, tmux: r.tmux })) : vm(r)
+      return worker ? mergePair(vm(r, worker), vm({ ...worker, tmux: r.tmux })) : vm(r)
     })
   return { ...(self ? { self } : {}), others: groupByTmux(others) }
 }

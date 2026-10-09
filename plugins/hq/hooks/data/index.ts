@@ -19,6 +19,7 @@ import {
   goalText,
   ingest,
   ingestLines,
+  jumpTitlesOf,
   parsePrStates,
   prKey as prStateKey,
   prStateQuery,
@@ -706,8 +707,13 @@ async function start($: EngineInterface): Promise<void> {
     const todos = fresh?.todos ?? todoProgress(d.tasks)
     const title = d.titles[d.titles.length - 1]
     const first = goalText(undefined, { ...d, titles: [] })
+    const jumpTitles = jumpTitlesOf(d)
     return {
-      topic: { ...(title ? { title } : {}), ...(first ? { firstPrompt: first } : {}) },
+      topic: {
+        ...(title ? { title } : {}),
+        ...(first ? { firstPrompt: first } : {}),
+        ...(jumpTitles.length ? { jumpTitles } : {}),
+      },
       ctx: {
         ...(cache?.goal ? { goal: cache.goal } : {}),
         ...(day ? { day } : {}),

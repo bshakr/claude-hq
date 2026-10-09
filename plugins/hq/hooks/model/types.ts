@@ -29,6 +29,8 @@ export type Jump =
       bg?: true
       jobId?: string
       openIn?: string
+      /** Titles Claude Code may have written as the terminal title, likeliest first. */
+      titles?: string[]
       term: TermEnv
     }
 

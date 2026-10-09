@@ -39,6 +39,9 @@ export interface Digest extends TranscriptWait {
   lastTs?: number
   firstPrompt?: string
   titles: string[]
+  /** The newest of each kind: Claude Code's terminal title prefers the /rename one. */
+  aiTitle?: string
+  customTitle?: string
   prs: { url: string; repo: string; number: number; ts: number }[]
   branches: string[]
   prompts: { text: string; ts: number }[]
@@ -184,7 +187,10 @@ export function ingestLine(d: Digest, line: string): void {
     case 'ai-title':
     case 'custom-title': {
       const t = (str(v.aiTitle) ?? str(v.customTitle))?.trim()
-      if (t) pushDistinct(d.titles, t, TITLES_KEPT)
+      if (!t) return
+      pushDistinct(d.titles, t, TITLES_KEPT)
+      if (v.type === 'ai-title') d.aiTitle = t
+      else d.customTitle = t
       return
     }
     case 'pr-link': {
@@ -461,6 +467,11 @@ export async function refreshGoal(
     ...(d.compact ? { compactTs: d.compact.ts } : {}),
     ...(promptTs !== undefined ? { promptTs } : {}),
   }
+}
+
+/** Claude Code's terminal title is the /rename title, else the AI one; the rename can be kept off the title, so the AI one is a second candidate. */
+export function jumpTitlesOf(d: Digest): string[] {
+  return [...new Set([d.customTitle ?? d.aiTitle, d.aiTitle].filter((t): t is string => !!t))]
 }
 
 /** The card's name: the summary's goal, else the newest title, else the first prompt's first line. */
