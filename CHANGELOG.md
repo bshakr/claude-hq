@@ -2,6 +2,10 @@
 
 Each release has a section headed `## X.Y.Z`; the release workflow publishes that section as the GitHub release notes.
 
+## 0.1.3
+
+- Pressing a session that runs in Ghostty (1.3 or later) brings forward its own tab, quick terminal included, instead of only raising Ghostty. The first press asks once for permission to control Ghostty. When several tabs share the session's folder and none carries its title, Ghostty is raised as before.
+
 ## 0.1.2
 
 - `/hq match-bg <#hex>` paints Claude Code's side panel your terminal background colour, so the pane no longer sits on a grey or brown block. It updates your custom theme, or writes an `hq-<base>` theme to pick once in `/theme`.
