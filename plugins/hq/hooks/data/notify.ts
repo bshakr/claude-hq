@@ -1,4 +1,4 @@
-// A native notification when another session newly waits on the user (ADR 0006).
+// A native notification when another session newly waits on the user.
 import type { TmuxGroupVM } from '../model/types'
 import { isRealWait } from './waiting'
 

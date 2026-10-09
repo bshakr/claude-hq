@@ -1,4 +1,4 @@
-// Which terminal holds a session, read from its process (ADR 0008).
+// Which terminal holds a session, read from its process.
 import type { TermEnv } from '../model/types'
 
 const KEYS = [

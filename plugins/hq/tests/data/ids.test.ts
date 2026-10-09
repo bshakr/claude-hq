@@ -27,9 +27,9 @@ const NOW = 1_800_000_000_000
 
 describe('ids: parsing and expansion', () => {
   test('tickets and ADR numbers in any spelling, each once, in order', () => {
-    expect(findIds('Finish ADR 0019 epic ENG-1936 work, then ADR-19 and ENG-1936 again; ADR 7, AB-1, ABCDEF-2, x-1')).toEqual([
+    expect(findIds('Finish ADR 0019 epic ENG-4810 work, then ADR-19 and ENG-4810 again; ADR 7, AB-1, ABCDEF-2, x-1')).toEqual([
       { kind: 'adr', id: 'ADR 0019', num: '0019' },
-      { kind: 'ticket', id: 'ENG-1936' },
+      { kind: 'ticket', id: 'ENG-4810' },
       { kind: 'adr', id: 'ADR 0007', num: '0007' },
       { kind: 'ticket', id: 'AB-1' },
     ])
@@ -37,27 +37,27 @@ describe('ids: parsing and expansion', () => {
   })
 
   test('the first occurrence of each glossed id is expanded; unknown ids and later repeats stay bare', () => {
-    const g = { 'ENG-1947': 'withhold file from labels', 'ADR 0019': 'append-only raw bank data' }
-    expect(expandIds('Fix batch ENG-1947', g)).toBe('Fix batch ENG-1947 (withhold file from labels)')
-    expect(expandIds('Finish ADR-19 epic ENG-1936, ENG-1947 then ENG-1947', g)).toBe(
-      'Finish ADR-19 (append-only raw bank data) epic ENG-1936, ENG-1947 (withhold file from labels) then ENG-1947',
+    const g = { 'ENG-4821': 'webhook retry for refunds', 'ADR 0019': 'append-only raw cart data' }
+    expect(expandIds('Fix batch ENG-4821', g)).toBe('Fix batch ENG-4821 (webhook retry for refunds)')
+    expect(expandIds('Finish ADR-19 epic ENG-4810, ENG-4821 then ENG-4821', g)).toBe(
+      'Finish ADR-19 (append-only raw cart data) epic ENG-4810, ENG-4821 (webhook retry for refunds) then ENG-4821',
     )
-    expect(expandIds('ENG-1947 (already said)', g)).toBe('ENG-1947 (already said)')
-    expect(expandIds('Fix batch ENG-1947', undefined)).toBe('Fix batch ENG-1947')
+    expect(expandIds('ENG-4821 (already said)', g)).toBe('ENG-4821 (already said)')
+    expect(expandIds('Fix batch ENG-4821', undefined)).toBe('Fix batch ENG-4821')
   })
 
   test('linear show, ADR headings, and the model reply', () => {
-    expect(parseLinearShow("# ENG-1947: Evaluation: write a blind build's withhold file from a label set\n\nbody", 'ENG-1947')).toBe(
-      "Evaluation: write a blind build's withhold file from a label set",
+    expect(parseLinearShow('# ENG-4821: Evaluation: write a webhook retry queue for failed deliveries.\n\nbody', 'ENG-4821')).toBe(
+      'Evaluation: write a webhook retry queue for failed deliveries.',
     )
-    expect(parseLinearShow('# ENG-1: other\n', 'ENG-1947')).toBeUndefined()
-    expect(parseLinearShow('error: not found', 'ENG-1947')).toBeUndefined()
-    expect(adrTitle('- Status: x\n# Raw bank data is append-only\n', '0019-raw.md')).toBe('Raw bank data is append-only')
-    expect(adrTitle('no heading', '0019-append-only-raw-bank-data.md')).toBe('append only raw bank data')
+    expect(parseLinearShow('# ENG-1: other\n', 'ENG-4821')).toBeUndefined()
+    expect(parseLinearShow('error: not found', 'ENG-4821')).toBeUndefined()
+    expect(adrTitle('- Status: x\n# Raw cart data is append-only\n', '0019-raw.md')).toBe('Raw cart data is append-only')
+    expect(adrTitle('no heading', '0019-append-only-raw-cart-data.md')).toBe('append only raw cart data')
     expect(
-      parseBriefReply('```json\n{"1": "withhold file from labels.", "2": "one two three four five six"}\n```', ['1', '2', '3']),
-    ).toEqual({ '1': 'withhold file from labels', '2': 'one two three four five' })
-    expect(glossOf({ title: 'Evaluation: write a blind build withhold file', fetchedAt: 1 })).toBe('Evaluation: write a blind build')
+      parseBriefReply('```json\n{"1": "webhook retry for refunds.", "2": "one two three four five six"}\n```', ['1', '2', '3']),
+    ).toEqual({ '1': 'webhook retry for refunds', '2': 'one two three four five' })
+    expect(glossOf({ title: 'Evaluation: write a retry queue for webhooks', fetchedAt: 1 })).toBe('Evaluation: write a retry queue')
     expect(glossOf({ title: 'x y', brief: 'short', fetchedAt: 1 })).toBe('short')
   })
 })
@@ -66,20 +66,20 @@ describe('ids: ADR resolution from a repo', () => {
   const tree: Record<string, { name: string; kind: string }[]> = {
     '/r/docs/adr': [
       { name: '0004-a-card-names-its-goal.md', kind: 'file' },
-      { name: '0019-append-only-raw-bank-data.md', kind: 'file' },
+      { name: '0019-append-only-raw-cart-data.md', kind: 'file' },
     ],
-    '/r/design': [{ name: 'pricing', kind: 'directory' }],
-    '/r/design/pricing/adr': [{ name: '0031-seat-pricing.md', kind: 'file' }],
+    '/r/design': [{ name: 'billing', kind: 'directory' }],
+    '/r/design/billing/adr': [{ name: '0031-seat-billing.md', kind: 'file' }],
   }
   const files: Record<string, string> = {
-    '/r/docs/adr/0019-append-only-raw-bank-data.md': '# Raw bank data is append-only and never rewritten\n\n- Status: accepted\n',
-    '/r/design/pricing/adr/0031-seat-pricing.md': 'no heading here',
+    '/r/docs/adr/0019-append-only-raw-cart-data.md': '# Raw cart data is append-only and never rewritten\n\n- Status: accepted\n',
+    '/r/design/billing/adr/0031-seat-billing.md': 'no heading here',
   }
   const fs: Fs = { list: async d => tree[d], read: async p => files[p] }
 
   test('docs/adr by heading, design/<topic>/adr by slug, a missing number fails', async () => {
-    expect((await lookUpAdr('/r', '0019', undefined, NOW, fs)).title).toBe('Raw bank data is append-only and never rewritten')
-    expect((await lookUpAdr('/r', '0031', undefined, NOW, fs)).title).toBe('seat pricing')
+    expect((await lookUpAdr('/r', '0019', undefined, NOW, fs)).title).toBe('Raw cart data is append-only and never rewritten')
+    expect((await lookUpAdr('/r', '0031', undefined, NOW, fs)).title).toBe('seat billing')
     expect(await lookUpAdr('/r', '0099', undefined, NOW, fs)).toEqual({ failedAt: NOW })
     expect(await lookUpAdr('/nowhere', '0019', undefined, NOW, fs)).toEqual({ failedAt: NOW })
   })
@@ -110,38 +110,38 @@ describe('ids: cache and refresh', () => {
   })
 
   test('a ticket lookup runs linear issue show; a failure keeps the old title; a rename drops the old brief', async () => {
-    const { calls, run } = linear('Write the withhold file')
-    const e = await lookUpTicket('ENG-1947', undefined, NOW, run)
-    expect(calls).toEqual([['linear', 'issue', 'show', 'ENG-1947']])
-    expect(e).toEqual({ title: 'Write the withhold file', fetchedAt: NOW })
-    const failed = await lookUpTicket('ENG-1947', { ...e, brief: 'withhold file' }, NOW + 1, linear(undefined).run)
-    expect(failed).toEqual({ title: 'Write the withhold file', brief: 'withhold file', fetchedAt: NOW, failedAt: NOW + 1 })
-    expect(glossOf(failed)).toBe('withhold file')
-    const same = await lookUpTicket('ENG-1947', { ...e, brief: 'withhold file' }, NOW + 2, run)
-    expect(same.brief).toBe('withhold file')
-    const renamed = await lookUpTicket('ENG-1947', { ...e, brief: 'withhold file' }, NOW + 2, linear('Something else').run)
+    const { calls, run } = linear('Write the webhook retry')
+    const e = await lookUpTicket('ENG-4821', undefined, NOW, run)
+    expect(calls).toEqual([['linear', 'issue', 'show', 'ENG-4821']])
+    expect(e).toEqual({ title: 'Write the webhook retry', fetchedAt: NOW })
+    const failed = await lookUpTicket('ENG-4821', { ...e, brief: 'webhook retry' }, NOW + 1, linear(undefined).run)
+    expect(failed).toEqual({ title: 'Write the webhook retry', brief: 'webhook retry', fetchedAt: NOW, failedAt: NOW + 1 })
+    expect(glossOf(failed)).toBe('webhook retry')
+    const same = await lookUpTicket('ENG-4821', { ...e, brief: 'webhook retry' }, NOW + 2, run)
+    expect(same.brief).toBe('webhook retry')
+    const renamed = await lookUpTicket('ENG-4821', { ...e, brief: 'webhook retry' }, NOW + 2, linear('Something else').run)
     expect(renamed).toEqual({ title: 'Something else', fetchedAt: NOW + 2 })
   })
 
   test('briefs: one call for every title without one; a missed key falls back to the first words and retries after 30 min', async () => {
     const entries = new Map<string, GlossEntry>([
-      ['gloss:ENG-1947', { title: "Evaluation: write a blind build's withhold file from a label set", fetchedAt: NOW }],
-      ['gloss:adr:/r:0019', { title: 'Raw bank data is append-only and never rewritten', fetchedAt: NOW }],
+      ['gloss:ENG-4821', { title: 'Evaluation: write a webhook retry queue for failed deliveries.', fetchedAt: NOW }],
+      ['gloss:adr:/r:0019', { title: 'Raw cart data is append-only and never rewritten', fetchedAt: NOW }],
       ['gloss:ENG-1', { title: 'has one', brief: 'has one', fetchedAt: NOW }],
       ['gloss:ENG-2', { failedAt: NOW }],
     ])
     const asked: string[] = []
     const got = await briefBatch(entries, NOW, async req => {
       asked.push(req.prompt)
-      return { isAnswered: true, text: '{"1": "withhold file from labels"}' }
+      return { isAnswered: true, text: '{"1": "webhook retry for refunds"}' }
     })
     expect(asked).toEqual([
-      "1: Evaluation: write a blind build's withhold file from a label set\n2: Raw bank data is append-only and never rewritten",
+      '1: Evaluation: write a webhook retry queue for failed deliveries.\n2: Raw cart data is append-only and never rewritten',
     ])
-    expect(got.get('gloss:ENG-1947')!.brief).toBe('withhold file from labels')
+    expect(got.get('gloss:ENG-4821')!.brief).toBe('webhook retry for refunds')
     const missed = got.get('gloss:adr:/r:0019')!
     expect(missed.briefFailedAt).toBe(NOW)
-    expect(glossOf(missed)).toBe('Raw bank data is append-only')
+    expect(glossOf(missed)).toBe('Raw cart data is append-only')
     expect(briefDue(missed, NOW + LOOKUP_RETRY_MS - 1)).toBe(false)
     expect(briefDue(missed, NOW + LOOKUP_RETRY_MS)).toBe(true)
     // A thrown call backs every key off.
@@ -153,10 +153,10 @@ describe('ids: cache and refresh', () => {
 
   test('resolved titles reach the goal summary input', () => {
     const d = emptyDigest()
-    d.firstPrompt = 'Finish ADR 0019 epic ENG-1936 work'
-    const text = goalInput(d, { idTitles: ['ENG-1936: Raw bank import epic', 'ADR 0019: Raw bank data is append-only'] })
+    d.firstPrompt = 'Finish ADR 0019 epic ENG-4810 work'
+    const text = goalInput(d, { idTitles: ['ENG-4810: Raw cart import epic', 'ADR 0019: Raw cart data is append-only'] })
     expect(
-      text.includes('## Tickets and ADRs referenced\n- ENG-1936: Raw bank import epic\n- ADR 0019: Raw bank data is append-only'),
+      text.includes('## Tickets and ADRs referenced\n- ENG-4810: Raw cart import epic\n- ADR 0019: Raw cart data is append-only'),
     ).toBe(true)
   })
 })
@@ -209,7 +209,7 @@ describe('doing line: never a raw shell command', () => {
 
   test("live path: this session's agent running the loop", () => {
     const s = emptyAgents()
-    onSpawn(s, { toolUseId: 'tu1', description: 'Fix batch ENG-1947', background: true }, 'a1', 'opus', NOW)
+    onSpawn(s, { toolUseId: 'tu1', description: 'Fix batch ENG-4821', background: true }, 'a1', 'opus', NOW)
     onSubagentTool(s, 'a1', { tool: 'Bash', command: LOOP }, '/home/u', NOW)
     expect(s.byId.a1!.now).toBe('waiting for CI')
   })
@@ -221,16 +221,16 @@ describe('layout: glossed ids', () => {
     counts: { waiting: 0, broken: 0, inProgress: 1, sessions: 2 },
     current: {
       label: '',
-      goal: { text: 'Finish ADR 0019 epic ENG-1936 work', day: 2 },
+      goal: { text: 'Finish ADR 0019 epic ENG-4810 work', day: 2 },
       agents: [
         {
           id: 'a1',
-          title: 'Fix batch ENG-1947',
+          title: 'Fix batch ENG-4821',
           status: 'running',
           background: true,
           startedAt: NOW - 60_000,
           toolCount: 1,
-          now: 'reading ENG-1947 notes',
+          now: 'reading ENG-4821 notes',
           files: [],
         },
       ],
@@ -243,11 +243,11 @@ describe('layout: glossed ids', () => {
         sessions: [
           {
             sessionId: 'm1',
-            name: 'Finish ADR 0019 epic ENG-1936 work',
+            name: 'Finish ADR 0019 epic ENG-4810 work',
             windowLabel: '@1',
             status: 'idle',
-            step: 'ENG-1947 fix batch under review',
-            agents: [{ id: 'o1', title: 'Fix batch ENG-1947', startedAt: NOW - 60_000, doing: 'waiting for CI' }],
+            step: 'ENG-4821 fix batch under review',
+            agents: [{ id: 'o1', title: 'Fix batch ENG-4821', startedAt: NOW - 60_000, doing: 'waiting for CI' }],
             ...(glosses ? { glosses } : {}),
           },
         ],
@@ -255,16 +255,16 @@ describe('layout: glossed ids', () => {
     ],
     statusText: '',
   })
-  const G = { 'ADR 0019': 'append-only raw bank data', 'ENG-1936': 'raw bank import', 'ENG-1947': 'withhold file from labels' }
+  const G = { 'ADR 0019': 'append-only raw cart data', 'ENG-4810': 'raw cart import', 'ENG-4821': 'webhook retry for refunds' }
   const draw = (m: HqModel, width: number) =>
     layout(m, { width, rows: 40, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0 }).rows.map(r => r.text())
 
   test('wide: every id on goal, step, agent title and doing lines is glossed once per line', () => {
     const got = draw(model(G), 120)
-    expect(got.some(l => l.includes('Finish ADR 0019 (append-only raw bank data) epic ENG-1936 (raw bank import) work'))).toBe(true)
-    expect(got.filter(l => l.includes('Fix batch ENG-1947 (withhold file from labels)')).length).toBe(2)
-    expect(got.some(l => l.includes('reading ENG-1947 (withhold file from labels) notes'))).toBe(true)
-    expect(got.some(l => l.includes('ENG-1947 (withhold file from labels) fix batch under review'))).toBe(true)
+    expect(got.some(l => l.includes('Finish ADR 0019 (append-only raw cart data) epic ENG-4810 (raw cart import) work'))).toBe(true)
+    expect(got.filter(l => l.includes('Fix batch ENG-4821 (webhook retry for refunds)')).length).toBe(2)
+    expect(got.some(l => l.includes('reading ENG-4821 (webhook retry for refunds) notes'))).toBe(true)
+    expect(got.some(l => l.includes('ENG-4821 (webhook retry for refunds) fix batch under review'))).toBe(true)
   })
 
   test('narrow: the expanded line is clipped with …; without glosses the ids stay bare', () => {
@@ -273,6 +273,6 @@ describe('layout: glossed ids', () => {
     expect(goal.includes('Finish ADR 0…  day 2 · ◷ waiting')).toBe(true)
     expect(goal.length).toBeLessThanOrEqual(40)
     const bare = draw(model(undefined), 120)
-    expect(bare.some(l => l.includes('Fix batch ENG-1947') && !l.includes('('))).toBe(true)
+    expect(bare.some(l => l.includes('Fix batch ENG-4821') && !l.includes('('))).toBe(true)
   })
 })

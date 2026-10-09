@@ -92,9 +92,9 @@ test('fleet: grouped by tmux session, waiting groups first, longest wait first',
     session('st-admin', 'acme-store:@4.%2', 'busy', NOW - 360_000),
     session('st-mobile', 'acme-store:@5.%3', 'waiting', NOW - 60_000),
     session('st-api', 'acme-store:@3.%6', 'waiting', NOW - 120_000),
-    session('rota', 'rota-roster:@6.%9', 'idle', NOW - 10_000),
+    session('blog', 'blog-engine:@6.%9', 'idle', NOW - 10_000),
   ])
-  expect(groups.map(g => g.tmuxSession)).toEqual(['acme-store', 'rota-roster', 'devbox-local'])
+  expect(groups.map(g => g.tmuxSession)).toEqual(['acme-store', 'blog-engine', 'devbox-local'])
   expect(groups[0]!.sessions.map(s => s.name)).toEqual(['st-api', 'st-mobile', 'st-admin'])
 })
 
@@ -153,7 +153,7 @@ function sheetA() {
       agentsRunning: 4,
       prSummary: { total: 2, broken: 0, waiting: 1, inProgress: 0 },
     }),
-    ...['st-docs', 'home', 'webapp-ui-research', 'travel', 'rota', 'rota-research', 'finance'].map((n, i) =>
+    ...['st-docs', 'home', 'webapp-ui-research', 'notes', 'blog', 'blog-research', 'finance'].map((n, i) =>
       session(n, `t${i}:@${i}.%${i}`, 'idle', NOW - 1_000_000),
     ),
   ])

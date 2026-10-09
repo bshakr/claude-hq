@@ -1,4 +1,4 @@
-// Broader context for a session card (ADR 0004): facts read from its transcript, and the goal summary built from them.
+// Broader context for a session card: facts read from its transcript, and the goal summary built from them.
 import type { TodoProgress } from '../model/types'
 import { noteWaitLine } from './waiting'
 import type { TranscriptWait } from './waiting'
@@ -47,7 +47,7 @@ export interface Digest extends TranscriptWait {
   tasks: Task[]
   /** tool_use id of a TaskCreate whose result has not been seen. */
   pendingCreates: Record<string, string>
-  /** The newest main-thread response's input tokens and model (ADR 0007). */
+  /** The newest main-thread response's input tokens and model. */
   usage?: UsageSample
 }
 
@@ -351,7 +351,7 @@ export interface GoalCache {
 
 export interface GoalExtras {
   prTitles?: readonly string[]
-  /** Titles of the tickets and ADRs the session names, as "ENG-1947: <title>". */
+  /** Titles of the tickets and ADRs the session names, as "ENG-4821: <title>". */
   idTitles?: readonly string[]
 }
 

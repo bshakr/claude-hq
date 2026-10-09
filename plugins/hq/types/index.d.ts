@@ -80,7 +80,7 @@ declare module 'claude-code' {
       scroll: number
       /** Motion phase: +1 every 2 s while the pane is open and something runs. */
       phase: number
-      /** PRs and branches this session owns (ADR 0002); kept here so a reload keeps them. */
+      /** PRs and branches this session owns; kept here so a reload keeps them. */
       owned: OwnedState
       /** The main loop's last prompt, in-flight tool, todo list and background shells. */
       activity: ActivityState

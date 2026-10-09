@@ -83,7 +83,7 @@ export function mapStatus(status: string | undefined): OtherSessionVM['status'] 
   return 'idle'
 }
 
-/** The summary lines a card shows under its name (ADR 0004). */
+/** The summary lines a card shows under its name. */
 export interface SessionContext {
   goal?: string
   day?: number
@@ -155,7 +155,7 @@ export function toSessionVM(
   }
 }
 
-/** A detected session focuses through ADR 0008's strategies; an undetected one keeps the plain tmux jump. */
+/** A detected session focuses through the strategies in ui/focus.ts; an undetected one keeps the plain tmux jump. */
 export function jumpOf(row: RegistryRow, term: TermEnv | undefined, openIn?: string): Jump | undefined {
   if (!term) return row.tmux ? { kind: 'tmux', target: row.tmux } : undefined
   return {

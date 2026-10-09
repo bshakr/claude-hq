@@ -1,4 +1,4 @@
-// What a session waits on the user for (ADR 0006): captured live in this session, read from the others.
+// What a session waits on the user for: captured live in this session, read from the others.
 import type { On } from 'claude-code'
 
 import type { PublishedSession, WaitVM } from '../model/types'

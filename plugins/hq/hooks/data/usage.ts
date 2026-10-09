@@ -1,4 +1,4 @@
-// Context fill per session and the account's plan usage (ADR 0007).
+// Context fill per session and the account's plan usage.
 import type { AccountUsage, ContextUsage, PublishedSession } from '../model/types'
 
 export const WINDOW_DEFAULT = 200_000

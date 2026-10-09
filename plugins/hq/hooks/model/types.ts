@@ -10,7 +10,7 @@ export interface Counts {
   sessions: number
 }
 
-/** A session's terminal, read from its process: tty and the env keys focus strategies use (ADR 0008). */
+/** A session's terminal, read from its process: tty and the env keys focus strategies use. */
 export interface TermEnv {
   tty?: string
   env: Readonly<Record<string, string>>
@@ -99,7 +99,7 @@ export interface PrVM {
   stale?: boolean
 }
 
-/** What a session waits on the user for (ADR 0006); `turn` is the low-priority "your turn" after a reply. */
+/** What a session waits on the user for; `turn` is the low-priority "your turn" after a reply. */
 export type WaitKind = 'permission' | 'question' | 'plan' | 'turn'
 
 export interface WaitVM {
@@ -131,22 +131,22 @@ export interface OtherSessionVM {
   jump?: Jump
   /** Calendar day of the session, 1 on the day its transcript starts. */
   day?: number
-  /** Where the work is, from the goal summary (ADR 0004). */
+  /** Where the work is, from the goal summary. */
   step?: string
   /** "12 PRs merged, 1 open" over the PRs its transcript links. */
   prText?: string
   todos?: TodoProgress
-  /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-1947", "ADR 0019"). */
+  /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-4821", "ADR 0019"). */
   glosses?: Record<string, string>
   /** What it waits on the user for; a real wait (not `turn`) also makes `status` waiting. */
   wait?: WaitVM
-  /** Its context window's fill (ADR 0007). */
+  /** Its context window's fill. */
   context?: ContextUsage
   /** A background session no front-end is attached to. */
   background?: true
 }
 
-/** A session's context fill: live from its own HQ, else estimated from its transcript (ADR 0007). */
+/** A session's context fill: live from its own HQ, else estimated from its transcript. */
 export interface ContextUsage {
   /** Whole percent of `window`, 0 to 100. */
   percent: number
@@ -216,7 +216,7 @@ export interface HqModel {
   flare?: Flare
   current: {
     label: string // e.g. "webapp-ui:@1 · ENG-1940-promote"
-    /** The session's goal summary and calendar day (ADR 0004). */
+    /** The session's goal summary and calendar day. */
     goal?: { text: string; day?: number; step?: string }
     /** Repo or folder name: the card's title once there is a goal. */
     title?: string
@@ -225,7 +225,7 @@ export interface HqModel {
     waiting?: WaitingVM[]
     agents: AgentVM[]
     prs: PrVM[]
-    /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-1947", "ADR 0019"). */
+    /** Brief glosses of the ticket ids and ADR numbers its lines name, by id ("ENG-4821", "ADR 0019"). */
     glosses?: Record<string, string>
     context?: ContextUsage
   }
@@ -247,7 +247,7 @@ export interface PublishedSession {
   doing?: string
   /** Its running subagents, newest first, at most a few. */
   agents?: OtherAgentVM[]
-  /** The PRs this session owns (ADR 0002). */
+  /** The PRs this session owns. */
   owned?: { repo: string; number: number }[]
   /** Its open owned PRs as its own pane draws them, so other cards can list and link them. */
   prs?: PrVM[]
@@ -255,7 +255,7 @@ export interface PublishedSession {
   todos?: TodoProgress
   /** Its own goal summary, so other sessions reuse it instead of asking the model again. */
   goal?: { goal?: string; step?: string; at: number }
-  /** What it waits on the user for right now (ADR 0006). */
+  /** What it waits on the user for right now. */
   waiting?: WaitVM
   /** Its live context fill, as the engine reports it. */
   context?: ContextUsage

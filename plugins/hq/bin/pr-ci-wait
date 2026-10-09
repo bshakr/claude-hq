@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT (see LICENSE at the repository root)
 # pr-ci-wait — poll a pull request until every check has settled, then report.
 #
 #   pr-ci-wait <pr-number|pr-url> [--repo owner/name] [--timeout SECONDS] [--interval SECONDS] [--no-state]

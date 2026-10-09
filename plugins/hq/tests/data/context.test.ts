@@ -206,11 +206,11 @@ describe('transcript digest', () => {
         timestamp: at(50),
         message: {
           content:
-            'This session is being continued.\n\nSummary:\n1. Primary Request and Intent:\n   Finish epic ENG-1936: v2 pipeline.\n\n2. Key Technical Concepts:\n   - rails',
+            'This session is being continued.\n\nSummary:\n1. Primary Request and Intent:\n   Finish epic ENG-4810: v2 pipeline.\n\n2. Key Technical Concepts:\n   - rails',
         },
       }),
     )
-    expect(d.compact?.text).toBe('Finish epic ENG-1936: v2 pipeline.')
+    expect(d.compact?.text).toBe('Finish epic ENG-4810: v2 pipeline.')
     expect(d.prompts.length).toBe(2)
   })
 
@@ -232,15 +232,15 @@ describe('todos from the transcript', () => {
     ingest(
       d,
       [
-        use('u1', 'TaskCreate', { subject: 'Implement ENG-1947 withhold file', description: '' }),
-        result('u1', { id: '1', subject: 'Implement ENG-1947 withhold file' }),
+        use('u1', 'TaskCreate', { subject: 'Implement ENG-4821 webhook retry', description: '' }),
+        result('u1', { id: '1', subject: 'Implement ENG-4821 webhook retry' }),
         use('u2', 'TaskCreate', { subject: 'Write the ADR', description: '' }),
         result('u2', { id: '2' }),
-        use('u3', 'TaskUpdate', { taskId: '1', status: 'in_progress', activeForm: 'Implementing ENG-1947 withhold file' }),
+        use('u3', 'TaskUpdate', { taskId: '1', status: 'in_progress', activeForm: 'Implementing ENG-4821 webhook retry' }),
         use('u4', 'TaskUpdate', { taskId: '2', status: 'completed' }),
       ].join(''),
     )
-    expect(todoProgress(d.tasks)).toEqual({ done: 1, total: 2, active: 'Implementing ENG-1947 withhold file' })
+    expect(todoProgress(d.tasks)).toEqual({ done: 1, total: 2, active: 'Implementing ENG-4821 webhook retry' })
   })
 
   test('TodoWrite replaces the list; no list, no line', () => {
@@ -417,11 +417,11 @@ describe('the card', () => {
       day: 3,
       step: 'stage 4 of 7: kind stage',
       prText: '12 PRs merged',
-      todos: { done: 5, total: 9, active: 'Implement ENG-1947 withhold file' },
+      todos: { done: 5, total: 9, active: 'Implement ENG-4821 webhook retry' },
       agents: [
         {
           id: 'a',
-          title: 'Implement ENG-1947 withhold file',
+          title: 'Implement ENG-4821 webhook retry',
           model: 'opus',
           startedAt: NOW - 26_000,
           doing: 'Read rake spec patterns and report leaky spec',
@@ -441,9 +441,9 @@ describe('the card', () => {
       ' ╭─ webapp-ui ──────────────────────────────────────────╮',
       ' │  Pipeline v2 rearchitecture       day 3 · ● busy 1m  │',
       ' │  stage 4 of 7: kind stage · 12 PRs merged            │',
-      ' │  todos 5/9 ● Implement ENG-1947 withhold file        │',
+      ' │  todos 5/9 ● Implement ENG-4821 webhook retry        │',
       ' ├─ agents ─────────────────────────────────────────────┤',
-      ' │  ● Implement ENG-1947 withhold file      opus · 26s  │',
+      ' │  ● Implement ENG-4821 webhook retry      opus · 26s  │',
       ' │    Read rake spec patterns and report leaky spec     │',
       ' ╰──────────────────────────────────────────────────────╯',
     ])

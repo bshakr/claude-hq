@@ -796,7 +796,7 @@ async function start($: EngineInterface): Promise<void> {
       for (const f of [pair.ci, pair.merge]) if (f && typeof f.pid === 'number' && f.pid > 0) pids.add(f.pid)
     }
     let alive = new Set<number>()
-    // Sessions not yet seen are read with their env in the same ps (ADR 0008).
+    // Sessions not yet seen are read with their env in the same ps.
     const unread = rows.filter(r => !r.spare && pids.has(r.pid) && !terms.has(r.pid)).map(r => r.pid)
     if (pids.size > 0) {
       const r = await run(['ps', ...(unread.length ? ['eww', '-o', 'pid=,tty=,command='] : ['-o', 'pid=']), '-p', [...pids].join(',')])

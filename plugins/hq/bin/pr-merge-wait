@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT (see LICENSE at the repository root)
 # pr-merge-wait — watch open pull requests until one merges, closes or starts
 # conflicting, then report once and exit.
 #
