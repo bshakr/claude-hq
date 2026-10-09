@@ -1,0 +1,8 @@
+claude-hq
+Copyright (c) 2026 Bassem Shaker. Licensed under the MIT License (see LICENSE).
+
+types/claude-code/index.d.ts is not covered by that licence. It is the plugin
+API's TypeScript declaration file written by Claude Code (its first line names
+the version that wrote it), copied here unchanged from the copy the engine
+writes beside a plugin it loads. It is Anthropic's, and is included only so a
+fresh clone of this repo type-checks. See types/claude-code/README.md.
