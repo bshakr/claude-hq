@@ -2,6 +2,12 @@
 
 Each release has a section headed `## X.Y.Z`; the release workflow publishes that section as the GitHub release notes.
 
+## 0.1.2
+
+- `/hq match-bg <#hex>` paints Claude Code's side panel your terminal background colour, so the pane no longer sits on a grey or brown block. It updates your custom theme, or writes an `hq-<base>` theme to pick once in `/theme`.
+- "Your turn" on another session counts from its last reply, not from the session's last heartbeat.
+- PR rows no longer show a "gallery linked / no gallery" fact, and the PR watchers no longer fetch PR bodies.
+
 ## 0.1.1
 
 - Hovering a row reads like the keyboard cursor: its title turns bold, a PR title underlined too, instead of the light inverted block. Other Buttons in the pane no longer invert under the pointer either.
