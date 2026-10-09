@@ -71,7 +71,8 @@ function drawRow(row: Row, o: DrawOpts, hovered: boolean): RenderElement {
     if (spec.dim) props.dimColor = true
     if (hovered) props.hover = { underline: true }
     if (o.autoFocusKey === spec.key) props.autoFocus = true
-    parts.push(<Button {...props} />)
+    // A Button's own props carry no weight: bold rides in a Text child, the label still names it.
+    parts.push(s.s.bold ? <Button {...props}>{<Text bold>{spec.label}</Text>}</Button> : <Button {...props} />)
   }
   flush()
   return (

@@ -55,7 +55,7 @@ const DATA_TEXT = [
 ]
   .filter(Boolean)
   .sort((a, b) => b.length - a.length)
-const GLYPHS = new Set([...'▌▶◆●◦○✓✗↑↓→·⏎⌃…─│╭╮╰╯▰▱◷━'])
+const GLYPHS = new Set([...'▌▶◆●◦○✓✗↑↓→·⏎⌃…─│╭╮╰╯┏┓┗┛┃▰▱◷━'])
 
 describe('every state, every width', () => {
   test('rows fill the body exactly and never pass its width', () => {
@@ -76,7 +76,8 @@ describe('every state, every width', () => {
     const fixtureText = JSON.stringify(MODELS)
     for (const m of Object.values(MODELS)) {
       for (const focused of [false, true]) {
-        const text = lines(m, { focused, expanded: ['a3', 'a2'] }).join('\n')
+        const cursor = focused ? 'a:a1' : null
+        const text = lines(m, { focused, cursor, expanded: ['a3', 'a2'] }).join('\n')
         for (const ch of text) {
           if (ch.charCodeAt(0) < 128) continue
           expect(GLYPHS.has(ch) || fixtureText.includes(ch) ? ch : `stray ${ch}`).toBe(ch)

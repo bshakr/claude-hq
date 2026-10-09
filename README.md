@@ -9,14 +9,14 @@ Run a few Claude Code sessions, each with its own subagents and pull requests, a
 ```
  ◆ 1 waiting on you · 2 working                  5h 12% · wk 31%
 
- ╭─ this session ─────────────────────────────────────────────╮
- │                                                            │
+ ╭─ shop · this session ──────────────────────────────────────╮
  │  Retry flaky checkout webhooks           day 2  ▰▰▰▱▱ 41%  │
  │  ● fix the retry backoff                               3m  │
  │    Bash: npm test                                     40s  │
  │  todos 1/3 ━━━─────  ● Running the webhook specs           │
- │                                                            │
  ╰────────────────────────────────────────────────────────────╯
+
+ ── other sessions ────────────────────────────────────────────
 
  ╭─ work ─────────────────────────────────────────────────────╮
  │  api               1 PR · day 1 · ◆ waiting 2m  ▰▰▰▰▱ 63%  │
