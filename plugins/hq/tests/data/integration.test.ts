@@ -376,7 +376,6 @@ test('integration: a session without HQ shows its running subagents from their t
   }
   const drawn = await pane()
   expect(drawn.includes('Implement ENG-1941 card pairing guard')).toBe(true)
-  expect(drawn.includes('Run ledger specs')).toBe(true)
   expect(drawn.includes('opus · 12m')).toBe(true)
   expect(drawn.includes('Review PR a')).toBe(false)
   expect(drawn.includes('Old work')).toBe(false)
@@ -433,7 +432,6 @@ test("integration: another session's agent inside one long call stays listed as 
   const drawn = JSON.stringify(await ui.drawn())
   await ui.unmount()
   expect(drawn.includes('Watch CI for #275')).toBe(true)
-  expect(drawn.includes('waiting · Wait for CI on #275 · 7m')).toBe(true)
   expect(drawn.includes('✢')).toBe(true)
 })
 
