@@ -1,6 +1,6 @@
 {
   "name": "hq",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "One pane for every Claude Code session on your machine: what each is doing, which one needs you, and your PRs' checks. Press a session to jump to it.",
   "types": "./types/index.d.ts",
   "author": {
