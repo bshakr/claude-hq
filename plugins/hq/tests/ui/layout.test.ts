@@ -575,7 +575,7 @@ describe('this session: finished agents, the waiting now line, the goal line', (
     const got = lines(m)
     expect(got[4]!.startsWith(' ╭─ this session')).toBe(true)
     expect(got[5]!.startsWith(' │  ✻ Fix the stale PR list')).toBe(true)
-    expect(got[5]!.endsWith('2m  ●●●●● 36%  │')).toBe(true)
+    expect(got[5]!.endsWith('2m  ● ● ● ● ● 36%  │')).toBe(true)
     expect(got.filter(l => l.includes('36%')).length).toBe(1)
   })
 
@@ -591,7 +591,7 @@ describe('this session: finished agents, the waiting now line, the goal line', (
     }
     const got = lines(m)
     expect(got[4]!.startsWith(' ╭─ claude-hq · this session ─')).toBe(true)
-    expect(got[5]).toBe(' │  Ship the HQ layout fixes                       day 3 · ✻ busy  ●●●●● 36%  │')
+    expect(got[5]).toBe(' │  Ship the HQ layout fixes                   day 3 · ✻ busy  ● ● ● ● ● 36%  │')
     expect(got[6]).toBe(' │  Rewriting the agent rows                                                  │')
     expect(got[7]!.startsWith(' │  ✻ Fix the stale PR list')).toBe(true)
     expect(got[7]!.endsWith('2m  │')).toBe(true)

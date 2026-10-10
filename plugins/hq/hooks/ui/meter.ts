@@ -22,12 +22,14 @@ export function filledCells(percent: number, cells = METER_CELLS): number {
   return Math.max(0, Math.min(cells, Math.ceil((cells * percent) / 100)))
 }
 
-/** `●●●●●`: lit dots in the tone, the rest the same dot dimmed; every fill level is `cells` wide. */
-export function bar(percent: number, cells: number, tone: Sty): Part[] {
-  const on = filledCells(percent, cells)
+/** `● ● ● ● ●`: lit dots in the tone, the rest the same dot dimmed, a space apart; `2 * dots - 1` cells at every fill level. */
+export function bar(percent: number, dots: number, tone: Sty): Part[] {
+  const on = filledCells(percent, dots)
+  const run = (n: number) => Array(n).fill('●').join(' ')
   const out: Part[] = []
-  if (on) out.push({ t: '●'.repeat(on), s: tone })
-  if (on < cells) out.push({ t: '●'.repeat(cells - on), s: DIM })
+  if (on) out.push({ t: run(on), s: tone })
+  if (on && on < dots) out.push({ t: ' ', s: {} })
+  if (on < dots) out.push({ t: run(dots - on), s: DIM })
   return out
 }
 
