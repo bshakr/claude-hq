@@ -1,8 +1,8 @@
 import type { Jump } from '../model/types'
 import { charWidth, cellLen } from './text'
 
-/** Colour tokens of the sheet; dim and bold are attributes, not tokens. */
-export type Tok = 'fail' | 'wait' | 'run' | 'ok' | 'accent' | 'rule'
+/** Colour tokens of the sheet; dim and bold are attributes, not tokens. The model ones colour agent glyphs. */
+export type Tok = 'fail' | 'wait' | 'run' | 'ok' | 'accent' | 'rule' | 'fable' | 'opus' | 'sonnet' | 'haiku'
 
 export type Sty = { c?: Tok; dim?: true; bold?: true; underline?: true; btn?: string; href?: string }
 

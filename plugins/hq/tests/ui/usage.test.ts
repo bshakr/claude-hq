@@ -34,7 +34,7 @@ const M80 = [
   ' ── other sessions ────────────────────────────────────────────────────────────',
   '',
   ' ╭─ work ─────────────────────────────────────────────────────────────────────╮',
-  ' │  rp-api                                      2 PRs · ● busy 6m  ▰▰▰▱▱ 55%  │',
+  ' │  rp-api                                      2 PRs · ✻ busy 6m  ▰▰▰▱▱ 55%  │',
   ' │                                                                            │',
   ' │  rp-docs                                               idle 1h  ▰▰▰▰▰ 85%  │',
   ' │                                                                            │',
@@ -54,7 +54,7 @@ const M40 = [
   ' ── other sessions ────────────────────',
   '',
   ' ╭─ work ─────────────────────────────╮',
-  ' │  rp-api    2 PRs · ● busy 6m  55%  │',
+  ' │  rp-api    2 PRs · ✻ busy 6m  55%  │',
   ' │                                    │',
   ' │  rp-docs       idle 1h  ▰▰▰▰▰ 85%  │',
   ' │                                    │',
@@ -74,7 +74,7 @@ describe('sheet', () => {
   test('40 cols: meter cells drop before the percent', () => expect(lines(METERED, 40).slice(0, 16)).toEqual(M40))
   test('30 cols: PR facts drop next; the percent stays', () => {
     const l = lines(METERED, 30)
-    expect(l[10]).toBe(' │  rp-api  ● busy 6m  55%  │')
+    expect(l[10]).toBe(' │  rp-api  ✻ busy 6m  55%  │')
     expect(l[3]).toBe(' │  Session us…  idle  28%  │')
   })
   test('narrower still: the percent goes before the status', () => {

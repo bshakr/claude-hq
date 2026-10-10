@@ -389,3 +389,69 @@ export const WITH_PRS: HqModel = {
   ],
   statusText: '',
 }
+
+/** The agent kinds side by side: this session's main loop with two subagents and a shell, another busy on a subagent, one idle. */
+export const KINDS: HqModel = {
+  now: NOW,
+  counts: { waiting: 0, broken: 0, inProgress: 1, sessions: 3 },
+  current: {
+    label: LABEL,
+    now: {
+      prompt: 'Ship the refunds fix',
+      since: NOW - 12 * M,
+      idle: false,
+      tool: { text: 'Bash: bin/rspec spec/ledger', since: NOW - 40 * S },
+    },
+    context: { percent: 48, window: 200_000, tokens: 96_400, model: 'claude-fable-5', source: 'live' },
+    waiting: [{ text: 'pr-ci-wait 281', since: NOW - 9 * M }],
+    agents: [
+      agent({
+        id: 'k1',
+        title: 'Implement ledger refund reconcile',
+        status: 'running',
+        model: 'claude-opus-5-5',
+        tokens: 48_200,
+        startedAt: NOW - 8 * M,
+        now: 'Edit app/ledger/refund.rb',
+      }),
+      agent({
+        id: 'k2',
+        title: 'Run ledger specs and report',
+        status: 'running',
+        model: 'sonnet',
+        tokens: 8_400,
+        startedAt: NOW - 2 * M,
+        now: 'Bash: bin/rspec spec/ledger --fail-fast',
+      }),
+    ],
+    prs: [],
+  },
+  others: [
+    group('monolense', [
+      sess(
+        {
+          sessionId: 's-mono',
+          name: 'BLO-1950 category prompt',
+          status: 'busy',
+          statusSince: NOW - 4 * M,
+          day: 4,
+          context: { percent: 50, window: 200_000, tokens: 100_000, model: 'claude-fable-5', source: 'transcript' },
+          agentsRunning: 1,
+          agents: [
+            {
+              id: 'o1',
+              title: 'Adversarial review: candidate build',
+              model: 'claude-opus-5-5',
+              tokens: 61_000,
+              startedAt: NOW - 4 * M,
+              doing: 'reading pipeline.rb',
+            },
+          ],
+        },
+        'monolense',
+      ),
+    ]),
+    group('photo-site', [sess({ sessionId: 's-photos', name: 'photos', statusSince: NOW - 40 * M }, 'photo-site')]),
+  ],
+  statusText: 'hq: nothing needs you',
+}

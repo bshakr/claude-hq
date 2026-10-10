@@ -449,13 +449,14 @@ describe('the card', () => {
     }
     const rows = layout(m, { width: 58, rows: 40, focused: false, cursor: null, expanded: [], scroll: 0, phase: 0 }).rows.map(r => r.text())
     const top = rows.findIndex(l => l.includes('╭─ webapp-ui'))
-    expect(rows.slice(top, top + 8)).toEqual([
+    expect(rows.slice(top, top + 9)).toEqual([
       ' ╭─ webapp-ui ──────────────────────────────────────────╮',
-      ' │  Pipeline v2 rearchitecture       day 3 · ● busy 1m  │',
+      ' │  Pipeline v2 rearchitecture       day 3 · ✻ busy 1m  │',
       ' │  stage 4 of 7: kind stage · 12 PRs merged            │',
       ' │  todos 5/9 ● Implement ENG-4821 webhook retry        │',
+      ' │                                                      │',
       ' ├─ agents ─────────────────────────────────────────────┤',
-      ' │  ● Implement ENG-4821 webhook retry      opus · 26s  │',
+      ' │  ✢ Implement ENG-4821 webhook retry      opus · 26s  │',
       ' │    Read rake spec patterns and report leaky spec     │',
       ' ╰──────────────────────────────────────────────────────╯',
     ])

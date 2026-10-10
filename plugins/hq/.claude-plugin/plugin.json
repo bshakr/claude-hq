@@ -25,7 +25,7 @@
     "colorWorking": {
       "type": "string",
       "title": "Colour: working",
-      "description": "Running dots (and their dim pulse), checks in progress, busy sessions. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 4, the terminal's own palette slot.",
+      "description": "Running dots (and their dim pulse), checks in progress, busy sessions and their card borders, agents of an unknown model. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 4, the terminal's own palette slot.",
       "default": "ansi256(4)"
     },
     "colorDone": {
@@ -45,6 +45,30 @@
       "title": "Colour: dim",
       "description": "Borders and section dividers of cards with nothing broken or waiting. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 8, the terminal's own palette slot.",
       "default": "ansi256(8)"
+    },
+    "colorFable": {
+      "type": "string",
+      "title": "Colour: fable agents",
+      "description": "The agent glyph of a main loop or subagent running Fable. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 5, the terminal's own palette slot.",
+      "default": "ansi256(5)"
+    },
+    "colorOpus": {
+      "type": "string",
+      "title": "Colour: opus agents",
+      "description": "The agent glyph of a main loop or subagent running Opus. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 6, the terminal's own palette slot.",
+      "default": "ansi256(6)"
+    },
+    "colorSonnet": {
+      "type": "string",
+      "title": "Colour: sonnet agents",
+      "description": "The agent glyph of a main loop or subagent running Sonnet. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 4, the terminal's own palette slot.",
+      "default": "ansi256(4)"
+    },
+    "colorHaiku": {
+      "type": "string",
+      "title": "Colour: haiku agents",
+      "description": "The agent glyph of a main loop or subagent running Haiku. Accepts #rrggbb, ansi256(N) or a palette number N (0-255). Default 2, the terminal's own palette slot.",
+      "default": "ansi256(2)"
     },
     "summaries": {
       "type": "boolean",

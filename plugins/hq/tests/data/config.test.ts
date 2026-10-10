@@ -24,6 +24,10 @@ describe('colours', () => {
       ok: 'ansi256(2)',
       accent: 'ansi256(6)',
       rule: 'ansi256(8)',
+      fable: 'ansi256(5)',
+      opus: 'ansi256(6)',
+      sonnet: 'ansi256(4)',
+      haiku: 'ansi256(2)',
     })
     expect([c.summaries, c.wake, c.notify, c.autoOpen, c.updateCheck]).toEqual([true, true, true, true, true])
     expect(c.warning).toBe(undefined)
@@ -37,6 +41,9 @@ describe('colours', () => {
       colorDone: 'ansi256(10)',
       colorAccent: '',
       colorDim: '#12345',
+      colorFable: '#cba6f7',
+      colorOpus: 'opus',
+      colorSonnet: '12',
     })
     expect(c.tokens).toEqual({
       fail: '#f38ba8',
@@ -45,8 +52,12 @@ describe('colours', () => {
       ok: 'ansi256(10)',
       accent: 'ansi256(6)',
       rule: 'ansi256(8)',
+      fable: '#cba6f7',
+      opus: 'ansi256(6)',
+      sonnet: 'ansi256(12)',
+      haiku: 'ansi256(2)',
     })
-    expect(c.warning).toBe('hq: ignored colour waiting, dim (use #rrggbb, ansi256(N) or N)')
+    expect(c.warning).toBe('hq: ignored colour waiting, dim, opus (use #rrggbb, ansi256(N) or N)')
   })
 
   test('the switches read as given', () => {

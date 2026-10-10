@@ -181,6 +181,9 @@ test("subagents: the latest response's usage gives its context size and model; t
   expect(tail.model).toBe('claude-sonnet-5')
   expect(parseTail(SUB.running, false).tokens).toBe(undefined)
   const base = { id: 'a1', startedAt: T0, mtimeMs: T0, tail }
-  expect(otherAgents([{ ...base, meta: { description: 'Find callers' } }], T0)[0]).toMatchObject({ model: 'claude-sonnet-5', tokens: 48_012 })
+  expect(otherAgents([{ ...base, meta: { description: 'Find callers' } }], T0)[0]).toMatchObject({
+    model: 'claude-sonnet-5',
+    tokens: 48_012,
+  })
   expect(otherAgents([{ ...base, meta: { description: 'Find callers', model: 'haiku' } }], T0)[0]!.model).toBe('haiku')
 })
