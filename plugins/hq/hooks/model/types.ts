@@ -69,6 +69,7 @@ export interface AgentVM {
   files: string[]
   /** one-line outcome once finished (first line of its result). */
   outcome?: string
+  /** Its context size: at its latest response while it runs, the result's total once done. */
   tokens?: number
 }
 
@@ -174,6 +175,8 @@ export interface OtherAgentVM {
   id: string
   title: string
   model?: string
+  /** Its context size at its latest response. */
+  tokens?: number
   startedAt: number
   /** Its latest tool call in plain words. */
   doing?: string
