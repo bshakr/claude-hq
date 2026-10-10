@@ -24,19 +24,19 @@ const rowsOf = (m: HqModel, width: number) => layout(m, view({ width })).rows
 const lines = (m: HqModel, width: number) => rowsOf(m, width).map(r => r.text())
 
 const M80 = [
-  '                                                    5h •····· 5% · wk ••···· 18%',
+  '                                                    5h ●●●●●● 5% · wk ●●●●●● 18%',
   '',
   ' ╭─ claude-hq · this session ─────────────────────────────────────────────────╮',
-  ' │  Session usage meters                             day 2 · idle  ••··· 28%  │',
+  ' │  Session usage meters                             day 2 · idle  ●●●●● 28%  │',
   ' │  Wiring the header bars                                                    │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
   ' ── other sessions ────────────────────────────────────────────────────────────',
   '',
   ' ╭─ work ─────────────────────────────────────────────────────────────────────╮',
-  ' │  rp-api                                      2 PRs · ✻ busy 6m  •••·· 55%  │',
+  ' │  rp-api                                      2 PRs · ✻ busy 6m  ●●●●● 55%  │',
   ' │                                                                            │',
-  ' │  rp-docs                                               idle 1h  ••••• 85%  │',
+  ' │  rp-docs                                               idle 1h  ●●●●● 85%  │',
   ' │                                                                            │',
   ' │  fresh                                                            idle 1m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
@@ -44,7 +44,7 @@ const M80 = [
 
 // Narrow: the session meters drop their bars before rp-api drops its PR count; rp-docs keeps its bar.
 const M40 = [
-  '            5h •····· 5% · wk ••···· 18%',
+  '            5h ●●●●●● 5% · wk ●●●●●● 18%',
   '',
   ' ╭─ claude-hq · this session ─────────╮',
   ' │  Session usag…  day 2 · idle  28%  │',
@@ -56,7 +56,7 @@ const M40 = [
   ' ╭─ work ─────────────────────────────╮',
   ' │  rp-api    2 PRs · ✻ busy 6m  55%  │',
   ' │                                    │',
-  ' │  rp-docs       idle 1h  ••••• 85%  │',
+  ' │  rp-docs       idle 1h  ●●●●● 85%  │',
   ' │                                    │',
   ' │  fresh                    idle 1m  │',
   ' ╰────────────────────────────────────╯',
@@ -70,8 +70,12 @@ function styleAt(r: Row, text: string): Sty {
 }
 
 // A lit dot and an unlit one.
-const ON = '•'
-const OFF = '·'
+const ON = '●'
+const OFF = '●'
+
+// Lit and unlit dots share a glyph, so tell them apart by their segments' style.
+const dotSegs = (r: { segs(): { t: string; s: object }[] }) =>
+  r.segs().filter(x => x.t.includes(ON)).map(x => ({ t: x.t.trim(), s: x.s }))
 
 describe('sheet', () => {
   test('80 cols: meter on each first line, plan usage once in the header', () => expect(lines(METERED, 80).slice(0, 16)).toEqual(M80))
@@ -130,20 +134,26 @@ describe('colour thresholds', () => {
       expect(styleAt(r[12]!, ON)).toEqual({ c: 'fail' })
       expect(styleAt(r[0]!, '5h')).toEqual({ dim: true })
       expect(styleAt(r[0]!, '5%')).toEqual({ c: 'ok' })
-      expect(styleAt(r[0]!, ON)).toEqual({ c: 'ok' })
-      expect(styleAt(r[0]!, OFF)).toEqual({ dim: true })
+      expect(dotSegs(r[0]!)).toEqual([
+        { t: ON, s: { c: 'ok' } },
+        { t: OFF.repeat(5), s: { dim: true } },
+        { t: ON.repeat(2), s: { c: 'ok' } },
+        { t: OFF.repeat(4), s: { dim: true } },
+      ])
     })
   }
 
   test('header: plan bars are green, yellow from 50% used, red from 80%; the lit dots and figure share the colour', () => {
     const r = rowsOf({ ...METERED, account: { fiveHour: 85, week: 50 } }, 80)[0]!
     expect(r.text().endsWith(`5h ${ON.repeat(6)} 85% · wk ${ON.repeat(3)}${OFF.repeat(3)} 50%`)).toBe(true)
-    expect(styleAt(r, ON.repeat(6))).toEqual({ c: 'fail' })
+    expect(dotSegs(r)).toEqual([
+      { t: ON.repeat(6), s: { c: 'fail' } },
+      { t: ON.repeat(3), s: { c: 'wait' } },
+      { t: OFF.repeat(3), s: { dim: true } },
+    ])
     expect(styleAt(r, '85%')).toEqual({ c: 'fail' })
-    expect(styleAt(r, `${ON.repeat(3)}${OFF.repeat(3)}`)).toEqual({ c: 'wait' })
     expect(styleAt(r, '50%')).toEqual({ c: 'wait' })
     expect(styleAt(r, 'wk')).toEqual({ dim: true })
-    expect(r.segs().some(x => x.s.c !== undefined && x.t.includes(OFF))).toBe(false)
   })
 
   test('header: narrowing drops the bars, then the week', () => {

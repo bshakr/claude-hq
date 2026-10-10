@@ -2,6 +2,10 @@
 
 Each release has a section headed `## X.Y.Z`; the release workflow publishes that section as the GitHub release notes.
 
+## 0.1.6
+
+- Meter dots are full circles of one size (`●●●●●`): lit ones take green, yellow or red, the rest are the same circle dimmed.
+
 ## 0.1.5
 
 - Meters are small dots again (`•••··`), lit in green, yellow from 50% or red from 80%; the rounded pill is gone.
