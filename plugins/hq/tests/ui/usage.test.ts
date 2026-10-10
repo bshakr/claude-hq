@@ -75,7 +75,10 @@ const OFF = '●'
 
 // Lit and unlit dots share a glyph, so tell them apart by their segments' style.
 const dotSegs = (r: { segs(): { t: string; s: object }[] }) =>
-  r.segs().filter(x => x.t.includes(ON)).map(x => ({ t: x.t.trim(), s: x.s }))
+  r
+    .segs()
+    .filter(x => x.t.includes(ON))
+    .map(x => ({ t: x.t.trim(), s: x.s }))
 
 describe('sheet', () => {
   test('80 cols: meter on each first line, plan usage once in the header', () => expect(lines(METERED, 80).slice(0, 16)).toEqual(M80))
