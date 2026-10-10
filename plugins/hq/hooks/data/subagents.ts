@@ -4,6 +4,7 @@ import type { OtherAgentVM } from '../model/types'
 
 export { LONG_CALL_MS }
 import { doingText } from './doing'
+import { sampleOf } from './usage'
 
 /** A transcript untouched this long is not running, whatever its last line says. */
 export const AGENT_FRESH_MS = 120_000
@@ -41,13 +42,16 @@ export interface AgentTail {
   doing?: string
   /** The oldest tool call with no result yet: the agent is inside it, however old the file is. */
   open?: { text: string; since?: number }
+  /** Its latest response's context size and model. */
+  tokens?: number
+  model?: string
 }
 
 type Entry = {
   type?: string
   timestamp?: string
   toolEndsTurn?: boolean
-  message?: { stop_reason?: string | null; content?: unknown }
+  message?: { stop_reason?: string | null; content?: unknown; usage?: unknown; model?: unknown }
 }
 
 /** The end of a subagent transcript; `cut` drops the first line, which a byte tail splits. */
@@ -56,6 +60,7 @@ export function parseTail(text: string, cut: boolean): AgentTail {
   if (cut) lines.shift()
   let last: Entry | undefined
   let doing: string | undefined
+  let sample: ReturnType<typeof sampleOf>
   const open = new Map<string, { text: string; since?: number }>()
   for (const line of lines) {
     if (!line.trim()) continue
@@ -67,6 +72,7 @@ export function parseTail(text: string, cut: boolean): AgentTail {
     }
     if (v.type !== 'user' && v.type !== 'assistant') continue
     last = v
+    if (v.type === 'assistant') sample = sampleOf(v.message, 0) ?? sample
     if (!Array.isArray(v.message?.content)) continue
     for (const b of v.message!.content as Record<string, unknown>[]) {
       if (v.type === 'user') {
@@ -83,7 +89,12 @@ export function parseTail(text: string, cut: boolean): AgentTail {
   const stop = last?.type === 'assistant' ? last.message?.stop_reason : undefined
   const ended = last?.toolEndsTurn === true || (typeof stop === 'string' && stop !== 'tool_use')
   const first = ended ? undefined : [...open.values()][0]
-  return { ended, ...(doing ? { doing } : {}), ...(first ? { open: first } : {}) }
+  return {
+    ended,
+    ...(doing ? { doing } : {}),
+    ...(first ? { open: first } : {}),
+    ...(sample ? { tokens: sample.tokens, ...(sample.model ? { model: sample.model } : {}) } : {}),
+  }
 }
 
 export interface ListedFile {
@@ -136,11 +147,13 @@ export function otherAgents(running: readonly RunningAgent[], now = 0): OtherAge
       const o = a.tail.open
       const since = o ? (o.since ?? a.mtimeMs) : undefined
       const waiting = o && since !== undefined && now - since >= LONG_CALL_MS ? { text: o.text, since } : undefined
+      const model = a.meta.model ?? a.tail.model
       return {
         id: a.id,
         title: a.meta.description || a.id,
         startedAt: a.startedAt,
-        ...(a.meta.model ? { model: a.meta.model } : {}),
+        ...(model ? { model } : {}),
+        ...(a.tail.tokens ? { tokens: a.tail.tokens } : {}),
         ...(a.tail.doing ? { doing: a.tail.doing } : {}),
         ...(waiting ? { waiting } : {}),
       }

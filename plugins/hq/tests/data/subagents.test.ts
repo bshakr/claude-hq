@@ -174,3 +174,16 @@ test("subagents: this session's agent in one long call publishes as waiting; par
   expect(longCall({ status: 'waiting', callSince: T0 }, T0 + LONG_CALL_MS)).toBe(undefined)
   expect(longCall({ status: 'running' }, T0 + LONG_CALL_MS)).toBe(undefined)
 })
+
+test("subagents: the latest response's usage gives its context size and model; the meta's model wins", () => {
+  const tail = parseTail(SUB.running + SUB.withUsage, false)
+  expect(tail.tokens).toBe(48_012)
+  expect(tail.model).toBe('claude-sonnet-5')
+  expect(parseTail(SUB.running, false).tokens).toBe(undefined)
+  const base = { id: 'a1', startedAt: T0, mtimeMs: T0, tail }
+  expect(otherAgents([{ ...base, meta: { description: 'Find callers' } }], T0)[0]).toMatchObject({
+    model: 'claude-sonnet-5',
+    tokens: 48_012,
+  })
+  expect(otherAgents([{ ...base, meta: { description: 'Find callers', model: 'haiku' } }], T0)[0]!.model).toBe('haiku')
+})

@@ -3,6 +3,7 @@ import { LONG_CALL_MS } from '../model/types'
 import type {
   AgentVM,
   CiState,
+  ContextUsage,
   HqModel,
   NowVM,
   OtherAgentVM,
@@ -68,8 +69,32 @@ export const agentKey = (a: AgentVM) => `a:${a.id}`
 export const FINISHED_KEY = 'finished'
 export const FINISHED_ID = '+finished'
 
-/** The running dot: one glyph, its colour stepping between full and dim with the motion phase. */
-const runDot = (phase: number): Sty => tok('run', phase % 2 ? { dim: true } : {})
+/** A session's main loop, a subagent, a background shell: Claude's own spinner marks for the agents. */
+export const MAIN_GLYPH = '✻'
+export const SUB_GLYPH = '✢'
+export const SHELL_GLYPH = '$'
+
+const MODEL_TOKS = new Set<Tok>(['fable', 'opus', 'sonnet', 'haiku'])
+const modelTok = (m?: string): Tok => {
+  const f = shortModel(m) as Tok | undefined
+  return f && MODEL_TOKS.has(f) ? f : 'run'
+}
+/** An agent glyph in its model's colour, pulsing with the motion phase while it works. */
+const agentSty = (model: string | undefined, pulse: boolean, phase: number): Sty =>
+  tok(modelTok(model), pulse && phase % 2 ? { dim: true } : {})
+
+/** "850", "8.4k", "48k", "1.2M": a context size at a glance. */
+export function compactTokens(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`
+  if (n < 999_500) return `${Math.round(n / 1000)}k`
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+}
+
+/** "opus · 48k", whichever of the two is known. */
+const modelFacts = (model: string | undefined, tokens: number | undefined) =>
+  [shortModel(model), tokens ? compactTokens(tokens) : undefined].filter(Boolean).join(' · ')
+
 export const prKey = (p: PrVM) => `p:${p.repo}#${p.number}`
 export const sessionKey = (s: OtherSessionVM) => `s:${s.sessionId}`
 
@@ -96,6 +121,9 @@ const HEAVY = { tl: '┏', tr: '┓', bl: '┗', br: '┛', h: '━', v: '┃', 
 
 /** A section divider row; `card` draws it joined to the border. */
 const section = (IW: number, label = ''): Row => Object.assign(new Row(IW), { section: label })
+
+/** A blank row ahead of a card's first section, so its lines above do not run into the divider. */
+const spaced = (IW: number, sections: Row[]): Row[] => (sections.length ? [new Row(IW), ...sections] : [])
 
 /** A divider then its rows, or nothing when there are none. */
 const withSection = (IW: number, label: string, rows: Row[]): Row[] => (rows.length ? [section(IW, label), ...rows] : [])
@@ -166,7 +194,9 @@ export const CURSOR_CARET = '▐'
 /** Lines the cursor row may grow to. */
 const FOCUS_LINES = 3
 
-const worst = (tones: readonly Tok[]): Tok => (tones.includes('fail') ? 'fail' : tones.includes('wait') ? 'wait' : 'rule')
+/** Broken, then waiting, then at work; a card with none of them keeps the quiet rule. */
+const worst = (tones: readonly Tok[]): Tok =>
+  tones.includes('fail') ? 'fail' : tones.includes('wait') ? 'wait' : tones.includes('run') ? 'run' : 'rule'
 
 // ---------- header and flare ----------
 
@@ -266,7 +296,7 @@ export function agentTree(agents: readonly AgentVM[]): Node[] {
   return roots
 }
 
-const shortModel = (m?: string) => {
+function shortModel(m?: string) {
   if (!m) return undefined
   const known = /opus|sonnet|haiku|fable/i.exec(m)
   return known ? known[0].toLowerCase() : clip(m, 12)
@@ -334,16 +364,18 @@ function agentRows(node: Node, depth: number, x: Ctx): Row[] {
     }
   } else {
     const longCall = a.status === 'running' && a.callSince !== undefined && now - a.callSince >= LONG_CALL_MS
-    const glyph = failed ? '✗' : a.status === 'waiting' || longCall ? '◷' : a.status === 'pending' ? '◦' : '●'
-    r.put(gc, glyph, glyph === '●' ? runDot(x.phase) : tok(failed ? 'fail' : 'run'))
+    if (failed) r.put(gc, '✗', tok('fail'))
+    else if (a.status === 'pending') r.put(gc, SUB_GLYPH, DIM)
+    else r.put(gc, SUB_GLYPH, agentSty(a.model, a.status === 'running' && !longCall, x.phase))
     const end = failed ? (a.endedAt ?? now) : now
-    const parts = [shortModel(a.model), elapsed(end - a.startedAt)].filter(Boolean)
-    let right = parts.join(' · ')
-    if (a.place) {
+    const time = elapsed(end - a.startedAt)
+    // Narrowing drops the place, then the tokens, then the model.
+    const tries = [modelFacts(a.model, a.tokens), shortModel(a.model) ?? '', ''].map(f => [f, time].filter(Boolean).join(' · '))
+    let right = tries.find(t => IW - tc - cellLen(t) - 2 >= 12) ?? time
+    if (a.place && right === tries[0]) {
       const placed = `${clip(a.place, 18)} · ${right}`
       if (IW - tc - cellLen(placed) - 2 >= 16) right = placed
     }
-    if (IW - tc - cellLen(right) - 2 < 12) right = parts.slice(-1).join('')
     const room = rightPart(r, tc, right)
     const sty = failed || focused ? FOCUS : {}
     const [head = '', ...rest] = lines(gl(a.title), room)
@@ -454,6 +486,7 @@ function nowRows(
   x: Ctx,
   meter: { full: Part[]; pct: Part[] },
   on: { text: string; since: number } | undefined,
+  ctx: ContextUsage | undefined,
 ): Row[] {
   const { IW, now } = x
   const r = new Row(IW)
@@ -461,17 +494,19 @@ function nowRows(
   const waiting = idle && on !== undefined
   const ago = waiting ? elapsed(now - on.since) : n ? age(now - n.since) : ''
   const lead: Part[] = ago ? [{ t: ago, s: DIM }] : []
-  const room = fitRight(r, [[...lead, ...meter.full], [...lead, ...meter.pct], lead], 10) - 2
+  const facts = n || waiting ? modelFacts(ctx?.model, ctx?.tokens) : ''
+  const full: Part[] = facts ? [{ t: lead.length ? `${facts} · ` : facts, s: DIM }, ...lead] : lead
+  const room = fitRight(r, [[...full, ...meter.full], [...full, ...meter.pct], full, lead], 10) - 2
   if (waiting) {
-    r.put(0, '◷', tok('run'))
+    r.put(0, MAIN_GLYPH, agentSty(ctx?.model, false, x.phase))
     r.put(2, clip(on.text, room))
   } else if (!n) {
     if (!meter.full.length) return []
   } else if (n.idle) {
-    r.put(0, '○', DIM)
+    r.put(0, MAIN_GLYPH, DIM)
     r.put(2, clip(n.prompt ? `idle · ${n.prompt}` : 'idle', room), DIM)
   } else {
-    r.put(0, '●', runDot(x.phase))
+    r.put(0, MAIN_GLYPH, agentSty(ctx?.model, true, x.phase))
     r.put(2, clip(n.prompt ?? 'working', room))
   }
   const out = [r]
@@ -508,12 +543,13 @@ function todoRow(todos: readonly TodoVM[], x: Ctx): Row {
   return r
 }
 
+/** The main loop's background shells, under it. */
 function waitingRows(list: readonly WaitingVM[], x: Ctx): Row[] {
   const { IW, now } = x
   return list.map(w => {
     const r = new Row(IW)
-    r.put(0, '◷', tok('run'))
-    r.put(2, clip(w.text, rightPart(r, 2, age(now - w.since), 8)))
+    r.put(2, SHELL_GLYPH, DIM)
+    r.put(4, clip(w.text, rightPart(r, 4, age(now - w.since), 8)))
     return r
   })
 }
@@ -531,12 +567,12 @@ function sessionCard(m: HqModel, x0: Ctx): Row[] {
     const busy = cur.now !== undefined && !cur.now.idle
     const status: Part[] = busy
       ? [
-          { t: '●', s: runDot(x.phase) },
+          { t: MAIN_GLYPH, s: agentSty(cur.context?.model, true, x.phase) },
           { t: ' busy', s: DIM },
         ]
       : on
         ? [
-            { t: '◷', s: tok('run') },
+            { t: MAIN_GLYPH, s: agentSty(cur.context?.model, false, x.phase) },
             { t: ' waiting', s: DIM },
           ]
         : [{ t: 'idle', s: DIM }]
@@ -549,9 +585,9 @@ function sessionCard(m: HqModel, x0: Ctx): Row[] {
       inner.push(st)
     }
   }
-  inner.push(...nowRows(cur.now, x, cur.goal ? { full: [], pct: [] } : meter, on))
-  if (cur.todos?.length) inner.push(todoRow(cur.todos, x))
+  inner.push(...nowRows(cur.now, x, cur.goal ? { full: [], pct: [] } : meter, on, cur.context))
   if (cur.waiting?.length) inner.push(...waitingRows(cur.waiting, x))
+  if (cur.todos?.length) inner.push(todoRow(cur.todos, x))
   const sections = [...withSection(x.IW, 'agents', agentBlock(cur.agents, x)), ...withSection(x.IW, 'pull requests', prSection(cur.prs, x))]
   // Without a line of its own the card would open on a divider.
   if (inner.length === 0) {
@@ -559,8 +595,13 @@ function sessionCard(m: HqModel, x0: Ctx): Row[] {
     r.put(0, 'nothing running', DIM)
     inner.push(r)
   }
-  inner.push(...sections)
-  const tone = worst([...cur.agents.filter(a => a.status === 'failed').map(() => 'fail' as const), ...cur.prs.map(prTone)])
+  inner.push(...spaced(x.IW, sections))
+  const busy = (cur.now !== undefined && !cur.now.idle) || on !== undefined
+  const tone = worst([
+    ...cur.agents.filter(a => a.status === 'failed').map(() => 'fail' as const),
+    ...cur.prs.map(prTone),
+    ...(busy ? ['run' as const] : []),
+  ])
   return card(x, cur.goal && cur.title ? cur.title : THIS_SESSION, tone, inner, true)
 }
 
@@ -579,8 +620,10 @@ function otherAgentRows(s: OtherSessionVM, under: () => Row, x: Ctx): Row[] {
   const out: Row[] = []
   for (const a of shown) {
     const r = under()
-    r.put(0, a.waiting ? '◷' : '●', tok('run'))
-    const room = rightPart(r, 2, [shortModel(a.model), age(now - a.startedAt)].filter(Boolean).join(' · '))
+    r.put(0, SUB_GLYPH, agentSty(a.model, !a.waiting, x.phase))
+    const time = age(now - a.startedAt)
+    const tries = [modelFacts(a.model, a.tokens), shortModel(a.model) ?? ''].map(f => [f, time].filter(Boolean).join(' · '))
+    const room = rightPart(r, 2, tries.find(t => IW - 2 - cellLen(t) - 2 >= 12) ?? time)
     r.put(2, clip(gl(a.title), room))
     out.push(r)
     const d = under()
@@ -601,7 +644,7 @@ function otherAgentRows(s: OtherSessionVM, under: () => Row, x: Ctx): Row[] {
 export const RESUME_HINT = '↵ copies resume'
 
 function sessionTone(s: OtherSessionVM): Tok {
-  const own: Tok = (s.prSummary?.broken ?? 0) > 0 ? 'fail' : s.status === 'waiting' ? 'wait' : 'rule'
+  const own: Tok = (s.prSummary?.broken ?? 0) > 0 ? 'fail' : s.status === 'waiting' ? 'wait' : s.status === 'busy' ? 'run' : 'rule'
   return worst([own, ...(s.prs ?? []).map(prTone)])
 }
 
@@ -668,7 +711,7 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
         ]
       : s.status === 'busy'
         ? [
-            { t: '●', s: runDot(x.phase) },
+            { t: MAIN_GLYPH, s: agentSty(s.context?.model, true, x.phase) },
             { t: ` busy${since}`, s: DIM },
           ]
         : [{ t: `${s.wait?.kind === 'turn' ? 'your turn' : 'idle'}${since}`, s: DIM }]
@@ -735,7 +778,9 @@ function otherRows(s: OtherSessionVM, x: Ctx): Row[] {
     out.push(t)
   }
   if (s.status === 'waiting' && s.wait && s.wait.kind !== 'turn') out.push(asksRow(s, s.wait, under(), x))
-  out.push(...withSection(IW, 'agents', otherAgentRows(s, under, x)), ...withSection(IW, 'pull requests', otherPrRows(s, x)))
+  out.push(
+    ...spaced(IW, [...withSection(IW, 'agents', otherAgentRows(s, under, x)), ...withSection(IW, 'pull requests', otherPrRows(s, x))]),
+  )
   return out
 }
 

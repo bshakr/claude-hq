@@ -129,11 +129,17 @@ export function toSessionVM(
   const real = isRealWait(wait)
   const name = ctx.goal || topic.title || topic.firstPrompt || nameOf(row) || basename(row.cwd) || 'session'
   const label = branch || basename(row.cwd)
-  const status = real ? 'waiting' : mapStatus(row.status)
   const fresh = published && now - published.updatedAt < PUBLISH_FRESH_MS ? published : undefined
   const agents = fresh?.agents ?? transcriptAgents
+  const own = mapStatus(row.status)
+  // A main loop idle on its running subagents is still at work, not waiting for the user.
+  const running = own === 'idle' && ((agents?.length ?? 0) > 0 || (fresh?.agentsRunning ?? 0) > 0)
+  const status = real ? 'waiting' : running ? 'busy' : own
   const turnSince = wait?.kind === 'turn' && status === 'idle' && wait.since > 0 ? wait.since : undefined
-  const since = real ? wait.since : (turnSince ?? (typeof row.statusUpdatedAt === 'number' ? row.statusUpdatedAt : undefined))
+  const firstAgent = agents?.length ? Math.min(...agents.map(a => a.startedAt)) : undefined
+  const since = real
+    ? wait.since
+    : (turnSince ?? (running ? firstAgent : undefined) ?? (typeof row.statusUpdatedAt === 'number' ? row.statusUpdatedAt : undefined))
   return {
     sessionId: row.sessionId,
     name,

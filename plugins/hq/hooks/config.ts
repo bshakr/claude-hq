@@ -10,6 +10,10 @@ export const DEFAULT_TOKENS: Readonly<Record<Tok, string>> = {
   ok: 'ansi256(2)',
   accent: 'ansi256(6)',
   rule: 'ansi256(8)',
+  fable: 'ansi256(5)',
+  opus: 'ansi256(6)',
+  sonnet: 'ansi256(4)',
+  haiku: 'ansi256(2)',
 }
 
 /** userConfig field → the token it paints. */
@@ -20,6 +24,10 @@ export const COLOR_FIELDS: ReadonlyArray<readonly [field: string, name: string, 
   ['colorDone', 'done', 'ok'],
   ['colorAccent', 'accent', 'accent'],
   ['colorDim', 'dim', 'rule'],
+  ['colorFable', 'fable', 'fable'],
+  ['colorOpus', 'opus', 'opus'],
+  ['colorSonnet', 'sonnet', 'sonnet'],
+  ['colorHaiku', 'haiku', 'haiku'],
 ]
 
 export const SUMMARIES_KEY = 'summaries'

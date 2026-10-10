@@ -144,6 +144,15 @@ export function onSubagentTool(s: AgentsState, agentId: string, e: ToolInput, ho
   return true
 }
 
+/** A subagent's model response: its context size now, and the model when the spawn did not name one. */
+export function onSubagentStep(s: AgentsState, agentId: string, tokens: number | undefined, model: string | undefined): boolean {
+  const a = s.byId[agentId]
+  if (!a || !isLive(a) || tokens === undefined) return false
+  a.tokens = tokens
+  if (model && !a.model) a.model = model
+  return true
+}
+
 /** A subagent's tool call returned. */
 export function onSubagentToolEnd(s: AgentsState, agentId: string): boolean {
   const a = s.byId[agentId]

@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
 import type { AccountUsage, HqModel, OtherAgentVM, PublishedSession, TermEnv, WaitVM } from '../model/types'
-import { isLive, onSpawn, onTaskNotification, onTurnComplete, prune, reconcile, settleQuiet } from './agents'
+import { isLive, onSpawn, onSubagentStep, onTaskNotification, onTurnComplete, prune, reconcile, settleQuiet } from './agents'
 import type { AgentsState, ListedAgent } from './agents'
 import { emptyActivity, notificationsOf, onPrompt, onTurnEnd, todosOf, nowOf } from './activity'
 import type { ActivityState } from './activity'
@@ -70,7 +70,7 @@ import {
   subagentsDir,
 } from './subagents'
 import type { AgentMeta, AgentTail, ListedFile, RunningAgent } from './subagents'
-import { accountOf, live, preferred, settingsModel } from './usage'
+import { accountOf, live, preferred, sampleOf, settingsModel } from './usage'
 import { BRANCH_TTL_MS, PUBLISH_MS, S, TICK_MS, afterTool, beforeTool, rebuild, storeKey, tokensOf } from './observe'
 import { parsePsTerm } from './term'
 import { MERGED_KEEP_MS, WATCHERS, claimKey, isEnded, parseStateFile, prFromSources, stateFileName } from './prs'
@@ -193,6 +193,22 @@ export function installData(on: On, onChange: () => void): void {
       // observation only
     }
     return next(e)
+  })
+
+  on('turn.step', async function* ($, e, next) {
+    const r = yield* next(e)
+    if (e.agentId && r?.usage) {
+      try {
+        const u = sampleOf({ usage: r.usage, model: r.usage.model }, 0)
+        if (onSubagentStep(S.agents, e.agentId, u?.tokens, u?.model)) {
+          S.dirty = true
+          rebuild()
+        }
+      } catch {
+        // observation only
+      }
+    }
+    return r
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -970,6 +986,7 @@ async function start($: EngineInterface): Promise<void> {
               title: a.title,
               startedAt: a.startedAt,
               ...(a.model ? { model: a.model } : {}),
+              ...(a.tokens ? { tokens: a.tokens } : {}),
               ...(doing ? { doing } : {}),
               ...(waiting ? { waiting } : {}),
             }

@@ -6,6 +6,7 @@ import {
   FINISHED_KEY,
   FOCUSED_HINT,
   UNFOCUSED_HINT,
+  compactTokens,
   layout,
   morePrsId,
   morePrsKey,
@@ -16,7 +17,7 @@ import { caretItem, caretKey } from '../../hooks/ui/caret'
 import type { View } from '../../hooks/ui/layout'
 import type { Row } from '../../hooks/ui/row'
 import { cellLen } from '../../hooks/ui/text'
-import { ACTIVE, BUSY, EMPTY, LONG, OTHER_PRS, QUIET, WITH_PRS } from './fixtures'
+import { ACTIVE, BUSY, EMPTY, KINDS, LONG, OTHER_PRS, QUIET, WITH_PRS } from './fixtures'
 import * as SHEET from './sheet'
 
 const view = (over: Partial<View> = {}): View => ({
@@ -52,6 +53,8 @@ describe('the sheet, cell for cell', () => {
   test("(g) other sessions' PRs, unfocused", () => expectSheet(lines(WITH_PRS, { rows: 40 }), SHEET.g80))
   test("(g') cursor on st-api's second PR", () =>
     expectSheet(lines(WITH_PRS, { rows: 40, focused: true, cursor: 's:s-st-api:p:acme-store/api#528' }), SHEET.g2))
+  test('(k) agent kinds: main loop, subagents and a shell; another session busy on a subagent; an idle one', () =>
+    expectSheet(lines(KINDS, { rows: 30, width: 72 }), SHEET.kinds72))
 })
 
 const MODELS = { BUSY, QUIET, LONG, EMPTY, ACTIVE, WITH_PRS }
@@ -69,7 +72,7 @@ const DATA_TEXT = [
 ]
   .filter(Boolean)
   .sort((a, b) => b.length - a.length)
-const GLYPHS = new Set([...'▌▐◆●◦○✓✗↑↓→·⏎⌃…─│╭╮╰╯┏┓┗┛┃├┤┣┫▰▱◷━−'])
+const GLYPHS = new Set([...'▌▐◆●○✻✢✓✗↑↓→·⏎⌃…─│╭╮╰╯┏┓┗┛┃├┤┣┫▰▱━−'])
 
 describe('every state, every width', () => {
   test('rows fill the body exactly and never pass its width', () => {
@@ -285,7 +288,7 @@ describe('targets', () => {
     expect(open[at + 1]!.startsWith(' │    result  3 findings: 1 HIGH')).toBe(true)
     expect(open.some(t => /│ {4}(agent|doing) |\d+ tools\b|tokens/.test(t))).toBe(false)
     const running = lines(BUSY, { expanded: ['a2'] })
-    const r = running.findIndex(t => t.includes('● Run ledger specs'))
+    const r = running.findIndex(t => t.includes('✢ Run ledger specs'))
     expect(running[r + 1]!.includes('Bash: bin/rspec')).toBe(true)
     expect(running[r + 2]!.includes('in      .koh/ledger-refund-reconcile')).toBe(true)
     expect(running.filter(t => t.includes('bin/rspec')).length).toBe(1)
@@ -306,10 +309,10 @@ describe('targets', () => {
 describe('scrolling and motion', () => {
   test('the below indicator counts lit items, the above one appears once scrolled', () => {
     const top = lines(LONG, { rows: 34 })
-    expect(top[32]).toBe(' ↓ 42 rows below   ✗ 1 broken   ◆ 2 waiting on you')
+    expect(top[32]).toBe(' ↓ 43 rows below   ✗ 1 broken   ◆ 3 waiting on you')
     const mid = lines(LONG, { rows: 34, scroll: 10 })
     expect(mid[3]!.startsWith(' ↑ 10 rows above   ✗ 1 broken')).toBe(true)
-    expect(mid[32]!.startsWith(' ↓ 32 rows below')).toBe(true)
+    expect(mid[32]!.startsWith(' ↓ 33 rows below')).toBe(true)
   })
 
   test('scrollFor keeps the cursor row inside the window', () => {
@@ -343,18 +346,19 @@ describe('scrolling and motion', () => {
 describe('this session: one card for now, todos, waiting and agents', () => {
   test('now, todos and waiting open the card; agents follow under their divider', () => {
     const got = lines(ACTIVE)
-    expect(got.slice(4, 20)).toEqual([
+    expect(got.slice(4, 21)).toEqual([
       ' ╭─ this session ─────────────────────────────────────────────────────────────╮',
-      ' │  ● Fix the stale PR list in hq and scope wave-watcher wakes to the o…  2m  │',
+      ' │  ✻ Fix the stale PR list in hq and scope wave-watcher wakes to the o…  2m  │',
       ' │    Check CI on 276                                                     4s  │',
+      ' │    $ pr-ci-wait 276                                                    3m  │',
       ' │  todos 2/5 ━━━─────  ● Rewriting the layout                                │',
-      ' │  ◷ pr-ci-wait 276                                                      3m  │',
+      ' │                                                                            │',
       ' ├─ agents ───────────────────────────────────────────────────────────────────┤',
       ' │  ✗ Capture screenshot pairs                               sonnet · 6m 30s  │',
       ' │    port 3000 already in use · failed 1m ago                                │',
-      ' │  ◷ Implement ledger refund reconcile                       opus · 14m 20s  │',
+      ' │  ✢ Implement ledger refund reconcile                       opus · 14m 20s  │',
       ' │    waiting on Run ledger specs and report                                  │',
-      ' │    ● Run ledger specs and report     ledger-refund-rec… · sonnet · 2m 10s  │',
+      ' │    ✢ Run ledger specs and report     ledger-refund-rec… · sonnet · 2m 10s  │',
       ' │      Running ledger specs                                             3/7  │',
       ' │                                                                            │',
       ' │  ✓ Adversarial review: refunds PR → 3 findings: 1 HIGH (refund r…  3m ago  │',
@@ -366,10 +370,11 @@ describe('this session: one card for now, todos, waiting and agents', () => {
     expect(got.some(l => /[└┄]/.test(l))).toBe(false)
   })
 
-  test('colours: blue for the running turn, the todo bar and the background wait; never yellow', () => {
+  test('colours: blue for the running turn and the todo bar, a dim background shell; never yellow', () => {
     const rows = layout(ACTIVE, view()).rows
     const toks = coloured(rows.slice(5, 9)).map(x => `${x.t}=${x.s.c}`)
-    expect(toks).toEqual(['●=run', '━━━=run', '●=run', '◷=run'])
+    expect(toks).toEqual(['✻=run', '━━━=run', '●=run'])
+    expect(rows[7]!.segs().find(x => x.t === '$')!.s).toEqual({ dim: true })
   })
 
   test('idle after the turn: dim, reads idle, no tool line', () => {
@@ -385,17 +390,18 @@ describe('this session: one card for now, todos, waiting and agents', () => {
       },
     }
     const rows = layout(m, view()).rows
-    expect(rows[5]!.text()).toBe(' │  ○ idle · Ship it                                                      1m  │')
+    expect(rows[5]!.text()).toBe(' │  ✻ idle · Ship it                                                      1m  │')
     expect(coloured([rows[5]!])).toEqual([])
-    expect(rows[6]!.text()).toBe(' ├─ agents ───────────────────────────────────────────────────────────────────┤')
-    expect(rows[7]!.text().startsWith(' │  ✗ Capture screenshot pairs')).toBe(true)
+    expect(rows[6]!.text()).toBe(' │                                                                            │')
+    expect(rows[7]!.text()).toBe(' ├─ agents ───────────────────────────────────────────────────────────────────┤')
+    expect(rows[8]!.text().startsWith(' │  ✗ Capture screenshot pairs')).toBe(true)
   })
 
   test('an empty session says so', () => {
     expect(lines(EMPTY)[3]).toBe(' │  nothing running                                                           │')
   })
 
-  test("an agent inside one long call reads ◷ with what it waits on and the call's age", () => {
+  test("an agent inside one long call holds its glyph steady and reads what it waits on and the call's age", () => {
     const agent = (callAgo: number) => ({
       id: 'lc',
       title: 'Watch CI',
@@ -407,14 +413,22 @@ describe('this session: one card for now, todos, waiting and agents', () => {
       now: 'Wait for CI on #275',
       callSince: QUIET.now - callAgo,
     })
-    const draw = (callAgo: number) => lines({ ...QUIET, current: { ...QUIET.current, agents: [agent(callAgo)] } })
+    const m = (callAgo: number) => ({ ...QUIET, current: { ...QUIET.current, agents: [agent(callAgo)] } })
+    const draw = (callAgo: number) => lines(m(callAgo))
+    // Phase 1 is the pulse's dim step: only a working agent takes it.
+    const glyph = (callAgo: number) =>
+      layout(m(callAgo), view({ phase: 1 }))
+        .rows.flatMap(r => r.segs())
+        .find(x => x.t === '✢')!.s
     const long = draw(7 * 60_000)
     const at = long.findIndex(l => l.includes('Watch CI'))
-    expect(long[at]!.startsWith(' │  ◷ Watch CI')).toBe(true)
+    expect(long[at]!.startsWith(' │  ✢ Watch CI')).toBe(true)
     expect(long[at + 1]!.startsWith(' │    waiting · Wait for CI on #275 · 7m ')).toBe(true)
+    expect(glyph(7 * 60_000)).toEqual({ c: 'run' })
     const short = draw(30_000)
-    expect(short[at]!.startsWith(' │  ● Watch CI')).toBe(true)
+    expect(short[at]!.startsWith(' │  ✢ Watch CI')).toBe(true)
     expect(short[at + 1]!.startsWith(' │    Wait for CI on #275 ')).toBe(true)
+    expect(glyph(30_000)).toEqual({ c: 'run', dim: true })
   })
 
   test('a finished agent with a markdown report shows its first sentence as plain text', () => {
@@ -448,17 +462,18 @@ describe('other sessions: one card per tmux group', () => {
   test('sessions of one group share a card, a blank between them, a bare rule after one with sections', () => {
     const got = lines(ACTIVE, { rows: 90 })
     const at = got.findIndex(l => l.includes('╭─ acme-store'))
-    expect(got.slice(at, at + 16)).toEqual([
+    expect(got.slice(at, at + 17)).toEqual([
       ' ╭─ acme-store ───────────────────────────────────────────────────────────────╮',
       ' │  st-api                           1 agent · 1 PR needs you · ◆ waiting 2m  │',
       ' │  api · ENG-12 · 3/7 · Rewriting PR claim rules                             │',
       ' │                                                                            │',
-      ' │  st-admin                                 1 of 2 PRs need you · ● busy 6m  │',
+      ' │  st-admin                                 1 of 2 PRs need you · ✻ busy 6m  │',
+      ' │                                                                            │',
       ' ├─ agents ───────────────────────────────────────────────────────────────────┤',
-      ' │  ● Implement ENG-1941 card pairing guard                       opus · 12m  │',
+      ' │  ✢ Implement ENG-1941 card pairing guard                       opus · 12m  │',
       ' │    Run ledger specs                                                        │',
-      ' │  ● Review the members table PR                               sonnet · 20m  │',
-      ' │  ● Capture screenshot pairs                                           25m  │',
+      ' │  ✢ Review the members table PR                               sonnet · 20m  │',
+      ' │  ✢ Capture screenshot pairs                                           25m  │',
       ' │    editing compare.html                                                    │',
       ' │    +1 more                                                                 │',
       ' ├────────────────────────────────────────────────────────────────────────────┤',
@@ -468,7 +483,7 @@ describe('other sessions: one card per tmux group', () => {
     ])
   })
 
-  test("another session's agent inside a long call reads ◷ waiting", () => {
+  test("another session's agent inside a long call reads waiting, its glyph steady", () => {
     const other = lines(
       {
         ...ACTIVE,
@@ -481,7 +496,7 @@ describe('other sessions: one card per tmux group', () => {
       },
       { rows: 90 },
     )
-    const at = other.findIndex(l => l.includes('◷ Implement ENG-1941'))
+    const at = other.findIndex(l => l.includes('✢ Implement ENG-1941'))
     expect(other[at + 1]!.startsWith(' │    waiting · Run the spec suite · 9m')).toBe(true)
   })
 })
@@ -520,10 +535,16 @@ describe('this session: finished agents, the waiting now line, the goal line', (
     expect(lines(BUSY, { rows: 90 }).some(l => l.includes('finished'))).toBe(false)
   })
 
-  test('idle with agents running reads ◷ waiting on N agents, timed by the longest-running one', () => {
+  test('idle with agents running reads waiting on N agents, timed by the longest-running one', () => {
     const m = { ...BUSY, current: { ...BUSY.current, now: { prompt: 'agent reported: done', since: BUSY.now - 60_000, idle: true } } }
     const got = lines(m)
-    expect(got[5]).toBe(' │  ◷ waiting on 1 agent                                             14m 20s  │')
+    expect(got[5]).toBe(' │  ✻ waiting on 1 agent                                             14m 20s  │')
+    // Waiting, not working: the main glyph keeps its colour through the pulse.
+    expect(
+      layout(m, view({ phase: 1 }))
+        .rows[5]!.segs()
+        .find(x => x.t === '✻')!.s,
+    ).toEqual({ c: 'run' })
     expect(got.some(l => l.includes('idle ·'))).toBe(false)
     const waitsOnly = {
       ...QUIET,
@@ -533,14 +554,15 @@ describe('this session: finished agents, the waiting now line, the goal line', (
         waiting: [{ text: 'pr-ci-wait 276', since: QUIET.now - 3 * 60_000 }],
       },
     }
-    expect(lines(waitsOnly)[3]!.includes('◷ waiting on 1 background task')).toBe(true)
+    expect(lines(waitsOnly)[3]!.includes('✻ waiting on 1 background task')).toBe(true)
+    expect(lines(waitsOnly)[4]!.includes('  $ pr-ci-wait 276')).toBe(true)
   })
 
   test('without a goal the context meter rides on the now line, not a line of its own', () => {
     const m: HqModel = { ...ACTIVE, current: { ...ACTIVE.current, context: { percent: 36, window: 1_000_000, source: 'live' } } }
     const got = lines(m)
     expect(got[4]!.startsWith(' ╭─ this session')).toBe(true)
-    expect(got[5]!.startsWith(' │  ● Fix the stale PR list')).toBe(true)
+    expect(got[5]!.startsWith(' │  ✻ Fix the stale PR list')).toBe(true)
     expect(got[5]!.endsWith('2m  ▰▰▱▱▱ 36%  │')).toBe(true)
     expect(got.filter(l => l.includes('36%')).length).toBe(1)
   })
@@ -557,15 +579,15 @@ describe('this session: finished agents, the waiting now line, the goal line', (
     }
     const got = lines(m)
     expect(got[4]!.startsWith(' ╭─ claude-hq · this session ─')).toBe(true)
-    expect(got[5]).toBe(' │  Ship the HQ layout fixes                       day 3 · ● busy  ▰▰▱▱▱ 36%  │')
+    expect(got[5]).toBe(' │  Ship the HQ layout fixes                       day 3 · ✻ busy  ▰▰▱▱▱ 36%  │')
     expect(got[6]).toBe(' │  Rewriting the agent rows                                                  │')
-    expect(got[7]!.startsWith(' │  ● Fix the stale PR list')).toBe(true)
+    expect(got[7]!.startsWith(' │  ✻ Fix the stale PR list')).toBe(true)
     expect(got[7]!.endsWith('2m  │')).toBe(true)
     const noGoal = lines({ ...m, current: { ...m.current, goal: undefined } })
     expect(noGoal[4]!.startsWith(' ╭─ this session')).toBe(true)
   })
 
-  test('running dots keep one glyph and step colour between full and dim', () => {
+  test('working agent glyphs keep one glyph and step colour between full and dim', () => {
     for (const m of [BUSY, ACTIVE]) {
       const a = layout(m, view({ phase: 0, rows: 90 })).rows
       const b = layout(m, view({ phase: 1, rows: 90 })).rows
@@ -573,9 +595,9 @@ describe('this session: finished agents, the waiting now line, the goal line', (
       a.forEach((r, i) =>
         r.cells.forEach((c, j) => {
           const d = b[i]!.cells[j]!
-          if (c.ch === '●' || d.ch === '●') {
+          if ('✻✢●'.includes(c.ch) || '✻✢●'.includes(d.ch)) {
             expect(d.ch).toBe(c.ch)
-            if (c.s.c === 'run' && !c.s.dim && d.s.c === 'run' && d.s.dim) stepped++
+            if (c.s.c !== undefined && c.s.c === d.s.c && !c.s.dim && d.s.dim) stepped++
           }
         }),
       )
@@ -606,12 +628,12 @@ describe('focus: the cursor card is heavy, the cursor row bold and whole', () =>
     const rows = layout(BUSY, view({ rows: 120, focused: true, cursor: 'a:a1' })).rows
     const marked = rows.filter(r => r.text().includes('▐'))
     expect(marked.length).toBe(1)
-    expect(marked[0]!.text().includes('▐ ◷ Implement ledger refund reconcile')).toBe(true)
+    expect(marked[0]!.text().includes('▐ ✢ Implement ledger refund reconcile')).toBe(true)
     // Every glyph on these rows is one cell, so a string index is a cell index.
     const titleOf = (r: Row, t: string) => r.cells[r.text().indexOf(t)]!.s
     expect(titleOf(marked[0]!, 'Implement')).toEqual({ bold: true, btn: 'a:a1' })
-    // The status dot keeps its own colour.
-    expect(marked[0]!.cells[4]!.s.c).toBe('run')
+    // The agent glyph keeps its model's colour.
+    expect(marked[0]!.cells[4]!.s.c).toBe('opus')
     const sibling = rows.find(r => r.text().includes('Run ledger specs and report') && r.head)!
     expect(titleOf(sibling, 'Run ledger').bold).toBe(undefined)
     const finished = rows.find(r => r.text().includes('Adversarial review'))!
@@ -659,7 +681,7 @@ describe('focus: the cursor card is heavy, the cursor row bold and whole', () =>
     const got = l.rows.map(r => r.text())
     const at = got.findIndex(t => t.includes('word0'))
     const wrapped = got.slice(at, at + 3)
-    expect(wrapped[0]!.includes('▐ ● word0')).toBe(true)
+    expect(wrapped[0]!.includes('▐ ✢ word0')).toBe(true)
     // Continuations sit at the title's column, inside the heavy card.
     for (const t of wrapped.slice(1)) expect(/^ ┃ {4}word\d+/.test(t)).toBe(true)
     expect(wrapped[2]!.endsWith('…  ┃')).toBe(true)
@@ -864,7 +886,77 @@ describe("sections and another session's PRs", () => {
     expect(tone({ ...WITH_PRS, others: [{ tmuxSession: 'x', sessions: [calm] }] }, 'x')).toBe('rule')
     expect(tone({ ...WITH_PRS, others: [{ tmuxSession: 'x', sessions: [red] }] }, 'x')).toBe('fail')
     const agentsOk = WITH_PRS.current.agents
-    expect(tone({ ...WITH_PRS, current: { ...WITH_PRS.current, agents: agentsOk, prs: [] } }, 'this session')).toBe('rule')
+    // Its agents still run, so the card is at work; nothing running leaves the quiet rule.
+    expect(tone({ ...WITH_PRS, current: { ...WITH_PRS.current, agents: agentsOk, prs: [] } }, 'this session')).toBe('run')
+    expect(tone({ ...WITH_PRS, current: { ...WITH_PRS.current, agents: [], prs: [] } }, 'this session')).toBe('rule')
     expect(tone(WITH_PRS, 'this session')).toBe('fail')
+  })
+
+  test('a busy card takes the working colour: this session running a turn, another session busy; broken and waiting still win', () => {
+    const tone = (m: HqModel, title: string) =>
+      layout(m, view({ rows: 40 })).rows.find(r => r.text().startsWith(` ╭─ ${title}`))!.cells[1]!.s.c
+    const idle = { ...st, prSummary: undefined, status: 'idle' as const, prs: [], agents: undefined }
+    const busy = { ...idle, status: 'busy' as const }
+    const quiet: HqModel = { ...WITH_PRS, current: { ...WITH_PRS.current, agents: [], prs: [] } }
+    const turn = { prompt: 'Ship it', since: WITH_PRS.now - 60_000, idle: false }
+    expect(tone({ ...quiet, current: { ...quiet.current, now: { ...turn, idle: true } } }, 'this session')).toBe('rule')
+    expect(tone({ ...quiet, current: { ...quiet.current, now: turn } }, 'this session')).toBe('run')
+    const shell = { ...quiet.current, now: { ...turn, idle: true }, waiting: [{ text: 'pr-ci-wait 7', since: WITH_PRS.now - 60_000 }] }
+    expect(tone({ ...quiet, current: shell }, 'this session')).toBe('run')
+    expect(tone({ ...quiet, others: [{ tmuxSession: 'x', sessions: [idle] }] }, 'x')).toBe('rule')
+    expect(tone({ ...quiet, others: [{ tmuxSession: 'x', sessions: [busy] }] }, 'x')).toBe('run')
+    expect(
+      tone({ ...quiet, others: [{ tmuxSession: 'x', sessions: [busy, { ...idle, sessionId: 'w', status: 'waiting' as const }] }] }, 'x'),
+    ).toBe('wait')
+    expect(tone({ ...quiet, others: [{ tmuxSession: 'x', sessions: [{ ...busy, prs: [OTHER_PRS[2]!] }] }] }, 'x')).toBe('fail')
+  })
+})
+
+describe('agent kinds: main loop, subagents, background shells', () => {
+  test('glyph colours: each agent in its model colour, the shell dim, the main loop pulsing while it works', () => {
+    const glyphs = (phase: number) =>
+      layout(KINDS, view({ rows: 30, width: 72, phase }))
+        .rows.flatMap(r => r.segs())
+        .filter(x => ['✻', '✢', '$'].includes(x.t))
+        .map(x => `${x.t}=${x.s.c ?? ''}${x.s.dim ? ' dim' : ''}`)
+    expect(glyphs(0)).toEqual(['✻=fable', '$= dim', '✢=opus', '✢=sonnet', '✻=fable', '✢=opus'])
+    expect(glyphs(1)).toEqual(['✻=fable dim', '$= dim', '✢=opus dim', '✢=sonnet dim', '✻=fable dim', '✢=opus dim'])
+  })
+
+  test('an unknown or missing model takes the working colour; facts narrow from tokens to model to time', () => {
+    const agent = (model?: string): AgentVM => ({
+      id: 'u',
+      title: 'Find callers',
+      status: 'running',
+      background: true,
+      startedAt: KINDS.now - 60_000,
+      toolCount: 0,
+      files: [],
+      tokens: 48_200,
+      ...(model ? { model } : {}),
+    })
+    const m = (a: AgentVM): HqModel => ({ ...KINDS, current: { ...KINDS.current, agents: [a] }, others: [] })
+    const head = (a: AgentVM, width = 72) => layout(m(a), view({ width })).rows.find(r => r.text().includes('Find callers'))!
+    expect(
+      head(agent('gpt-x'))
+        .segs()
+        .find(x => x.t === '✢')!.s.c,
+    ).toBe('run')
+    expect(head(agent()).text().endsWith('48k · 1m 0s  │')).toBe(true)
+    expect(head(agent('claude-haiku-4-5')).text().endsWith('haiku · 48k · 1m 0s  │')).toBe(true)
+    expect(head(agent('claude-haiku-4-5'), 38).text().endsWith('haiku · 1m 0s  │')).toBe(true)
+    expect(head(agent('claude-haiku-4-5'), 30).text().endsWith('1m 0s  │')).toBe(true)
+  })
+
+  test('token counts read compact', () => {
+    expect([850, 8_400, 10_000, 48_200, 999_400, 1_000_000, 1_250_000].map(compactTokens)).toEqual([
+      '850',
+      '8.4k',
+      '10k',
+      '48k',
+      '999k',
+      '1M',
+      '1.3M',
+    ])
   })
 })

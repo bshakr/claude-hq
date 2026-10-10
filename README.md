@@ -101,6 +101,7 @@ Set options in `/config`, or in `~/.claude/settings.json` (use the key `hq@inlin
 | `updateCheck` | `true` | check once a day for a newer HQ and say so in the pane header |
 | `autoOpen` | `true` | open the pane once per session (from 144 columns; 110 after you have opened it with `/hq`) |
 | `colorBroken`, `colorWaiting`, `colorWorking`, `colorDone`, `colorAccent`, `colorDim` | `ansi256(1)`, `(3)`, `(4)`, `(2)`, `(6)`, `(8)` | colours: `#rrggbb`, `ansi256(N)` or `N` (0-255); defaults follow your terminal theme |
+| `colorFable`, `colorOpus`, `colorSonnet`, `colorHaiku` | `ansi256(5)`, `(6)`, `(4)`, `(2)` | the agent glyph (`✻` a session's main loop, `✢` a subagent) by model; a background shell is a dim `$` |
 
 The `/hq` toggles override `wake`, `notify` and `summaries` on one machine until `/hq reset`.
 

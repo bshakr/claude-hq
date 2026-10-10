@@ -14,6 +14,10 @@ const MOCHA = {
   colorDone: '#a6e3a1',
   colorAccent: '#94e2d5',
   colorDim: '#6c7086',
+  colorFable: '#cba6f7',
+  colorOpus: '#74c7ec',
+  colorSonnet: '#b4befe',
+  colorHaiku: '#a6e3a1',
 }
 const props = (isFocused: boolean) => ({
   title: 'hq',
@@ -61,6 +65,8 @@ test('the engine accepts hex tokens on every coloured element, the dimmed runnin
     const json = JSON.stringify(await ui.drawn())
     expect(json.includes('ansi256(')).toBe(false)
     expect(/"color":"#89b4fa","dimColor":true/.test(json)).toBe(true)
+    // The running sonnet subagent's glyph pulses in its model's colour.
+    expect(/"color":"#b4befe","dimColor":true/.test(json)).toBe(true)
     for (const hex of ['#f38ba8', '#f9e2af', '#94e2d5']) expect(json.includes(`"color":"${hex}"`)).toBe(true)
     await ui.unmount()
   }

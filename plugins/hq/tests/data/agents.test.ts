@@ -6,6 +6,7 @@ import {
   onAgentResult,
   onHandback,
   onSpawn,
+  onSubagentStep,
   onSubagentTool,
   onTaskNotification,
   onTurnComplete,
@@ -263,4 +264,18 @@ test('agents: internal tools never become doing text', () => {
   }
   onTurnComplete(s, 'x', 'answer', 'ok', 2_411_391, 9)
   expect(s.byId.x!.now).toBe(undefined)
+})
+
+test("agents: each response updates a live agent's context size; the model only fills a gap; a finished one keeps its total", () => {
+  const s = emptyAgents()
+  onSpawn(s, { toolUseId: 'tu1', description: 'Find callers', background: true }, 'a1', undefined, 1_000)
+  expect(onSubagentStep(s, 'a1', 12_000, 'claude-haiku-4-5')).toBe(true)
+  expect(s.byId.a1).toMatchObject({ tokens: 12_000, model: 'claude-haiku-4-5' })
+  expect(onSubagentStep(s, 'a1', 30_500, 'claude-opus-5-5')).toBe(true)
+  expect(s.byId.a1).toMatchObject({ tokens: 30_500, model: 'claude-haiku-4-5' })
+  expect(onSubagentStep(s, 'a1', undefined, undefined)).toBe(false)
+  expect(onSubagentStep(s, 'nope', 1, undefined)).toBe(false)
+  onTurnComplete(s, 'a1', 'completed', 'done', 31_000, 2_000)
+  expect(onSubagentStep(s, 'a1', 99_000, undefined)).toBe(false)
+  expect(s.byId.a1!.tokens).toBe(30_500)
 })

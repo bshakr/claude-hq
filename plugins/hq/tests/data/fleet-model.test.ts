@@ -58,7 +58,8 @@ test('fleet: registry row → session VM; shell reads as idle; stale publish ign
     sessionId: 's1',
     name: 'webapp-ui-bb',
     windowLabel: '@3 ENG-1940-promote',
-    status: 'idle',
+    // Its two running agents make it busy; with none the shell reads as idle (below).
+    status: 'busy',
     tmuxTarget: 'webapp-ui:@3.%7',
     jump: { kind: 'tmux', target: 'webapp-ui:@3.%7' },
     statusSince: NOW - 60_000,
@@ -67,6 +68,7 @@ test('fleet: registry row → session VM; shell reads as idle; stale publish ign
     detail: 'webapp-ui · ENG-1940-promote',
   })
   expect(toSessionVM(row, undefined, { ...pub, updatedAt: NOW - 31_000 }, NOW).agentsRunning).toBe(undefined)
+  expect(toSessionVM(row, undefined, { ...pub, agentsRunning: 0 }, NOW).status).toBe('idle')
   // Its published open PRs ride onto the card while the publish is fresh, and only then.
   const pr = {
     repo: 'acme/app',
@@ -83,6 +85,23 @@ test('fleet: registry row → session VM; shell reads as idle; stale publish ign
   expect('prs' in toSessionVM(row, undefined, { ...pub, prs: [] }, NOW)).toBe(false)
   expect(parseRegistryRow('{not json')).toBe(undefined)
   expect(parsePsPids('  38348\n45327\n')).toEqual(new Set([38348, 45327]))
+})
+
+test('fleet: an idle main loop with a running subagent is busy since that agent started, not your turn', () => {
+  const row = parseRegistryRow(
+    JSON.stringify({ pid: 1, sessionId: 's2', cwd: '/Users/me/code/monolense', status: 'idle', statusUpdatedAt: NOW - 240_000 }),
+  )!
+  const agent = { id: 'a1', title: 'Review the pipeline', model: 'opus', tokens: 48_000, startedAt: NOW - 600_000 }
+  const turn = { kind: 'turn' as const, text: 'your turn', since: NOW - 240_000 }
+  const vm = toSessionVM(row, undefined, undefined, NOW, {}, [agent], {}, turn)
+  expect(vm.status).toBe('busy')
+  expect(vm.statusSince).toBe(NOW - 600_000)
+  expect(vm.wait).toBe(undefined)
+  expect(vm.agents).toEqual([agent])
+  // No agents: the same row is your turn.
+  const idle = toSessionVM(row, undefined, undefined, NOW, {}, [], {}, turn)
+  expect(idle.status).toBe('idle')
+  expect(idle.wait).toEqual(turn)
 })
 
 test('fleet: grouped by tmux session, waiting groups first, longest wait first', () => {

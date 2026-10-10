@@ -49,3 +49,16 @@ export const openCall = (at: number) =>
       content: [{ type: 'tool_use', id: 't9', name: 'Bash', input: { command: 'pr-ci-wait 275', description: 'Wait for CI on #275' } }],
     },
   })
+
+/** Appended to `running`: a step whose usage names its model and context, input plus both caches. */
+export const withUsage = line({
+  type: 'assistant',
+  message: {
+    role: 'assistant',
+    type: 'message',
+    model: 'claude-sonnet-5',
+    stop_reason: 'tool_use',
+    usage: { input_tokens: 12, cache_read_input_tokens: 40_000, cache_creation_input_tokens: 8_000, output_tokens: 900 },
+    content: [{ type: 'tool_use', id: 't4', name: 'Grep', input: { pattern: 'refund' } }],
+  },
+})

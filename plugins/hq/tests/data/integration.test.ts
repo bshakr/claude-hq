@@ -434,7 +434,7 @@ test("integration: another session's agent inside one long call stays listed as 
   await ui.unmount()
   expect(drawn.includes('Watch CI for #275')).toBe(true)
   expect(drawn.includes('waiting · Wait for CI on #275 · 7m')).toBe(true)
-  expect(drawn.includes('◷')).toBe(true)
+  expect(drawn.includes('✢')).toBe(true)
 })
 
 test('integration: a tick writes the store only when a value changed', async ($, on) => {
