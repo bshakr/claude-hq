@@ -2,6 +2,10 @@
 
 Each release has a section headed `## X.Y.Z`; the release workflow publishes that section as the GitHub release notes.
 
+## 0.1.5
+
+- Meters are small dots again (`•••··`), lit in green, yellow from 50% or red from 80%; the rounded pill is gone.
+
 ## 0.1.4
 
 - Agents get their own glyphs: the main agent is `✻` and each subagent `✢`, coloured by model (fable, opus, sonnet, haiku; each colour is configurable), with model, context size and run time on the right. Background shells show as a dim `$` under the main agent.

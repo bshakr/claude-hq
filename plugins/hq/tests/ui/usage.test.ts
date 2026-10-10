@@ -24,19 +24,19 @@ const rowsOf = (m: HqModel, width: number) => layout(m, view({ width })).rows
 const lines = (m: HqModel, width: number) => rowsOf(m, width).map(r => r.text())
 
 const M80 = [
-  '                                                    5h \ue0b6\ue0b4\uee01\uee01\uee01\uee02 5% · wk \ue0b6\ue0b4\uee01\uee01\uee01\uee02 18%',
+  '                                                    5h •····· 5% · wk ••···· 18%',
   '',
   ' ╭─ claude-hq · this session ─────────────────────────────────────────────────╮',
-  ' │  Session usage meters                          day 2 · idle  \ue0b6█\ue0b4\uee01\uee01\uee01\uee01\uee02 28%  │',
+  ' │  Session usage meters                             day 2 · idle  ••··· 28%  │',
   ' │  Wiring the header bars                                                    │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
   '',
   ' ── other sessions ────────────────────────────────────────────────────────────',
   '',
   ' ╭─ work ─────────────────────────────────────────────────────────────────────╮',
-  ' │  rp-api                                   2 PRs · ✻ busy 6m  \ue0b6███\ue0b4\uee01\uee01\uee02 55%  │',
+  ' │  rp-api                                      2 PRs · ✻ busy 6m  •••·· 55%  │',
   ' │                                                                            │',
-  ' │  rp-docs                                            idle 1h  \ue0b6█████\ue0b4\uee02 85%  │',
+  ' │  rp-docs                                               idle 1h  ••••• 85%  │',
   ' │                                                                            │',
   ' │  fresh                                                            idle 1m  │',
   ' ╰────────────────────────────────────────────────────────────────────────────╯',
@@ -44,7 +44,7 @@ const M80 = [
 
 // Narrow: the session meters drop their bars before rp-api drops its PR count; rp-docs keeps its bar.
 const M40 = [
-  '            5h \ue0b6\ue0b4\uee01\uee01\uee01\uee02 5% · wk \ue0b6\ue0b4\uee01\uee01\uee01\uee02 18%',
+  '            5h •····· 5% · wk ••···· 18%',
   '',
   ' ╭─ claude-hq · this session ─────────╮',
   ' │  Session usag…  day 2 · idle  28%  │',
@@ -56,7 +56,7 @@ const M40 = [
   ' ╭─ work ─────────────────────────────╮',
   ' │  rp-api    2 PRs · ✻ busy 6m  55%  │',
   ' │                                    │',
-  ' │  rp-docs    idle 1h  \ue0b6█████\ue0b4\uee02 85%  │',
+  ' │  rp-docs       idle 1h  ••••• 85%  │',
   ' │                                    │',
   ' │  fresh                    idle 1m  │',
   ' ╰────────────────────────────────────╯',
@@ -69,12 +69,9 @@ function styleAt(r: Row, text: string): Sty {
   return r.cells[[...r.text().slice(0, at)].reduce((n, ch) => n + cellLen(ch), 0)]!.s
 }
 
-// The Nerd Font pill caps and the progress outline's empty ends and middle.
-const L = '\ue0b6'
-const R = '\ue0b4'
-const O0 = '\uee00'
-const O = '\uee01'
-const O2 = '\uee02'
+// A lit dot and an unlit one.
+const ON = '•'
+const OFF = '·'
 
 describe('sheet', () => {
   test('80 cols: meter on each first line, plan usage once in the header', () => expect(lines(METERED, 80).slice(0, 16)).toEqual(M80))
@@ -111,13 +108,13 @@ describe('colour thresholds', () => {
     ])
   })
 
-  test('cells: any use lights one, eight at 88 and up', () => {
-    expect([0, 1, 12, 13, 28, 50, 87, 88, 100].map(p => filledCells(p))).toEqual([0, 1, 1, 2, 3, 4, 7, 8, 8])
+  test('cells: any use lights one, five at 81 and up', () => {
+    expect([0, 1, 20, 21, 50, 80, 81, 100].map(p => filledCells(p))).toEqual([0, 1, 1, 2, 3, 4, 5, 5])
   })
 
-  test('meter parts: the pill and percent take the tone, the outline stays dim', () => {
+  test('meter parts: the lit dots and percent take the tone, the rest are dim', () => {
     const { full, pct } = meterParts(ctx(55))
-    expect(full.map(p => p.t).join('')).toBe(`  ${L}███${R}${O}${O}${O2} 55%`)
+    expect(full.map(p => p.t).join('')).toBe(`  ${ON}${ON}${ON}${OFF}${OFF} 55%`)
     expect(full.map(p => p.s)).toEqual([{}, { c: 'wait' }, { dim: true }, { c: 'wait' }])
     expect(pct.map(p => p.t).join('')).toBe('  55%')
     expect(pct[1]!.s).toEqual({ c: 'wait' })
@@ -130,28 +127,28 @@ describe('colour thresholds', () => {
       expect(styleAt(r[3]!, '28%')).toEqual({ c: 'ok' })
       expect(styleAt(r[10]!, '55%')).toEqual({ c: 'wait' })
       expect(styleAt(r[12]!, '85%')).toEqual({ c: 'fail' })
-      expect(styleAt(r[12]!, L)).toEqual({ c: 'fail' })
+      expect(styleAt(r[12]!, ON)).toEqual({ c: 'fail' })
       expect(styleAt(r[0]!, '5h')).toEqual({ dim: true })
       expect(styleAt(r[0]!, '5%')).toEqual({ c: 'ok' })
-      expect(styleAt(r[0]!, L)).toEqual({ c: 'ok' })
-      expect(styleAt(r[0]!, O)).toEqual({ dim: true })
+      expect(styleAt(r[0]!, ON)).toEqual({ c: 'ok' })
+      expect(styleAt(r[0]!, OFF)).toEqual({ dim: true })
     })
   }
 
-  test('header: plan bars are green, yellow from 50% used, red from 80%; the pill and figure share the colour', () => {
+  test('header: plan bars are green, yellow from 50% used, red from 80%; the lit dots and figure share the colour', () => {
     const r = rowsOf({ ...METERED, account: { fiveHour: 85, week: 50 } }, 80)[0]!
-    expect(r.text().endsWith(`5h ${L}████${R} 85% · wk ${L}█${R}${O}${O}${O2} 50%`)).toBe(true)
-    expect(styleAt(r, `${L}████${R}`)).toEqual({ c: 'fail' })
+    expect(r.text().endsWith(`5h ${ON.repeat(6)} 85% · wk ${ON.repeat(3)}${OFF.repeat(3)} 50%`)).toBe(true)
+    expect(styleAt(r, ON.repeat(6))).toEqual({ c: 'fail' })
     expect(styleAt(r, '85%')).toEqual({ c: 'fail' })
-    expect(styleAt(r, `${L}█${R}`)).toEqual({ c: 'wait' })
+    expect(styleAt(r, `${ON.repeat(3)}${OFF.repeat(3)}`)).toEqual({ c: 'wait' })
     expect(styleAt(r, '50%')).toEqual({ c: 'wait' })
     expect(styleAt(r, 'wk')).toEqual({ dim: true })
-    expect(r.segs().some(x => x.s.c !== undefined && (x.t.includes(O) || x.t.includes(O2)))).toBe(false)
+    expect(r.segs().some(x => x.s.c !== undefined && x.t.includes(OFF))).toBe(false)
   })
 
   test('header: narrowing drops the bars, then the week', () => {
     const at = (w: number) => rowsOf(METERED, w)[0]!.text().trim()
-    expect(at(30)).toBe(`5h ${L}${R}${O}${O}${O}${O2} 5% · wk ${L}${R}${O}${O}${O}${O2} 18%`)
+    expect(at(30)).toBe(`5h ${ON}${OFF.repeat(5)} 5% · wk ${ON.repeat(2)}${OFF.repeat(4)} 18%`)
     expect(at(26)).toBe('5h 5% · wk 18%')
     expect(at(14)).toBe('5h 5%')
     expect(
@@ -165,7 +162,7 @@ describe('colour thresholds', () => {
     expect(
       rowsOf({ ...METERED, account: { fiveHour: 23.5 } }, 80)[0]!
         .text()
-        .endsWith(`5h ${L}${R}${O}${O}${O}${O2} 23.5%`),
+        .endsWith(`5h ${ON.repeat(2)}${OFF.repeat(4)} 23.5%`),
     ).toBe(true)
   })
 })
@@ -176,36 +173,36 @@ describe('the bar', () => {
       .map(x => x.t)
       .join('')
 
-  test('session bar at 0, 2, 28, 50 and 100%: outline, a lone pill, then the pill grows; always eight cells', () => {
-    expect([0, 2, 28, 50, 100].map(p => drawn(p, 8))).toEqual([
-      `${O0}${O}${O}${O}${O}${O}${O}${O2}`,
-      `${L}${R}${O}${O}${O}${O}${O}${O2}`,
-      `${L}█${R}${O}${O}${O}${O}${O2}`,
-      `${L}██${R}${O}${O}${O}${O2}`,
-      `${L}██████${R}`,
+  test('session bar at 0, 2, 28, 50 and 100%: all dim, then lit dots grow; always five cells', () => {
+    expect([0, 2, 28, 50, 100].map(p => drawn(p, 5))).toEqual([
+      OFF.repeat(5),
+      ON + OFF.repeat(4),
+      ON.repeat(2) + OFF.repeat(3),
+      ON.repeat(3) + OFF.repeat(2),
+      ON.repeat(5),
     ])
-    for (let p = 0; p <= 100; p++) expect(cellLen(drawn(p, 8))).toBe(8)
+    for (let p = 0; p <= 100; p++) expect(cellLen(drawn(p, 5))).toBe(5)
   })
 
-  test("header bar: six cells; a pill one short of full leaves only the outline's right end", () => {
+  test('header bar: six cells, one lit dot per sixth, any use lights one', () => {
     expect([0, 1, 50, 83, 100].map(p => drawn(p, 6))).toEqual([
-      `${O0}${O}${O}${O}${O}${O2}`,
-      `${L}${R}${O}${O}${O}${O2}`,
-      `${L}█${R}${O}${O}${O2}`,
-      `${L}███${R}${O2}`,
-      `${L}████${R}`,
+      OFF.repeat(6),
+      ON + OFF.repeat(5),
+      ON.repeat(3) + OFF.repeat(3),
+      ON.repeat(5) + OFF,
+      ON.repeat(6),
     ])
     for (let p = 0; p <= 100; p++) expect(cellLen(drawn(p, 6))).toBe(6)
   })
 
-  test('the pill takes the tone, the outline is dim, and nothing draws at 0% or past 100%', () => {
-    expect(bar(0, 8, usageTone(0))).toEqual([{ t: `${O0}${O}${O}${O}${O}${O}${O}${O2}`, s: { dim: true } }])
-    expect(bar(100, 8, usageTone(100))).toEqual([{ t: `${L}██████${R}`, s: { c: 'fail' } }])
-    expect(bar(150, 8, usageTone(150)).map(x => x.t)).toEqual([`${L}██████${R}`])
+  test('lit dots take the tone, the rest are dim, and nothing more draws past 100%', () => {
+    expect(bar(0, 5, usageTone(0))).toEqual([{ t: OFF.repeat(5), s: { dim: true } }])
+    expect(bar(100, 5, usageTone(100))).toEqual([{ t: ON.repeat(5), s: { c: 'fail' } }])
+    expect(bar(150, 5, usageTone(150)).map(x => x.t)).toEqual([ON.repeat(5)])
   })
 
-  test('the Nerd Font glyphs are one cell each, so the right border stays put', () => {
-    expect([L, R, O0, O, O2].map(cellLen)).toEqual([1, 1, 1, 1, 1])
-    expect(cellLen(clip(`${L}██${R}`, 3))).toBe(3)
+  test('the dots are one cell each, so the right border stays put', () => {
+    expect([ON, OFF].map(cellLen)).toEqual([1, 1])
+    expect(cellLen(clip(ON.repeat(5), 3))).toBe(3)
   })
 })

@@ -5,7 +5,7 @@ import { cellLen } from './text'
 
 export type Part = { t: string; s: Sty }
 
-export const METER_CELLS = 8
+export const METER_CELLS = 5
 export const USAGE_CELLS = 6
 export const WARN_AT = 50
 export const FAIL_AT = 80
@@ -17,21 +17,17 @@ export function usageTone(percent: number): Sty {
   return { c: percent >= FAIL_AT ? 'fail' : percent >= WARN_AT ? 'wait' : 'ok' }
 }
 
-/** Any use lights a cell, so 28% shows three of eight. */
+/** Any use lights a cell, so 28% shows two of five. */
 export function filledCells(percent: number, cells = METER_CELLS): number {
   return Math.max(0, Math.min(cells, Math.ceil((cells * percent) / 100)))
 }
 
-/** A solid pill for the used share inside a dim outline (Nerd Font glyphs); every fill level is `cells` wide. */
+/** `•••··`: lit dots in the tone, the rest dim; every fill level is `cells` wide. */
 export function bar(percent: number, cells: number, tone: Sty): Part[] {
-  const lit = filledCells(percent, cells)
-  // A pill needs both caps; a lone cap reads as a broken outline.
-  const on = lit ? Math.min(cells, Math.max(2, lit)) : 0
+  const on = filledCells(percent, cells)
   const out: Part[] = []
-  if (on) out.push({ t: `\ue0b6${'█'.repeat(on - 2)}\ue0b4`, s: tone })
-  const off = cells - on
-  const ring = Array.from({ length: off }, (_, i) => (i === off - 1 ? '\uee02' : i === 0 && !on ? '\uee00' : '\uee01'))
-  if (off) out.push({ t: ring.join(''), s: DIM })
+  if (on) out.push({ t: '•'.repeat(on), s: tone })
+  if (on < cells) out.push({ t: '·'.repeat(cells - on), s: DIM })
   return out
 }
 
