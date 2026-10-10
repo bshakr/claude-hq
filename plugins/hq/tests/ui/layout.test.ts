@@ -264,7 +264,7 @@ describe('targets', () => {
     const rows = layout(ACTIVE, view({ rows: 90 })).rows
     // The agents divider between them belongs to no item.
     const group = rows.filter(r => r.item === 's:s-st-admin')
-    expect(group.length).toBe(7)
+    expect(group.length).toBe(5)
     expect(group.every(r => r.text().startsWith(' │') && r.text().endsWith('│'))).toBe(true)
     expect(group.filter(r => r.head).length).toBe(1)
   })
@@ -462,7 +462,7 @@ describe('other sessions: one card per tmux group', () => {
   test('sessions of one group share a card, a blank between them, a bare rule after one with sections', () => {
     const got = lines(ACTIVE, { rows: 90 })
     const at = got.findIndex(l => l.includes('╭─ acme-store'))
-    expect(got.slice(at, at + 17)).toEqual([
+    expect(got.slice(at, at + 15)).toEqual([
       ' ╭─ acme-store ───────────────────────────────────────────────────────────────╮',
       ' │  st-api                           1 agent · 1 PR needs you · ◆ waiting 2m  │',
       ' │  api · ENG-12 · 3/7 · Rewriting PR claim rules                             │',
@@ -471,10 +471,8 @@ describe('other sessions: one card per tmux group', () => {
       ' │                                                                            │',
       ' ├─ agents ───────────────────────────────────────────────────────────────────┤',
       ' │  ✢ Implement ENG-1941 card pairing guard                       opus · 12m  │',
-      ' │    Run ledger specs                                                        │',
       ' │  ✢ Review the members table PR                               sonnet · 20m  │',
       ' │  ✢ Capture screenshot pairs                                           25m  │',
-      ' │    editing compare.html                                                    │',
       ' │    +1 more                                                                 │',
       ' ├────────────────────────────────────────────────────────────────────────────┤',
       ' │  st-docs                                                          idle 1h  │',
@@ -483,21 +481,35 @@ describe('other sessions: one card per tmux group', () => {
     ])
   })
 
-  test("another session's agent inside a long call reads waiting, its glyph steady", () => {
-    const other = lines(
-      {
-        ...ACTIVE,
-        others: ACTIVE.others.map(g => ({
-          ...g,
-          sessions: g.sessions.map(x =>
-            x.agents ? { ...x, agents: [{ ...x.agents[0]!, waiting: { text: 'Run the spec suite', since: ACTIVE.now - 9 * 60_000 } }] } : x,
-          ),
-        })),
-      },
-      { rows: 90 },
-    )
+  test("another session's agent inside a long call keeps one line, its glyph steady", () => {
+    const m: HqModel = {
+      ...ACTIVE,
+      others: ACTIVE.others.map(g => ({
+        ...g,
+        sessions: g.sessions.map(x =>
+          x.agents ? { ...x, agents: [{ ...x.agents[0]!, waiting: { text: 'Run the spec suite', since: ACTIVE.now - 9 * 60_000 } }] } : x,
+        ),
+      })),
+    }
+    const other = lines(m, { rows: 90 })
     const at = other.findIndex(l => l.includes('✢ Implement ENG-1941'))
-    expect(other[at + 1]!.startsWith(' │    waiting · Run the spec suite · 9m')).toBe(true)
+    expect(other[at + 1]).toMatch(/^ (│ {4}\+\d+ more|[├╰]─)/)
+    expect(other.some(l => l.includes('Run the spec suite'))).toBe(false)
+    // Phase 1 is the pulse's dim step: only a working agent takes it.
+    const glyph = layout(m, view({ rows: 90, phase: 1 }))
+      .rows.filter(r => r.text().includes('Implement ENG-1941'))
+      .flatMap(r => r.segs())
+      .find(x => x.t === '✢')!.s
+    expect(glyph).toEqual({ c: 'opus' })
+  })
+
+  test("another session's agents are one line each; this session's keep their detail line", () => {
+    const got = lines(KINDS, { rows: 30, width: 72 })
+    const mine = got.findIndex(l => l.includes('✢ Implement ledger refund reconcile'))
+    expect(got[mine + 1]!.startsWith(' │    Edit app/ledger/refund.rb')).toBe(true)
+    const theirs = got.findIndex(l => l.includes('✢ Adversarial review: candidate build'))
+    expect(got[theirs + 1]!.startsWith(' ╰─')).toBe(true)
+    expect(got.some(l => l.includes('reading pipeline.rb'))).toBe(false)
   })
 })
 

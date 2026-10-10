@@ -609,7 +609,7 @@ function sessionCard(m: HqModel, x0: Ctx): Row[] {
 
 const OTHER_AGENTS_SHOWN = 3
 
-/** A session's running subagents under it: at most three, newest first, then "+N more". */
+/** A session's running subagents under it, one line each: at most three, newest first, then "+N more". */
 function otherAgentRows(s: OtherSessionVM, under: () => Row, x: Ctx): Row[] {
   const { IW, now } = x
   const gl = (t: string) => expandIds(t, s.glosses)
@@ -626,11 +626,6 @@ function otherAgentRows(s: OtherSessionVM, under: () => Row, x: Ctx): Row[] {
     const room = rightPart(r, 2, tries.find(t => IW - 2 - cellLen(t) - 2 >= 12) ?? time)
     r.put(2, clip(gl(a.title), room))
     out.push(r)
-    const d = under()
-    if (a.waiting) d.put(2, waitingLine(gl(a.waiting.text), now - a.waiting.since, IW - 2), DIM)
-    else if (a.doing) d.put(2, clip(gl(a.doing), IW - 2), DIM)
-    else continue
-    out.push(d)
   }
   if (more > 0) {
     const r = under()
