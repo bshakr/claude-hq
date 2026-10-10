@@ -5,48 +5,49 @@ import { cellLen } from './text'
 
 export type Part = { t: string; s: Sty }
 
-export const METER_CELLS = 5
+export const METER_CELLS = 8
+export const USAGE_CELLS = 6
 export const WARN_AT = 50
 export const FAIL_AT = 80
 
 const DIM: Sty = { dim: true }
 
-/** As the user's status line colours by what remains: ≤20% left fails, ≤50% left warns, else quiet. */
+/** As the user's status line colours by what remains: green, yellow from WARN_AT, red from FAIL_AT. */
 export function usageTone(percent: number): Sty {
-  if (percent >= FAIL_AT) return { c: 'fail' }
-  if (percent >= WARN_AT) return { c: 'wait' }
-  return DIM
+  return { c: percent >= FAIL_AT ? 'fail' : percent >= WARN_AT ? 'wait' : 'ok' }
 }
 
-/** Any use lights a cell, so 28% shows two of five. */
+/** Any use lights a cell, so 28% shows three of eight. */
 export function filledCells(percent: number, cells = METER_CELLS): number {
   return Math.max(0, Math.min(cells, Math.ceil((cells * percent) / 100)))
 }
 
-/** `▰▰▱▱▱ 28%` as parts, widest first, then `28%` alone; none without a figure. */
+/** A solid pill for the used share inside a dim outline (Nerd Font glyphs); every fill level is `cells` wide. */
+export function bar(percent: number, cells: number, tone: Sty): Part[] {
+  const lit = filledCells(percent, cells)
+  // A pill needs both caps; a lone cap reads as a broken outline.
+  const on = lit ? Math.min(cells, Math.max(2, lit)) : 0
+  const out: Part[] = []
+  if (on) out.push({ t: `\ue0b6${'█'.repeat(on - 2)}\ue0b4`, s: tone })
+  const off = cells - on
+  const ring = Array.from({ length: off }, (_, i) => (i === off - 1 ? '\uee02' : i === 0 && !on ? '\uee00' : '\uee01'))
+  if (off) out.push({ t: ring.join(''), s: DIM })
+  return out
+}
+
+/** The bar and percent as parts, widest first, then the percent alone; none without a figure. */
 export function meterParts(ctx: ContextUsage | undefined): { full: Part[]; pct: Part[] } {
   if (!ctx) return { full: [], pct: [] }
   const tone = usageTone(ctx.percent)
-  const on = filledCells(ctx.percent)
   const pct: Part[] = [
     { t: '  ', s: {} },
     { t: `${ctx.percent}%`, s: tone },
   ]
-  const full: Part[] = [{ t: '  ', s: {} }]
-  if (on) full.push({ t: '▰'.repeat(on), s: tone })
-  if (on < METER_CELLS) full.push({ t: '▱'.repeat(METER_CELLS - on), s: DIM })
-  full.push({ t: ` ${ctx.percent}%`, s: tone })
+  const full: Part[] = [{ t: '  ', s: {} }, ...bar(ctx.percent, METER_CELLS, tone), { t: ` ${ctx.percent}%`, s: tone }]
   return { full, pct }
 }
 
-export const USAGE_CELLS = 6
-
-/** Plan usage as the status line colours it: green, yellow from WARN_AT, red from FAIL_AT. */
-export function planTone(percent: number): Sty {
-  return { c: percent >= FAIL_AT ? 'fail' : percent >= WARN_AT ? 'wait' : 'ok' }
-}
-
-/** `5h ▰▱▱▱▱▱ 10% · wk ▰▰▱▱▱▱ 20%`; `bars: false` drops the cells. */
+/** `5h <bar> 10% · wk <bar> 20%`; `bars: false` drops the bars. */
 export function accountParts(a: AccountUsage | undefined, bars = true): Part[] {
   if (!a) return []
   const out: Part[] = []
@@ -56,14 +57,9 @@ export function accountParts(a: AccountUsage | undefined, bars = true): Part[] {
   ] as const) {
     if (v === undefined) continue
     if (out.length) out.push({ t: ' · ', s: DIM })
-    const tone = planTone(v)
+    const tone = usageTone(v)
     out.push({ t: `${label} `, s: DIM })
-    if (bars) {
-      const on = filledCells(v, USAGE_CELLS)
-      if (on) out.push({ t: '▰'.repeat(on), s: tone })
-      if (on < USAGE_CELLS) out.push({ t: '▱'.repeat(USAGE_CELLS - on), s: DIM })
-      out.push({ t: ' ', s: {} })
-    }
+    if (bars) out.push(...bar(v, USAGE_CELLS, tone), { t: ' ', s: {} })
     out.push({ t: `${v}%`, s: tone })
   }
   return out
