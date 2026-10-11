@@ -2,6 +2,10 @@
 
 Each release has a section headed `## X.Y.Z`; the release workflow publishes that section as the GitHub release notes.
 
+## 0.1.8
+
+- Meter dots are smaller circles side by side (`∙∙∙∙∙`), back to 5 cells for a session and 6 per plan figure.
+
 ## 0.1.7
 
 - Meter circles sit a space apart (`● ● ● ● ●`) instead of touching.
