@@ -38,7 +38,7 @@ The pane opens by itself once per session when the terminal is at least 144 colu
 
 | Tool | Required? | Without it |
 | --- | --- | --- |
-| Claude Code 2.1.295+ | yes | HQ does not load (the plugin API is early access) |
+| Claude Code 2.1.295+ | yes | HQ does not load; run `claude update` |
 | `git` | yes | no PRs are tied to a session |
 | `gh`, logged in | yes, for PRs | PRs show without titles, checks or merge state; the watchers exit |
 | `jq` | recommended | `pr-ci-wait` refuses to run; HQ polls `gh` itself |
