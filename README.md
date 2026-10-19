@@ -2,7 +2,7 @@
 
 **One pane for every Claude Code session on your machine, and the one that needs you.**
 
-<p align="center"><img src="docs/hq.png" alt="The HQ pane: one card per Claude Code session, with what each is doing and which one needs you" width="560"></p>
+<p align="center"><img src="docs/hq-demo.gif" alt="HQ in use: one card per Claude Code session; the one waiting on you turns yellow and Enter jumps to its tab" width="760"></p>
 
 ## Features
 
