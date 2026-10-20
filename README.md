@@ -107,7 +107,12 @@ The `/hq` toggles override `wake`, `notify` and `summaries` on one machine until
 
 ## What it reads and calls
 
-HQ reads Claude Code's local session files under `~/.claude/` and each session writes a short summary of itself to `~/.claude/hq/sessions/` for the others to read. For goal lines and ticket glosses it sends up to 6,000 characters of a session's prompts and titles to Haiku through your own Claude account; set `summaries` to `false` or run `/hq summaries off` to stop all model calls. Once a day HQ fetches its published `plugin.json` from raw.githubusercontent.com to see whether a newer version is out; set `updateCheck` to `false`, or set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, to stop it. PR state comes from `gh` (and the watchers' files in `~/.cache/pr-watch/`), ticket titles from `linear` when installed. No telemetry; nothing else leaves your machine.
+HQ reads Claude Code's local session files under `~/.claude/` and each session writes a short summary of itself to `~/.claude/hq/sessions/` for the others to read. For goal lines and ticket glosses it sends up to 6,000 characters of a session's prompts and titles to Haiku through your own Claude account; set `summaries` to `false` or run `/hq summaries off` to stop all model calls. Goal lines refresh every 30 minutes while a session is busy and has new content. Once a day HQ fetches its published `plugin.json` from raw.githubusercontent.com to see whether a newer version is out; set `updateCheck` to `false`, or set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, to stop it. PR state comes from `gh` (and the watchers' files in `~/.cache/pr-watch/`), ticket titles from `linear` when installed. No telemetry; nothing else leaves your machine.
+
+## FAQ
+
+**How is this different from claude-hud?**
+[claude-hud](https://github.com/jarrodwatts/claude-hud) shows context, agents and tools for the one session you're in. HQ looks across every Claude Code session on your machine at once: it shows which one is waiting on you, jumps to its terminal with one press, and starts a turn in a session when a PR it owns goes red, conflicts or falls behind.
 
 ## Contributing
 
